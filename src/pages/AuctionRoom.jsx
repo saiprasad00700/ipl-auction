@@ -61,6 +61,7 @@ const AuctionRoom = () => {
       joinAuction,
       joinRoomDb,
       endPlayerAuction,
+      decideRetention,
       pauseAuction,
       resumeAuction,
       endAuction,
@@ -1652,6 +1653,41 @@ const AuctionRoom = () => {
                   </div>
                </motion.div>
             )}
+         </AnimatePresence>
+
+         <AnimatePresence>
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && (() => {
+               const offer = displayAuctionState.retentionOffer;
+               const eligible = offer.eligibleUserId === user?.uid;
+               const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
+               const secondsLeft = Math.max(0, Math.ceil((Number(offer.expiresAt) - getSyncedTime()) / 1000));
+               return (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                     <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
+                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{eligible ? 'Retention decision required' : 'Retention offer in progress'}</div>
+                        <div className="flex items-center gap-4 mb-5">
+                           <img src={player?.image} alt={player?.name || 'Player'} className="w-20 h-20 object-contain rounded-2xl bg-white/5 border border-white/10" />
+                           <div>
+                              <h2 className="text-xl font-black text-white">{player?.name || 'Player'}</h2>
+                              <p className="text-sm text-gray-400">Winning bid: <span className="text-yellow-400 font-black">₹{Number(offer.bid).toFixed(2)} Cr</span></p>
+                              <p className="text-xs text-gray-500 mt-1">Original franchise: {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId}</p>
+                           </div>
+                        </div>
+                        {eligible ? (
+                           <>
+                              <p className="text-sm text-gray-300 mb-4">Use one of your remaining retention cards to acquire this player at the winning bid. Your decision window closes in <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                 <button onClick={() => decideRetention(id, 'accept').catch((e) => setError(e.message))} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3">Retain player</button>
+                                 <button onClick={() => decideRetention(id, 'decline').catch((e) => setError(e.message))} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3">Decline</button>
+                              </div>
+                           </>
+                        ) : (
+                           <p className="text-sm text-gray-300">Only the original franchise manager can decide. The current winning bid is on hold for up to five seconds; other managers cannot accept or decline this offer.</p>
+                        )}
+                     </motion.div>
+                  </motion.div>
+               );
+            })()}
          </AnimatePresence>
 
          <AnimatePresence>
