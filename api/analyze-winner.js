@@ -89,7 +89,25 @@ ${JSON.stringify(normalized)}`;
     if (!response.ok) {
       const detail = await response.text();
       console.error("Gemini ranking request failed", response.status, detail.slice(0, 1000));
-      const error = { error: "AI ranking service failed. Please retry the analysis." };
+      let providerMessage = "";
+      try {
+        providerMessage = getText(JSON.parse(detail)?.error?.message).slice(0, 300);
+      } catch {
+        providerMessage = "";
+      }
+      let message;
+      if (response.status === 401 || response.status === 403) {
+        message = `Gemini rejected the server API key or its permissions (HTTP ${response.status}). Check GEMINI_API_KEY and Generative Language API access in Render/Google AI Studio.`;
+      } else if (response.status === 429) {
+        message = "Gemini quota or rate limit reached (HTTP 429). Check the API quota/billing and retry after it resets.";
+      } else if (response.status === 404) {
+        message = "The configured Gemini model/API endpoint was not found (HTTP 404). Check model availability for this API key.";
+      } else if (response.status === 400) {
+        message = `Gemini rejected the analysis request (HTTP 400)${providerMessage ? `: ${providerMessage}` : "."}`;
+      } else {
+        message = `Gemini analysis request failed (HTTP ${response.status})${providerMessage ? `: ${providerMessage}` : ". Check the server logs and API configuration."}`;
+      }
+      const error = { error: message };
       if (res?.status) return res.status(502).json(error);
       return json(502, error);
     }
