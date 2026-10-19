@@ -27,26 +27,21 @@ const toPlayer = (squadItem, playerCatalog) => {
 };
 
 /**
- * Conservative role-balanced XI fallback. Uses the actual franchise squad only,
- * prefers keeper + top-order coverage + all-rounders + both pace/spin when role
- * metadata permits, then fills remaining slots with the best catalog ratings.
+ * Role-balanced XI fallback. Uses only the actual franchise squad and role metadata;
+ * it does not depend on artificial player ratings.
  */
 export function autoSelectBestXI(squad, playerCatalog = []) {
   const players = (Array.isArray(squad) ? squad : [])
     .map((item) => toPlayer(item, playerCatalog))
     .filter(Boolean);
   const unique = [...new Map(players.map((p) => [p.id, p])).values()];
-  const rating = (p) => {
-    const raw = Number(p.rating ?? p.overallRating ?? p.overall ?? p.skillRating ?? 0);
-    return Number.isFinite(raw) ? raw : 0;
-  };
   const selected = [];
   const addBest = (predicate, categoryLimit) => {
     const alreadySelected = selected.filter(predicate).length;
     const needed = Math.max(0, categoryLimit - alreadySelected);
     const candidates = unique
       .filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
-      .sort((a, b) => rating(b) - rating(a));
+      .sort((a, b) => unique.indexOf(a) - unique.indexOf(b));
     selected.push(...candidates.slice(0, needed));
   };
 
@@ -58,7 +53,7 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
   const impact = unique
     .filter((p) => !startingXI.some((s) => s.id === p.id))
-    .sort((a, b) => rating(b) - rating(a))[0] || null;
+    [0] || null;
 
   return { startingXI, impactPlayer: impact, autoSelected: true };
 }
