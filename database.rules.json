@@ -56,7 +56,7 @@
           // on any client, so this cannot be host-only.
           "status": {
             ".write": "auth != null",
-            ".validate": "newData.val() == 'waiting' || newData.val() == 'active' || newData.val() == 'completed'"
+            ".validate": "newData.val() == 'waiting' || newData.val() == 'active' || newData.val() == 'paused' || newData.val() == 'awaiting_xi' || newData.val() == 'analyzing' || newData.val() == 'analysis_failed' || newData.val() == 'completed'"
           }
 
           // Everything else under room (bannedPlayers, auctionType, isPublic,
