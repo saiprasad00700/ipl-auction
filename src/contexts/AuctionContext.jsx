@@ -423,7 +423,7 @@ export const AuctionProvider = ({ children }) => {
           if (!currentData || currentData.status !== 'processing_sale') return;
           const offer = currentData.retentionOffer;
           if (!offer || offer.status !== 'pending') return;
-          if (offer.decision === 'accept' && getSyncedTime() <= Number(offer.expiresAt)) {
+          if (offer.decision === 'accept' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
             currentData.highBidderId = offer.eligibleUserId;
             currentData.highBidderName = offer.eligibleTeamName;
             currentData.highBidderTeamId = offer.originalFranchiseId;
