@@ -1427,6 +1427,23 @@ export const AuctionProvider = ({ children }) => {
     }
   }, [getSyncedTime, flushAuctionToFirestore]);
 
+  // Allow a manager to retry a failed AI analysis after fixing the server API configuration.
+  // A transaction ensures only one connected client can reclaim the analysis phase.
+  const retryWinnerAnalysis = useCallback(async (roomId) => {
+    const roomRef = ref(rtdb, `auctions/${roomId}/room`);
+    const retryClaim = await runTransactionRtdb(roomRef, (current) => {
+      if (!current || current.status !== 'analysis_failed') return;
+      return {
+        ...current,
+        status: 'awaiting_xi',
+        winnerAnalysisStatus: 'collecting',
+        winnerAnalysisError: null
+      };
+    });
+    if (!retryClaim.committed) return;
+    await finalizeWinnerAnalysis(roomId);
+  }, [finalizeWinnerAnalysis]);
+
 
 
   // ─── Bot Management & Bidding Engine ───
@@ -1704,6 +1721,7 @@ export const AuctionProvider = ({ children }) => {
     endAuction,
     submitPlayingXI,
     finalizeWinnerAnalysis,
+    retryWinnerAnalysis,
     sendMessage,
     messages,
     addBotTeam,
