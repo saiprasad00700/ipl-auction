@@ -67,6 +67,7 @@ const AuctionRoom = () => {
       endAuction,
       submitPlayingXI,
       finalizeWinnerAnalysis,
+      retryWinnerAnalysis,
       sendMessage,
       messages,
       updateRoomSettings,
@@ -91,6 +92,8 @@ const AuctionRoom = () => {
    const [selectedImpactId, setSelectedImpactId] = useState('');
    const [isSubmittingXI, setIsSubmittingXI] = useState(false);
    const [xiSubmitError, setXiSubmitError] = useState('');
+   const [xiSubmitSuccess, setXiSubmitSuccess] = useState(false);
+   const [isRetryingAnalysis, setIsRetryingAnalysis] = useState(false);
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
@@ -149,6 +152,19 @@ const AuctionRoom = () => {
       return player ? { ...player, bid: typeof item === 'object' ? item.bid : 0 } : null;
    }).filter(Boolean), [team?.squad]);
 
+   const savedPlayingXI = team?.playingXI;
+   const xiAlreadySubmitted = xiSubmitSuccess || Boolean(
+      savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer
+   );
+
+   // Restore a previously submitted XI after a refresh/rejoin.
+   useEffect(() => {
+      if (!savedPlayingXI?.submittedAt) return;
+      setSelectedXIIds((savedPlayingXI.startingXI || []).map((player) => typeof player === 'string' ? player : player?.id).filter(Boolean));
+      setSelectedImpactId(typeof savedPlayingXI.impactPlayer === 'string' ? savedPlayingXI.impactPlayer : savedPlayingXI.impactPlayer?.id || '');
+      setXiSubmitSuccess(true);
+   }, [savedPlayingXI?.submittedAt]);
+
    const submitXI = async () => {
       setXiSubmitError('');
       setIsSubmittingXI(true);
@@ -156,10 +172,23 @@ const AuctionRoom = () => {
          const startingXI = selectedXIIds.map((playerId) => mySquadPlayers.find((p) => p.id === playerId)).filter(Boolean);
          const impactPlayer = mySquadPlayers.find((p) => p.id === selectedImpactId);
          await submitPlayingXI(id, startingXI, impactPlayer);
+         setXiSubmitSuccess(true);
       } catch (err) {
          setXiSubmitError(err?.message || 'Could not submit your Playing XI.');
       } finally {
          setIsSubmittingXI(false);
+      }
+   };
+
+   const retryAnalysis = async () => {
+      setIsRetryingAnalysis(true);
+      try {
+         await retryWinnerAnalysis(id);
+      } catch (err) {
+         setError(err?.message || 'Could not retry AI analysis.');
+         setTimeout(() => setError(''), 5000);
+      } finally {
+         setIsRetryingAnalysis(false);
       }
    };
 
@@ -1871,7 +1900,14 @@ const AuctionRoom = () => {
                   <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
                   <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
                   <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
-                  <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>
+                  {xiAlreadySubmitted ? (
+                     <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">
+                        <p className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> Playing XI submitted successfully</p>
+                        <p className="text-xs mt-1 text-emerald-200/80">Your 11 starters and Impact Player are saved. Waiting for the other franchises or the 2-minute deadline.</p>
+                     </div>
+                  ) : (
+                     <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                      {mySquadPlayers.map((player) => {
                         const isStarter = selectedXIIds.includes(player.id);
@@ -1879,8 +1915,8 @@ const AuctionRoom = () => {
                         return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-orange-400/40 bg-orange-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
                            <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
                            <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
-                           <button type="button" disabled={isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
-                           <button type="button" disabled={isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
+                           <button type="button" disabled={xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
+                           <button type="button" disabled={xiAlreadySubmitted || isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
                         </div>;
                      })}
                   </div>
@@ -1888,13 +1924,13 @@ const AuctionRoom = () => {
                   {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
                      <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
-                     <button type="button" onClick={submitXI} disabled={isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : 'Submit Playing XI'}</button>
+                     <button type="button" onClick={submitXI} disabled={xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
                   </div>
                </div>
             </div>
          )}
          {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
-         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'} Check server API configuration before retrying.</p></div></div>}
+         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
 
          <ConfirmDialog
             isOpen={showEndConfirm}
