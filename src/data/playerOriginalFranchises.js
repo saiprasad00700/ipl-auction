@@ -11,7 +11,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_104: "MI", // Hardik Pandya
   p_129: "MI", // Rohit Sharma
   p_166: "MI", // Tilak Varma
-  p_138: "MI", // Tim David
+  p_138: "RCB", // Tim David
   p_140: "MI", // Trent Boult
   p_240: "MI", // Naman Dhir
   p_186: "MI", // Ryan Rickelton
@@ -70,7 +70,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_115: "PBKS", // Marcus Stoinis
   p_131: "RR", // Sam Curran
   p_145: "PBKS", // Yuzvendra Chahal
-  p_216: "PBKS", // Ashutosh Sharma
+  p_216: "DC", // Ashutosh Sharma
   p_243: "PBKS", // Prabhsimran Singh
   p_245: "PBKS", // Priyansh Arya
   p_254: "PBKS", // Shashank Singh
@@ -99,7 +99,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_139: "SRH", // Travis Head
   p_146: "SRH", // Abhishek Sharma
   p_196: "SRH", // Nitish Kumar Reddy
-  p_223: "SRH", // Gurjapneet Singh
+  p_223: "CSK", // Gurjapneet Singh
   p_227: "SRH", // Harsh Dubey
   p_270: "SRH", // Zeeshan Ansari
   p_402: "SRH", // Salil Arora
@@ -116,7 +116,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_192: "GT", // Jayant Yadav
   p_197: "GT", // Sai Kishore
   p_200: "GT", // Shahrukh Khan
-  p_237: "GT", // Mohsin Khan
+  p_237: "LSG", // Mohsin Khan
   p_298: "SRH", // Shivam Mavi
   p_406: "MI", // Mohammed Izhar
 
