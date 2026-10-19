@@ -64,6 +64,8 @@ const AuctionRoom = () => {
       pauseAuction,
       resumeAuction,
       endAuction,
+      submitPlayingXI,
+      finalizeWinnerAnalysis,
       sendMessage,
       messages,
       updateRoomSettings,
@@ -84,6 +86,10 @@ const AuctionRoom = () => {
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
    const [isEnding, setIsEnding] = useState(false);
+   const [selectedXIIds, setSelectedXIIds] = useState([]);
+   const [selectedImpactId, setSelectedImpactId] = useState('');
+   const [isSubmittingXI, setIsSubmittingXI] = useState(false);
+   const [xiSubmitError, setXiSubmitError] = useState('');
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
@@ -105,6 +111,36 @@ const AuctionRoom = () => {
    }, [currentAuction?.currentAuction?.currentBid, optimisticState]);
 
    const displayAuctionState = optimisticState || currentAuction?.currentAuction;
+
+   useEffect(() => {
+      if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
+      const tick = () => {
+         if (getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline)) finalizeWinnerAnalysis(id).catch(() => {});
+      };
+      tick();
+      const timer = setInterval(tick, 1000);
+      return () => clearInterval(timer);
+   }, [currentAuction?.status, currentAuction?.xiSubmissionDeadline, finalizeWinnerAnalysis, getSyncedTime, id]);
+
+   const mySquadPlayers = useMemo(() => (team?.squad || []).map((item) => {
+      const playerId = typeof item === 'string' ? item : item?.id;
+      const player = IPL_PLAYERS.find((p) => p.id === playerId);
+      return player ? { ...player, bid: typeof item === 'object' ? item.bid : 0 } : null;
+   }).filter(Boolean), [team?.squad]);
+
+   const submitXI = async () => {
+      setXiSubmitError('');
+      setIsSubmittingXI(true);
+      try {
+         const startingXI = selectedXIIds.map((playerId) => mySquadPlayers.find((p) => p.id === playerId)).filter(Boolean);
+         const impactPlayer = mySquadPlayers.find((p) => p.id === selectedImpactId);
+         await submitPlayingXI(id, startingXI, impactPlayer);
+      } catch (err) {
+         setXiSubmitError(err?.message || 'Could not submit your Playing XI.');
+      } finally {
+         setIsSubmittingXI(false);
+      }
+   };
 
    // Real-time team ratings calculated entirely in browser memory (0 DB / infra cost)
    const liveTeamRatings = useMemo(() => {
@@ -1775,6 +1811,37 @@ const AuctionRoom = () => {
                </motion.div>
             )}
          </AnimatePresence>
+
+         {currentAuction?.status === 'awaiting_xi' && (
+            <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+               <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#101010] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+                  <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
+                  <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
+                  <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
+                  <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                     {mySquadPlayers.map((player) => {
+                        const isStarter = selectedXIIds.includes(player.id);
+                        const isImpact = selectedImpactId === player.id;
+                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-orange-400/40 bg-orange-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                           <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
+                           <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
+                           <button type="button" disabled={isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
+                           <button type="button" disabled={isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
+                        </div>;
+                     })}
+                  </div>
+                  {mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available in this view. The system will attempt automatic selection at the deadline.</p>}
+                  {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
+                     <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
+                     <button type="button" onClick={submitXI} disabled={isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : 'Submit Playing XI'}</button>
+                  </div>
+               </div>
+            </div>
+         )}
+         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
+         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'} Check server API configuration before retrying.</p></div></div>}
 
          <ConfirmDialog
             isOpen={showEndConfirm}
