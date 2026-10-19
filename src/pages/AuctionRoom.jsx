@@ -1093,11 +1093,7 @@ const AuctionRoom = () => {
                                                                   <img src={p?.image} alt={p?.name || 'Player'} className="w-5 h-5 object-contain rounded bg-white/5" />
                                                                   <div className="overflow-hidden">
                                                                      <div className="flex items-center gap-1">
-                                                                        <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5>
-                                                                        {p?.rating && (
-                                                                           <span className="text-[8px] text-amber-400/80 font-medium">★{p.rating}</span>
-                                                                        )}
-                                                                     </div>
+                                                                        <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5> </div>
                                                                   </div>
                                                                </div>
                                                                <span className="text-[9px] font-bold text-yellow-500">
