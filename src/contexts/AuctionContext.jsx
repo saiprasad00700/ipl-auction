@@ -1177,6 +1177,27 @@ export const AuctionProvider = ({ children }) => {
     }
   }, [currentAuction, user, team, getSyncedTime]);
 
+  const decideRetention = useCallback(async (roomId, decision) => {
+    if (!user?.uid || !['accept', 'decline'].includes(decision)) {
+      throw new Error('Invalid retention decision.');
+    }
+    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    const result = await runTransactionRtdb(liveRef, (currentData) => {
+      if (!currentData || currentData.status !== 'processing_sale') return;
+      const offer = currentData.retentionOffer;
+      if (!offer || offer.status !== 'pending') return;
+      if (offer.eligibleUserId !== user.uid) return;
+      if (getServerTime() > Number(offer.expiresAt)) return;
+      offer.decision = decision;
+      offer.decidedBy = user.uid;
+      offer.decidedAt = getServerTime();
+      return currentData;
+    });
+    if (!result.committed) {
+      throw new Error('This retention offer has expired or is not assigned to your franchise.');
+    }
+  }, [user]);
+
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
     if (!rtdbRoomSnap.exists()) return;
@@ -1649,6 +1670,7 @@ export const AuctionProvider = ({ children }) => {
     updateRoomSettings,
     startAuction,
     endPlayerAuction,
+    decideRetention,
     pauseAuction,
     resumeAuction,
     endAuction,
