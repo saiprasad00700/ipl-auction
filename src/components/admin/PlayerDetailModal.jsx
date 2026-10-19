@@ -1,12 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, Activity } from 'lucide-react';
+import { X, Activity } from 'lucide-react';
 
 const PlayerDetailModal = ({
   player,
   onClose,
   getRoleBadgeStyle,
-  getRatingBadgeStyle,
 }) => {
   return (
     <AnimatePresence>
@@ -70,17 +69,7 @@ const PlayerDetailModal = ({
                   </span>
                 </div>
 
-                {/* Rating + Base Price */}
-                <div className="mt-3 flex items-center gap-2">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${getRatingBadgeStyle ? getRatingBadgeStyle(player.rating) : ''}`}>
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    <span className="text-sm font-black">{player.rating}</span>
-                    <span className="text-[9px] uppercase tracking-wider opacity-60">/ 100</span>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-xs font-bold text-gray-300">
-                    Base: ₹{player.basePrice} Cr
-                  </div>
-                </div>
+                <div className="mt-3 inline-flex px-3 py-1.5 rounded-lg bg-white/5 border border-white/8 text-xs font-bold text-gray-300">Base: ₹{player.basePrice} Cr</div>
               </div>
             </div>
 
