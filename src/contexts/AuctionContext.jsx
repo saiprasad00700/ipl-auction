@@ -43,6 +43,7 @@ import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
+import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI } from '../lib/auctionWinnerRules';
 
 
 const TEAMS = [
@@ -1167,26 +1168,119 @@ export const AuctionProvider = ({ children }) => {
     ]);
   }, [getSyncedTime, user, currentAuction]);
 
+  // End the bidding phase and open the shared two-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { status: 'completed' });
-    await flushAuctionToFirestore(roomId);
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction COMPLETED by Admin`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
+    const roomRef = ref(rtdb, `auctions/${roomId}/room`);
+    const roomSnap = await get(roomRef);
+    if (!roomSnap.exists()) throw new Error('Auction room not found');
+    const roomData = roomSnap.val();
+    if (roomData.hostId !== user.uid) throw new Error('Only the host can end the auction');
+    if (roomData.status === 'awaiting_xi' || roomData.status === 'analyzing' || roomData.status === 'completed') return;
+    const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
+    await updateRtdb(roomRef, {
+      status: 'awaiting_xi',
+      xiSubmissionStartedAt: getSyncedTime(),
+      xiSubmissionDeadline: deadline,
+      winnerAnalysisStatus: 'collecting'
     });
+    await push(ref(rtdb, `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System',
+      text: 'Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+      type: 'log', timestamp: serverTimestampRtdb()
+    });
+  }, [user, currentAuction, getSyncedTime]);
 
-    // Clean up completed room node from RTDB after 5 seconds to keep RTDB size at 0MB
-    setTimeout(async () => {
-      try {
-        await remove(ref(rtdb, `auctions/${roomId}`));
-      } catch (cleanErr) {}
-    }, 5000);
-  }, [user, currentAuction, flushAuctionToFirestore]);
+  const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayer) => {
+    if (!user) throw new Error('Sign in to submit your Playing XI');
+    const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+    if (!roomSnap.exists()) throw new Error('Auction room not found');
+    const roomData = roomSnap.val();
+    if (roomData.status !== 'awaiting_xi') throw new Error('Playing XI submissions are closed');
+    if (getSyncedTime() > Number(roomData.xiSubmissionDeadline || 0)) throw new Error('Submission deadline has passed');
+    const teamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`));
+    if (!teamSnap.exists()) throw new Error('Your franchise squad was not found');
+    const teamData = teamSnap.val();
+    if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [])) {
+      throw new Error('Choose 11 unique players and one different Impact Player from your squad');
+    }
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
+      playingXI: { startingXI, impactPlayer, submittedAt: getSyncedTime(), autoSelected: false }
+    });
+    await push(ref(rtdb, `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System',
+      text: `${teamData.teamName || teamData.teamId} submitted its Playing XI.`,
+      type: 'log', timestamp: serverTimestampRtdb()
+    });
+  }, [user, getSyncedTime]);
+
+  // One client claims the analysis phase transactionally after the deadline.
+  // All other clients observe the same persisted result through the room listener.
+  const finalizeWinnerAnalysis = useCallback(async (roomId) => {
+    const roomRef = ref(rtdb, `auctions/${roomId}/room`);
+    const roomSnap = await get(roomRef);
+    if (!roomSnap.exists()) return;
+    const roomData = roomSnap.val();
+    if (roomData.status !== 'awaiting_xi' || getSyncedTime() < Number(roomData.xiSubmissionDeadline || 0)) return;
+    const claim = await runTransactionRtdb(roomRef, (current) => {
+      if (!current || current.status !== 'awaiting_xi' || getSyncedTime() < Number(current.xiSubmissionDeadline || 0)) return;
+      return { ...current, status: 'analyzing', winnerAnalysisStatus: 'analyzing' };
+    });
+    if (!claim.committed) return;
+
+    try {
+      const teamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
+      const teamsData = teamsSnap.val() || {};
+      const franchises = Object.values(teamsData).filter((t) => t?.teamId && t.teamId !== 'NONE');
+      const payload = franchises.map((t) => {
+        const squad = Array.isArray(t.squad) ? t.squad : [];
+        const savedXI = t.playingXI;
+        const selection = savedXI?.startingXI?.length === 11 && savedXI?.impactPlayer
+          ? savedXI
+          : autoSelectBestXI(squad, IPL_PLAYERS);
+        const toFullPlayer = (item) => {
+          const id = typeof item === 'string' ? item : item?.id;
+          const catalog = IPL_PLAYERS.find((p) => p.id === id) || {};
+          return { ...catalog, ...(typeof item === 'object' && item ? item : {}), id };
+        };
+        const fullSquad = squad.map(toFullPlayer);
+        return {
+          franchiseId: t.teamId,
+          franchiseName: t.teamName || t.teamId,
+          submittedXI: [
+            ...(selection.startingXI || []).map(toFullPlayer),
+            { ...toFullPlayer(selection.impactPlayer), isImpactPlayer: true }
+          ],
+          fullSquad,
+          autoSelected: !savedXI?.startingXI?.length || Boolean(savedXI.autoSelected)
+        };
+      });
+      if (payload.length < 2) throw new Error('At least two franchises are required to rank the auction');
+      const response = await fetch('/api/analyze-winner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, franchises: payload })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'AI analysis failed');
+      await updateRtdb(roomRef, {
+        status: 'completed',
+        winnerAnalysisStatus: 'completed',
+        winnerRankings: result.rankings,
+        winnerAnalysisModel: result.model || 'AI',
+        winnerAnalysisCompletedAt: getSyncedTime()
+      });
+      await push(ref(rtdb, `auctions/${roomId}/messages`), {
+        userId: 'system', userName: 'System',
+        text: 'AI franchise rankings are ready. Open Auction Summary to view the results.',
+        type: 'log', timestamp: serverTimestampRtdb()
+      });
+      await flushAuctionToFirestore(roomId);
+    } catch (error) {
+      await updateRtdb(roomRef, { status: 'analysis_failed', winnerAnalysisStatus: 'failed', winnerAnalysisError: String(error?.message || 'AI analysis failed') });
+      throw error;
+    }
+  }, [getSyncedTime, flushAuctionToFirestore]);
 
 
 
@@ -1462,6 +1556,8 @@ export const AuctionProvider = ({ children }) => {
     pauseAuction,
     resumeAuction,
     endAuction,
+    submitPlayingXI,
+    finalizeWinnerAnalysis,
     sendMessage,
     messages,
     addBotTeam,
