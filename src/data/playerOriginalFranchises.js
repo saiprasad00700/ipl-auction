@@ -136,10 +136,10 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_220: "LSG", // Digvesh Singh Rathi
   p_410: "SRH", // Sakib Hussain
   p_349: "PBKS", // Ben Dwarshuis
-  p_334: "RCB", // Vicky Ostwal
-  p_299: "LSG", // Anrich Nortje
-  p_335: "GT", // Ashok Sharma
   p_406: "MI", // Mohammad Izhar
+  p_151: "GT", // Glenn Phillips
+  p_365: "GT", // Tom Banton
+  p_390: "RCB", // Mangesh Yadav
 };
 
 export function getPlayerOriginalFranchise(playerId) {
