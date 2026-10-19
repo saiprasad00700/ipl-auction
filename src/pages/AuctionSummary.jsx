@@ -118,7 +118,10 @@ const AuctionSummary = () => {
               squadLimit: aData.squad_limit || 25,
               overseasLimit: aData.overseas_limit || 8,
               players: aData.players || [],
-              settings: aData.settings || { budget: 120, bidTimer: 10 }
+              settings: aData.settings || { budget: 120, bidTimer: 10 },
+              winnerRankings: aData.settings?.winnerRankings || [],
+              winnerAnalysisStatus: aData.settings?.winnerAnalysisStatus || null,
+              winnerAnalysisModel: aData.settings?.winnerAnalysisModel || null
             });
 
             if (tData && tData.length > 0) {
@@ -161,6 +164,8 @@ const AuctionSummary = () => {
   }, [id]);
 
   const activeAuction = currentAuction || dbAuction;
+  const winnerRankings = activeAuction?.winnerRankings || activeAuction?.settings?.winnerRankings || [];
+  const winnerAnalysisStatus = activeAuction?.winnerAnalysisStatus || activeAuction?.settings?.winnerAnalysisStatus;
   const activeTeams = (roomTeams && roomTeams.length > 0) ? roomTeams : dbTeams;
 
   // Derived Data
@@ -337,8 +342,8 @@ const AuctionSummary = () => {
                 <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">AI Franchise Rankings</h2>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-2">Playing XI + Impact Player, with full-squad depth as a tiebreaker</p>
               </div>
-              {Array.isArray(activeAuction?.winnerRankings) && activeAuction.winnerRankings.length ? (
-                [...activeAuction.winnerRankings].sort((a, b) => a.rank - b.rank).map((entry) => {
+              {Array.isArray(winnerRankings) && winnerRankings.length ? (
+                [...winnerRankings].sort((a, b) => a.rank - b.rank).map((entry) => {
                   const teamInfo = TEAMS.find((t) => t.id === entry.franchiseId);
                   return <div key={entry.franchiseId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6">
                     <div className="flex items-start gap-4">
@@ -357,7 +362,7 @@ const AuctionSummary = () => {
                 })
               ) : (
                 <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 text-sm text-gray-400">
-                  {activeAuction?.winnerAnalysisStatus === 'analyzing' ? 'AI analysis is in progress. Rankings will appear here when ready.' : activeAuction?.winnerAnalysisStatus === 'failed' ? 'AI analysis failed. The host should check the server configuration.' : 'No AI rankings are saved for this auction yet.'}
+                  {winnerAnalysisStatus === 'analyzing' ? 'AI analysis is in progress. Rankings will appear here when ready.' : winnerAnalysisStatus === 'failed' ? 'AI analysis failed. The host should check the server configuration.' : 'No AI rankings are saved for this auction yet.'}
                 </div>
               )}
             </motion.section>
