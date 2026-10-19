@@ -1049,7 +1049,7 @@ const AuctionRoom = () => {
                                     <span className="text-[10px] font-bold block leading-none text-gray-200">
                                        ₹{(teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120.0)).toFixed(1)} Cr
                                     </span>
-                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
+                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>\n                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
                                  </div>
                                  <ChevronDown size={12} className={`text-gray-500 transition-transform duration-300 ${isSelected ? 'rotate-180' : ''}`} />
                               </div>
@@ -1067,7 +1067,7 @@ const AuctionRoom = () => {
                                        {/* Header Stats */}
                                        <div className="flex items-center justify-between text-[9px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 pb-2">
                                           <span>Spent: <span className="text-yellow-500">₹{((currentAuction?.settings?.budget || 120) - (teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120))).toFixed(2)} Cr</span></span>
-                                          <span>Rating: <span className="text-amber-400 font-extrabold">{ratingInfo?.avgRating ? `${ratingInfo.avgRating}` : 'N/A'}</span></span>
+                                          
                                           <span>Overseas: <span className="text-white">{(teamDoc?.squad?.filter(s => {
                                              const pid = typeof s === 'string' ? s : s.id;
                                              return IPL_PLAYERS.find(pl => pl.id === pid)?.country !== 'IND';
