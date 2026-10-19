@@ -1049,7 +1049,8 @@ const AuctionRoom = () => {
                                     <span className="text-[10px] font-bold block leading-none text-gray-200">
                                        ₹{(teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120.0)).toFixed(1)} Cr
                                     </span>
-                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>\n                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
+                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
+                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
                                  </div>
                                  <ChevronDown size={12} className={`text-gray-500 transition-transform duration-300 ${isSelected ? 'rotate-180' : ''}`} />
                               </div>
