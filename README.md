@@ -161,10 +161,10 @@ The auction now includes a five-second retention decision for the verified IPL 2
 ### Deployment checks
 
 - Render serves the app and exposes `/health`; the GitHub Actions workflow checks this endpoint after pushes to `main`.
-- `database.rules.json` contains the Realtime Database rules. Changes to this file are **not** deployed by a Render build. Deploy the rules to Firebase separately after authenticating the Firebase CLI for project `ipl-auction-friends-3fc71`:
+- `database.rules.json` contains the Realtime Database rules. Changes to this file are **not** deployed by a Render build. Before deploying rules, confirm that the Firebase project selected in `.firebaserc` matches the project's `VITE_FIREBASE_PROJECT_ID` configured in Render. After authenticating the Firebase CLI for that exact project, deploy with:
 
   ```sh
-  firebase deploy --only database --project ipl-auction-friends-3fc71
+  firebase deploy --only database
   ```
 
 - Never commit Firebase credentials or the Gemini API key to the repository.
