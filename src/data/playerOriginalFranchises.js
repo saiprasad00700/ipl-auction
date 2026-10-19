@@ -23,13 +23,11 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_132: "CSK", // Sanju Samson
   p_134: "CSK", // Shivam Dube
   p_219: "CSK", // Ayush Mhatre
-  p_296: "CSK", // Matheesha Pathirana
-  p_301: "CSK", // Maheesh Theekshana
+  p_296: "KKR", // Matheesha Pathirana
   p_315: "CSK", // Prashant Veer
   p_321: "CSK", // Kartik Sharma
-  p_322: "CSK", // Mukul Choudhary
-  p_349: "CSK", // Ben Dwarshuis
-  p_351: "CSK", // Daryl Mitchell
+  p_322: "LSG", // Mukul Choudhary
+  p_349: "PBKS", // Ben Dwarshuis
   p_354: "CSK", // Matt Short
   p_357: "CSK", // Zak Foulkes
 
@@ -79,9 +77,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_258: "PBKS", // Suryansh Shedge
   p_279: "SRH", // Liam Livingstone
   p_314: "MI", // Mahipal Lomror
-  p_317: "SRH", // Sanvir Singh
   p_318: "SRH", // Shivang Kumar
-  p_320: "PBKS", // Vijay Shankar
   p_343: "DC", // Pathum Nissanka
 
   // Rajasthan Royals
