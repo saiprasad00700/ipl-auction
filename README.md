@@ -140,3 +140,16 @@ Join the discussion, follow updates, or start a conversation in GitHub Issues.
 
 ## License
 Crick Auction is available under the Apache License 2.0.
+
+
+## Winner analysis deployment
+
+The AI winner-ranking endpoint runs on the same Node service as the frontend; the Gemini API key must remain server-side.
+
+1. In Google AI Studio, create a Gemini API key: https://aistudio.google.com/apikey
+2. In the Render dashboard, open the `ipl-auction` web service and choose **Environment**.
+3. Add `GEMINI_API_KEY` with the secret value. Do not add it as a `VITE_*` variable and do not commit it to this repository.
+4. Deploy the branch that contains the winner-analysis changes. Render uses `render.yaml` to build the Vite frontend and start `server.js`.
+5. Confirm the service health check at `/health` returns `{"ok":true}`.
+
+The winner-analysis API applies a small per-IP request limit. Do not share the API key in chat, screenshots, or client-side code.

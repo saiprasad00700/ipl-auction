@@ -40,11 +40,7 @@ const PlayersTab = ({
   }
 
   // Sorting
-  if (playerSortBy === 'rating_desc') {
-    filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  } else if (playerSortBy === 'rating_asc') {
-    filtered.sort((a, b) => (a.rating || 0) - (b.rating || 0));
-  } else if (playerSortBy === 'price_desc') {
+  if (playerSortBy === 'price_desc') {
     filtered.sort((a, b) => (b.basePrice || 0) - (a.basePrice || 0));
   } else if (playerSortBy === 'price_asc') {
     filtered.sort((a, b) => (a.basePrice || 0) - (b.basePrice || 0));
@@ -92,8 +88,6 @@ const PlayersTab = ({
                 className="bg-transparent text-white text-xs font-bold outline-none cursor-pointer pr-2 w-full"
               >
                 <option value="default" className="bg-[#151515] text-white">Default (Set Order)</option>
-                <option value="rating_desc" className="bg-[#151515] text-white">Rating: High to Low ★</option>
-                <option value="rating_asc" className="bg-[#151515] text-white">Rating: Low to High</option>
                 <option value="price_desc" className="bg-[#151515] text-white">Base Price: High to Low</option>
                 <option value="price_asc" className="bg-[#151515] text-white">Base Price: Low to High</option>
                 <option value="matches_desc" className="bg-[#151515] text-white">Matches: Most Played</option>
@@ -171,11 +165,6 @@ const PlayersTab = ({
                   <p className="text-gray-500 text-[10px] font-medium mt-0.5">
                     {player.country}
                   </p>
-                </div>
-
-                <div className={`flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg border shrink-0 min-w-[42px] ${getRatingBadgeStyle(player.rating)}`}>
-                  <span className="text-base font-black leading-none">{player.rating ?? '—'}</span>
-                  <span className="text-[7px] font-bold uppercase tracking-wider opacity-60 mt-0.5">/ 100</span>
                 </div>
               </div>
 

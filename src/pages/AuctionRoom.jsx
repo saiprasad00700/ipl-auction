@@ -61,9 +61,12 @@ const AuctionRoom = () => {
       joinAuction,
       joinRoomDb,
       endPlayerAuction,
+      decideRetention,
       pauseAuction,
       resumeAuction,
       endAuction,
+      submitPlayingXI,
+      finalizeWinnerAnalysis,
       sendMessage,
       messages,
       updateRoomSettings,
@@ -84,6 +87,10 @@ const AuctionRoom = () => {
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
    const [isEnding, setIsEnding] = useState(false);
+   const [selectedXIIds, setSelectedXIIds] = useState([]);
+   const [selectedImpactId, setSelectedImpactId] = useState('');
+   const [isSubmittingXI, setIsSubmittingXI] = useState(false);
+   const [xiSubmitError, setXiSubmitError] = useState('');
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
@@ -105,6 +112,56 @@ const AuctionRoom = () => {
    }, [currentAuction?.currentAuction?.currentBid, optimisticState]);
 
    const displayAuctionState = optimisticState || currentAuction?.currentAuction;
+
+   const retentionOffer = displayAuctionState?.retentionOffer;
+   const [, setRetentionClockTick] = useState(0);
+   useEffect(() => {
+      if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
+      const timer = setInterval(() => setRetentionClockTick((n) => n + 1), 200);
+      return () => clearInterval(timer);
+   }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt]);
+
+   // Any connected manager can recover a pending retention sale if its coordinator tab closes.
+   useEffect(() => {
+      if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
+      const timer = setInterval(() => {
+         if (getSyncedTime() >= Number(retentionOffer.expiresAt)) {
+            clearInterval(timer);
+            endPlayerAuction(id).catch(() => {});
+         }
+      }, 250);
+      return () => clearInterval(timer);
+   }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt, endPlayerAuction, getSyncedTime, id]);
+
+   useEffect(() => {
+      if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
+      const tick = () => {
+         if (getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline)) finalizeWinnerAnalysis(id).catch(() => {});
+      };
+      tick();
+      const timer = setInterval(tick, 1000);
+      return () => clearInterval(timer);
+   }, [currentAuction?.status, currentAuction?.xiSubmissionDeadline, finalizeWinnerAnalysis, getSyncedTime, id]);
+
+   const mySquadPlayers = useMemo(() => (team?.squad || []).map((item) => {
+      const playerId = typeof item === 'string' ? item : item?.id;
+      const player = IPL_PLAYERS.find((p) => p.id === playerId);
+      return player ? { ...player, bid: typeof item === 'object' ? item.bid : 0 } : null;
+   }).filter(Boolean), [team?.squad]);
+
+   const submitXI = async () => {
+      setXiSubmitError('');
+      setIsSubmittingXI(true);
+      try {
+         const startingXI = selectedXIIds.map((playerId) => mySquadPlayers.find((p) => p.id === playerId)).filter(Boolean);
+         const impactPlayer = mySquadPlayers.find((p) => p.id === selectedImpactId);
+         await submitPlayingXI(id, startingXI, impactPlayer);
+      } catch (err) {
+         setXiSubmitError(err?.message || 'Could not submit your Playing XI.');
+      } finally {
+         setIsSubmittingXI(false);
+      }
+   };
 
    // Real-time team ratings calculated entirely in browser memory (0 DB / infra cost)
    const liveTeamRatings = useMemo(() => {
@@ -1005,6 +1062,7 @@ const AuctionRoom = () => {
                                        ₹{(teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120.0)).toFixed(1)} Cr
                                     </span>
                                     <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
+                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
                                  </div>
                                  <ChevronDown size={12} className={`text-gray-500 transition-transform duration-300 ${isSelected ? 'rotate-180' : ''}`} />
                               </div>
@@ -1022,7 +1080,7 @@ const AuctionRoom = () => {
                                        {/* Header Stats */}
                                        <div className="flex items-center justify-between text-[9px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 pb-2">
                                           <span>Spent: <span className="text-yellow-500">₹{((currentAuction?.settings?.budget || 120) - (teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120))).toFixed(2)} Cr</span></span>
-                                          <span>Rating: <span className="text-amber-400 font-extrabold">{ratingInfo?.avgRating ? `${ratingInfo.avgRating}` : 'N/A'}</span></span>
+                                          
                                           <span>Overseas: <span className="text-white">{(teamDoc?.squad?.filter(s => {
                                              const pid = typeof s === 'string' ? s : s.id;
                                              return IPL_PLAYERS.find(pl => pl.id === pid)?.country !== 'IND';
@@ -1057,11 +1115,7 @@ const AuctionRoom = () => {
                                                                   <img src={p?.image} alt={p?.name || 'Player'} className="w-5 h-5 object-contain rounded bg-white/5" />
                                                                   <div className="overflow-hidden">
                                                                      <div className="flex items-center gap-1">
-                                                                        <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5>
-                                                                        {p?.rating && (
-                                                                           <span className="text-[8px] text-amber-400/80 font-medium">★{p.rating}</span>
-                                                                        )}
-                                                                     </div>
+                                                                        <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5> </div>
                                                                   </div>
                                                                </div>
                                                                <span className="text-[9px] font-bold text-yellow-500">
@@ -1623,6 +1677,41 @@ const AuctionRoom = () => {
          </AnimatePresence>
 
          <AnimatePresence>
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && (() => {
+               const offer = displayAuctionState.retentionOffer;
+               const eligible = offer.eligibleUserId === user?.uid;
+               const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
+               const secondsLeft = Math.max(0, Math.ceil((Number(offer.expiresAt) - getSyncedTime()) / 1000));
+               return (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                     <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
+                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{eligible ? 'Retention decision required' : 'Retention offer in progress'}</div>
+                        <div className="flex items-center gap-4 mb-5">
+                           <img src={player?.image} alt={player?.name || 'Player'} className="w-20 h-20 object-contain rounded-2xl bg-white/5 border border-white/10" />
+                           <div>
+                              <h2 className="text-xl font-black text-white">{player?.name || 'Player'}</h2>
+                              <p className="text-sm text-gray-400">Winning bid: <span className="text-yellow-400 font-black">₹{Number(offer.bid).toFixed(2)} Cr</span></p>
+                              <p className="text-xs text-gray-500 mt-1">Original franchise: {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId}</p>
+                           </div>
+                        </div>
+                        {eligible ? (
+                           <>
+                              <p className="text-sm text-gray-300 mb-4">Use one of your remaining retention cards to acquire this player at the winning bid. Your decision window closes in <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                 <button onClick={() => decideRetention(id, 'accept').catch((e) => setError(e.message))} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3">Retain player</button>
+                                 <button onClick={() => decideRetention(id, 'decline').catch((e) => setError(e.message))} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3">Decline</button>
+                              </div>
+                           </>
+                        ) : (
+                           <p className="text-sm text-gray-300">Only the original franchise manager can decide. The current winning bid is on hold for up to five seconds; other managers cannot accept or decline this offer.</p>
+                        )}
+                     </motion.div>
+                  </motion.div>
+               );
+            })()}
+         </AnimatePresence>
+
+         <AnimatePresence>
             {error && (
                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="fixed bottom-20 md:bottom-12 bg-red-500/20 border border-red-500/50 p-4 md:p-6 rounded-3xl flex items-center gap-4 text-red-500 font-black z-[110]">
                   <AlertCircle size={16} /><span className="text-xs md:text-base">{error}</span>
@@ -1775,6 +1864,37 @@ const AuctionRoom = () => {
                </motion.div>
             )}
          </AnimatePresence>
+
+         {currentAuction?.status === 'awaiting_xi' && (
+            <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
+               <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#101010] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+                  <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
+                  <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
+                  <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
+                  <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                     {mySquadPlayers.map((player) => {
+                        const isStarter = selectedXIIds.includes(player.id);
+                        const isImpact = selectedImpactId === player.id;
+                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-orange-400/40 bg-orange-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                           <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
+                           <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
+                           <button type="button" disabled={isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
+                           <button type="button" disabled={isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
+                        </div>;
+                     })}
+                  </div>
+                  {mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available in this view. The system will attempt automatic selection at the deadline.</p>}
+                  {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
+                     <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
+                     <button type="button" onClick={submitXI} disabled={isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : 'Submit Playing XI'}</button>
+                  </div>
+               </div>
+            </div>
+         )}
+         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
+         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'} Check server API configuration before retrying.</p></div></div>}
 
          <ConfirmDialog
             isOpen={showEndConfirm}
