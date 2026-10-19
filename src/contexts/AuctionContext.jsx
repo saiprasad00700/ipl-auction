@@ -366,8 +366,27 @@ export const AuctionProvider = ({ children }) => {
       // Claim the lot atomically. If an eligible original franchise manager is present,
       // pause settlement for the five-second retention decision before charging anyone.
       const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData || currentData.status !== 'bidding') return;
+        if (!currentData) return;
         const now = getSyncedTime();
+
+        // Recovery path: if the client that opened a retention offer disconnected,
+        // any connected client can settle it after its deadline.
+        if (currentData.status === 'processing_sale') {
+          const offer = currentData.retentionOffer;
+          if (!offer || offer.status !== 'pending' || now < Number(offer.expiresAt)) return;
+          if (offer.decision === 'accept' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+            currentData.highBidderId = offer.eligibleUserId;
+            currentData.highBidderName = offer.eligibleTeamName;
+            currentData.highBidderTeamId = offer.originalFranchiseId;
+            offer.status = 'accepted';
+          } else {
+            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
+          }
+          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
+          return currentData;
+        }
+
+        if (currentData.status !== 'bidding') return;
         if (currentData.timerEndsAt && now < currentData.timerEndsAt) return;
 
         const isSold = !!currentData.highBidderId;
@@ -439,22 +458,7 @@ export const AuctionProvider = ({ children }) => {
           return;
         }
         auctionState = settleTx.snapshot.val();
-        if (auctionState.retentionOffer?.status === 'accepted') {
-          const acceptedTeamId = `${roomId}_${auctionState.highBidderId}`;
-          const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
-          const acceptedTeamSnap = await get(acceptedTeamRef);
-          const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
-          await updateRtdb(acceptedTeamRef, {
-            retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-          });
-          await push(ref(rtdb, `auctions/${roomId}/messages`), {
-            userId: 'system', userName: 'System',
-            text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} retained by ${auctionState.retentionOffer.originalFranchiseId} for ₹${auctionState.retentionOffer.bid} Cr.`,
-            type: 'retention_accepted',
-            metadata: { playerId: auctionState.playerId, teamId: auctionState.retentionOffer.originalFranchiseId, bid: auctionState.retentionOffer.bid },
-            timestamp: serverTimestampRtdb()
-          });
-        } else {
+        if (auctionState.retentionOffer?.status !== 'accepted') {
           await push(ref(rtdb, `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
             text: `Retention declined or timed out. The original winning bid stands.`,
@@ -462,6 +466,23 @@ export const AuctionProvider = ({ children }) => {
           });
         }
       }
+      if (auctionState.retentionOffer?.status === 'accepted') {
+        const acceptedTeamId = `${roomId}_${auctionState.highBidderId}`;
+        const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
+        const acceptedTeamSnap = await get(acceptedTeamRef);
+        const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
+        await updateRtdb(acceptedTeamRef, {
+          retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
+        });
+        await push(ref(rtdb, `auctions/${roomId}/messages`), {
+          userId: 'system', userName: 'System',
+          text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} retained by ${auctionState.retentionOffer.originalFranchiseId} for ₹${auctionState.retentionOffer.bid} Cr.`,
+          type: 'retention_accepted',
+          metadata: { playerId: auctionState.playerId, teamId: auctionState.retentionOffer.originalFranchiseId, bid: auctionState.retentionOffer.bid },
+          timestamp: serverTimestampRtdb()
+        });
+      }
+
       const isSold = auctionState.status === 'sold';
       const player = IPL_PLAYERS.find(p => p.id === auctionState.playerId);
       const teamDetails = TEAMS.find(t => t.id === auctionState.highBidderTeamId);
