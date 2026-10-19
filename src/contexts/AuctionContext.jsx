@@ -701,7 +701,8 @@ export const AuctionProvider = ({ children }) => {
           teamName: teamDetails?.name || 'Unknown',
           budgetRemaining: data.settings?.budget || 120.0,
           spent: 0,
-          squad: []
+          squad: [],
+          retentionCardsRemaining: 2
         };
         await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
       } else {
