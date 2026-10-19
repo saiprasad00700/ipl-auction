@@ -361,7 +361,7 @@ export const AuctionProvider = ({ children }) => {
       const preTeamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
       const preTeamsData = preTeamsSnap.exists() ? preTeamsSnap.val() : {};
       const { getPlayerOriginalFranchise } = await import('../data/playerOriginalFranchises');
-      const { RETENTION_DECISION_MS, RETENTION_CARDS_PER_FRANCHISE } = await import('../lib/auctionWinnerRules');
+      const { RETENTION_DECISION_MS, RETENTION_CARDS_PER_FRANCHISE, canUseRetentionCard } = await import('../lib/auctionWinnerRules');
 
       // Claim the lot atomically. If an eligible original franchise manager is present,
       // pause settlement for the five-second retention decision before charging anyone.
@@ -406,7 +406,13 @@ export const AuctionProvider = ({ children }) => {
             : RETENTION_CARDS_PER_FRANCHISE;
           const purseRemaining = Number(eligibleTeamData.budgetRemaining ?? preRoomData.settings?.budget ?? 120);
           if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer
-            && cardsRemaining > 0 && purseRemaining >= Number(currentData.currentBid || 0)) {
+            && canUseRetentionCard({
+              originalFranchiseId,
+              eligibleFranchiseId: eligibleTeamData.teamId,
+              cardsRemaining,
+              purseRemaining,
+              winningBid: Number(currentData.currentBid || 0)
+            })) {
             retentionOffer = {
               playerId: currentData.playerId,
               originalFranchiseId,
