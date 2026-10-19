@@ -70,7 +70,6 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_115: "PBKS", // Marcus Stoinis
   p_131: "RR", // Sam Curran
   p_145: "PBKS", // Yuzvendra Chahal
-  p_216: "DC", // Ashutosh Sharma
   p_243: "PBKS", // Prabhsimran Singh
   p_245: "PBKS", // Priyansh Arya
   p_254: "PBKS", // Shashank Singh
@@ -81,12 +80,11 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_343: "DC", // Pathum Nissanka
 
   // Rajasthan Royals
-  p_107: "GT", // Jofra Archer
+  p_107: "RR", // Jofra Archer
   p_144: "RR", // Yashasvi Jaiswal
   p_150: "GT", // Dhruv Jurel
   p_159: "RR", // Riyan Parag
   p_181: "RR", // Nandre Burger
-  p_198: "RR", // Sandeep Sharma
   p_264: "RR", // Vaibhav Sooryavanshi
   p_269: "RR", // Yudhvir Singh Charak
   p_366: "RR", // Adam Milne
@@ -99,7 +97,6 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_139: "SRH", // Travis Head
   p_146: "SRH", // Abhishek Sharma
   p_196: "SRH", // Nitish Kumar Reddy
-  p_223: "CSK", // Gurjapneet Singh
   p_227: "SRH", // Harsh Dubey
   p_270: "SRH", // Zeeshan Ansari
   p_402: "SRH", // Salil Arora
@@ -110,15 +107,12 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_110: "GT", // Kagiso Rabada
   p_122: "CSK", // Noor Ahmad
   p_136: "GT", // Shubman Gill
-  p_151: "GT", // Glenn Phillips
   p_162: "GT", // Sai Sudharsan
   p_185: "GT", // Rahul Tewatia
   p_192: "GT", // Jayant Yadav
   p_197: "GT", // Sai Kishore
   p_200: "GT", // Shahrukh Khan
-  p_237: "LSG", // Mohsin Khan
   p_298: "SRH", // Shivam Mavi
-  p_406: "MI", // Mohammed Izhar
 
   // Lucknow Super Giants
   p_113: "PBKS", // Lockie Ferguson
@@ -140,12 +134,12 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_119: "GT", // Mohammed Siraj
   p_153: "CSK", // Khaleel Ahmed
   p_220: "LSG", // Digvesh Singh Rathi
-  p_247: "MI", // Raghu Sharma
-  p_202: "KKR", // Umran Malik
-  p_353: "GT", // Jason Holder
-  p_369: "DC", // Kyle Jamieson
   p_410: "SRH", // Sakib Hussain
-  p_390: "RCB", // Mangesh Yadav
+  p_349: "PBKS", // Ben Dwarshuis
+  p_334: "RCB", // Vicky Ostwal
+  p_299: "LSG", // Anrich Nortje
+  p_335: "GT", // Ashok Sharma
+  p_406: "MI", // Mohammad Izhar
 };
 
 export function getPlayerOriginalFranchise(playerId) {
