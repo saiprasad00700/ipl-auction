@@ -501,16 +501,19 @@ export const AuctionProvider = ({ children }) => {
               status: 'bidding'
             });
           } else {
-            // Flush final completed status & all teams to Supabase once at end of auction!
-            await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { status: 'completed' });
-            await flushAuctionToFirestore(roomId);
-
-            // Clean up completed room from RTDB after 30 seconds
-            setTimeout(async () => {
-              try {
-                await remove(ref(rtdb, `auctions/${roomId}`));
-              } catch (cleanErr) {}
-            }, 30000);
+            // Natural end of bidding must enter the same shared XI phase as host-triggered end.
+            const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
+            await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
+              status: 'awaiting_xi',
+              xiSubmissionStartedAt: getSyncedTime(),
+              xiSubmissionDeadline: deadline,
+              winnerAnalysisStatus: 'collecting'
+            });
+            await push(ref(rtdb, `auctions/${roomId}/messages`), {
+              userId: 'system', userName: 'System',
+              text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+              type: 'log', timestamp: serverTimestampRtdb()
+            });
           }
         } finally {
           // Always release the lock — even if any async step above throws or component unmounts
