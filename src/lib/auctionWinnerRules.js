@@ -41,18 +41,19 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     return Number.isFinite(raw) ? raw : 0;
   };
   const selected = [];
-  const addBest = (predicate, limit) => {
-    for (const player of unique.filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
-      .sort((a, b) => rating(b) - rating(a))) {
-      if (selected.length >= limit) break;
-      selected.push(player);
-    }
+  const addBest = (predicate, categoryLimit) => {
+    const alreadySelected = selected.filter(predicate).length;
+    const needed = Math.max(0, categoryLimit - alreadySelected);
+    const candidates = unique
+      .filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
+      .sort((a, b) => rating(b) - rating(a));
+    selected.push(...candidates.slice(0, needed));
   };
 
   addBest((p) => normalizeRole(p) === 'wk', 1);
   addBest((p) => normalizeRole(p) === 'bat', 4);
   addBest((p) => normalizeRole(p) === 'ar', 2);
-  addBest((p) => normalizeRole(p) === 'bowl', 7);
+  addBest((p) => normalizeRole(p) === 'bowl', 4);
   addBest(() => true, PLAYING_XI_SIZE);
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
   const impact = unique
