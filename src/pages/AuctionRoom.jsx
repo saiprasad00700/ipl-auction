@@ -113,6 +113,14 @@ const AuctionRoom = () => {
 
    const displayAuctionState = optimisticState || currentAuction?.currentAuction;
 
+   const retentionOffer = displayAuctionState?.retentionOffer;
+   const [, setRetentionClockTick] = useState(0);
+   useEffect(() => {
+      if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
+      const timer = setInterval(() => setRetentionClockTick((n) => n + 1), 200);
+      return () => clearInterval(timer);
+   }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt]);
+
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
       const tick = () => {
