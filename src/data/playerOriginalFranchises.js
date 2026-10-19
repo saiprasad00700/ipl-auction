@@ -141,6 +141,15 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_244: "LSG", // Prince Yadav
   p_268: "LSG", // Yash Thakur
   p_304: "RR" // Ravi Bishnoi
+  p_119: "GT", // Mohammed Siraj
+  p_153: "CSK", // Khaleel Ahmed
+  p_220: "LSG", // Digvesh Singh Rathi
+  p_247: "MI", // Raghu Sharma
+  p_202: "KKR", // Umran Malik
+  p_353: "GT", // Jason Holder
+  p_369: "DC", // Kyle Jamieson
+  p_410: "SRH", // Sakib Hussain
+  p_390: "RCB", // Mangesh Yadav
 };
 
 export function getPlayerOriginalFranchise(playerId) {
