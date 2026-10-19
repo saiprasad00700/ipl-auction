@@ -149,8 +149,22 @@ ${JSON.stringify(normalized)}`;
     if (res?.status) return res.status(200).json(result);
     return json(200, result);
   } catch (error) {
-    console.error("Winner analysis error", error);
-    const result = { error: "Could not produce a valid ranking. Please retry." };
+    const rawMessage = getText(error?.message);
+    console.error("Winner analysis error", error?.stack || rawMessage || error);
+
+    // Return a safe, actionable diagnostic instead of hiding every failure behind
+    // the same message. Never include the API key or request URL in the response.
+    let message = "AI analysis failed while processing the model response. Please retry.";
+    if (rawMessage === "AI returned invalid JSON") {
+      message = "Gemini responded, but its answer was not valid JSON. Retry the analysis.";
+    } else if (rawMessage === "AI response failed ranking validation") {
+      message = "Gemini responded, but the rankings were incomplete or invalid. Retry the analysis.";
+    } else if (/fetch failed|network|socket|ECONN|ETIMEDOUT|ENOTFOUND/i.test(rawMessage)) {
+      message = "The server could not connect to Gemini. Check Render server logs and outbound API connectivity.";
+    } else if (rawMessage) {
+      message = `AI analysis processing error: ${rawMessage.slice(0, 240)}`;
+    }
+    const result = { error: message };
     if (res?.status) return res.status(502).json(result);
     return json(502, result);
   }
