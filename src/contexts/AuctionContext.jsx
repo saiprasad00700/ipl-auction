@@ -441,7 +441,31 @@ export const AuctionProvider = ({ children }) => {
       let auctionState = txResult.snapshot.val();
       if (auctionState.status === 'processing_sale' && auctionState.retentionOffer?.status === 'pending') {
         const remaining = Math.max(0, Number(auctionState.retentionOffer.expiresAt) - getSyncedTime());
-        await new Promise((resolve) => setTimeout(resolve, remaining));
+
+        // Wake as soon as the eligible manager decides instead of sleeping through
+        // the whole five-second window. Keep the expiry timer as the timeout fallback.
+        await new Promise((resolve) => {
+          let finished = false;
+          let unsubscribe = () => {};
+          let timeoutId;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            unsubscribe();
+            if (timeoutId) clearTimeout(timeoutId);
+            resolve();
+          };
+          timeoutId = setTimeout(finish, remaining);
+          unsubscribe = onValue(liveRef, (snapshot) => {
+            const latest = snapshot.val();
+            const offer = latest?.retentionOffer;
+            if (latest?.status !== 'processing_sale' || !offer || offer.status !== 'pending' || offer.decision) {
+              finish();
+            }
+          }, (error) => {
+            console.error('Retention decision listener failed; waiting until offer expiry.', error);
+          });
+        });
 
         // A decision is accepted only if it was made by the eligible manager before expiry.
         const settleTx = await runTransactionRtdb(liveRef, (currentData) => {
