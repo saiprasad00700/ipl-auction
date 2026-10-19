@@ -23,7 +23,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import SquadRating from '../components/SquadRating';
 
 const AuctionSummary = () => {
   const { id } = useParams();
@@ -245,11 +244,10 @@ const AuctionSummary = () => {
 
         {/* Tab Navigation */}
         <div className="mb-6 sm:mb-12">
-          <div className="bg-white/5 backdrop-blur-3xl p-1 sm:p-1.5 rounded-2xl sm:rounded-[2rem] border border-white/10 grid grid-cols-4 sm:flex sm:justify-center gap-1 sm:gap-2 max-w-full sm:max-w-max mx-auto">
+          <div className="bg-white/5 backdrop-blur-3xl p-1 sm:p-1.5 rounded-2xl sm:rounded-[2rem] border border-white/10 grid grid-cols-3 sm:flex sm:justify-center gap-1 sm:gap-2 max-w-full sm:max-w-max mx-auto">
             {[
               { id: 'squads', label: 'Squads', fullLabel: 'Team Squads', icon: Users },
               { id: 'leaderboard', label: 'Top 5', fullLabel: 'Top Expensive', icon: Trophy },
-              { id: 'fantasy', label: 'Ratings', fullLabel: 'Squad Ratings', icon: Zap },
               { id: 'ai-rankings', label: 'AI Rank', fullLabel: 'AI Team Rankings', icon: Trophy },
             ].map(tab => (
               <button
@@ -365,19 +363,6 @@ const AuctionSummary = () => {
                   {winnerAnalysisStatus === 'analyzing' ? 'AI analysis is in progress. Rankings will appear here when ready.' : winnerAnalysisStatus === 'failed' ? 'AI analysis failed. The host should check the server configuration.' : 'No AI rankings are saved for this auction yet.'}
                 </div>
               )}
-            </motion.section>
-          ) : activeTab === 'fantasy' ? (
-            <motion.section
-              key="fantasy"
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -30 }}
-              className="max-w-5xl mx-auto"
-            >
-              <SquadRating 
-                roomTeams={activeTeams}
-                currentAuction={activeAuction}
-              />
             </motion.section>
           ) : (
             <motion.section
@@ -536,10 +521,6 @@ const AuctionSummary = () => {
                                                       {p.country !== 'IND' && <Wifi size={12} className="text-purple-400 rotate-90 shrink-0" />}
                                                     </div>
                                                   </div>
-                                                </div>
-                                                <div className="text-right shrink-0">
-                                                  <span className="block text-[8px] sm:text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Rating</span>
-                                                  <span className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-[#ff5500]">{p.rating || 15}</span>
                                                 </div>
                                              </div>
                                              <div className="relative z-10 pt-4 border-t border-white/5 flex items-center justify-between">
