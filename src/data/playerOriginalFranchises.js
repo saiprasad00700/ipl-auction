@@ -55,7 +55,6 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_188: "KKR", // Ajinkya Rahane
   p_209: "KKR", // Angkrish Raghuvanshi
   p_281: "KKR", // Venkatesh Iyer
-  p_285: "KKR", // Finn Allen
   p_364: "KKR", // Tim Seifert
   p_365: "KKR", // Tom Banton
 
