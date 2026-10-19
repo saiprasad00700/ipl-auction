@@ -26,3 +26,22 @@ jobs:
         run: npm test
       - name: Build production frontend
         run: npm run build
+
+  render-health-check:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Render deployment health
+        run: |
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error https://ipl-auction-ootx.onrender.com/health; then
+              echo
+              echo "Render health check passed."
+              exit 0
+            fi
+            echo "Render is not healthy yet (attempt $attempt/20); retrying in 15 seconds."
+            sleep 15
+          done
+          echo "Render did not become healthy within five minutes."
+          exit 1
