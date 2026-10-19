@@ -240,11 +240,12 @@ const AuctionSummary = () => {
 
         {/* Tab Navigation */}
         <div className="mb-6 sm:mb-12">
-          <div className="bg-white/5 backdrop-blur-3xl p-1 sm:p-1.5 rounded-2xl sm:rounded-[2rem] border border-white/10 grid grid-cols-3 sm:flex sm:justify-center gap-1 sm:gap-2 max-w-full sm:max-w-max mx-auto">
+          <div className="bg-white/5 backdrop-blur-3xl p-1 sm:p-1.5 rounded-2xl sm:rounded-[2rem] border border-white/10 grid grid-cols-4 sm:flex sm:justify-center gap-1 sm:gap-2 max-w-full sm:max-w-max mx-auto">
             {[
               { id: 'squads', label: 'Squads', fullLabel: 'Team Squads', icon: Users },
               { id: 'leaderboard', label: 'Top 5', fullLabel: 'Top Expensive', icon: Trophy },
               { id: 'fantasy', label: 'Ratings', fullLabel: 'Squad Ratings', icon: Zap },
+              { id: 'ai-rankings', label: 'AI Rank', fullLabel: 'AI Team Rankings', icon: Trophy },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -329,6 +330,36 @@ const AuctionSummary = () => {
                   </motion.div>
                 ))}
               </div>
+            </motion.section>
+          ) : activeTab === 'ai-rankings' ? (
+            <motion.section key="ai-rankings" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto space-y-4">
+              <div className="mb-6">
+                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">AI Franchise Rankings</h2>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-2">Playing XI + Impact Player, with full-squad depth as a tiebreaker</p>
+              </div>
+              {Array.isArray(activeAuction?.winnerRankings) && activeAuction.winnerRankings.length ? (
+                [...activeAuction.winnerRankings].sort((a, b) => a.rank - b.rank).map((entry) => {
+                  const teamInfo = TEAMS.find((t) => t.id === entry.franchiseId);
+                  return <div key={entry.franchiseId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 shrink-0 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-xl font-black text-orange-400">#{entry.rank}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-black uppercase">{teamInfo?.name || entry.franchiseId}</h3>
+                          {Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
+                        </div>
+                        <p className="text-sm text-gray-300 mt-2">{entry.summary || 'AI squad assessment'}</p>
+                        {entry.strengths?.length > 0 && <p className="text-xs text-emerald-300 mt-3"><strong>Strengths:</strong> {entry.strengths.join(' · ')}</p>}
+                        {entry.risks?.length > 0 && <p className="text-xs text-amber-300 mt-2"><strong>Risks:</strong> {entry.risks.join(' · ')}</p>}
+                      </div>
+                    </div>
+                  </div>;
+                })
+              ) : (
+                <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 text-sm text-gray-400">
+                  {activeAuction?.winnerAnalysisStatus === 'analyzing' ? 'AI analysis is in progress. Rankings will appear here when ready.' : activeAuction?.winnerAnalysisStatus === 'failed' ? 'AI analysis failed. The host should check the server configuration.' : 'No AI rankings are saved for this auction yet.'}
+                </div>
+              )}
             </motion.section>
           ) : activeTab === 'fantasy' ? (
             <motion.section
