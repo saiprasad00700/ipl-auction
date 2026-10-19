@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getPlayerOriginalFranchise, PLAYER_ORIGINAL_FRANCHISES } from '../src/data/playerOriginalFranchises.js';
 import { canUseRetentionCard, RETENTION_CARDS_PER_FRANCHISE, RETENTION_DECISION_MS } from '../src/lib/auctionWinnerRules.js';
+import { IPL_PLAYERS } from '../src/data/players.js';
 
 test('known IPL 2026 player franchises are mapped correctly', () => {
   assert.equal(getPlayerOriginalFranchise('p_621'), 'MI');   // Jasprit Bumrah
@@ -11,6 +12,8 @@ test('known IPL 2026 player franchises are mapped correctly', () => {
   assert.equal(getPlayerOriginalFranchise('p_138'), 'RCB');  // Tim David
   assert.equal(getPlayerOriginalFranchise('p_174'), 'RCB');  // Jacob Bethell
   assert.equal(getPlayerOriginalFranchise('p_410'), 'SRH');  // Sakib Hussain
+  assert.equal(getPlayerOriginalFranchise('p_365'), 'GT');   // Tom Banton
+  assert.equal(getPlayerOriginalFranchise('p_390'), 'RCB');  // Mangesh Yadav
 });
 
 test('unmapped players are not offered retention and franchise IDs are valid', () => {
@@ -37,4 +40,12 @@ test('retention cards require the exact original franchise, available cards, and
   assert.equal(canUseRetentionCard({ ...base, cardsRemaining: 0 }), false);
   assert.equal(canUseRetentionCard({ ...base, purseRemaining: 14.99 }), false);
   assert.equal(canUseRetentionCard({ ...base, winningBid: Number.NaN }), false);
+});
+
+test('every mapped player ID exists in the catalogue and has a matching name comment', () => {
+  const playersById = new Map(IPL_PLAYERS.map((player) => [player.id, player]));
+  const source = PLAYER_ORIGINAL_FRANCHISES;
+  for (const playerId of Object.keys(source)) {
+    assert.ok(playersById.has(playerId), `Unknown player catalogue ID: ${playerId}`);
+  }
 });
