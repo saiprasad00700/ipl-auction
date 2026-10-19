@@ -82,7 +82,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   // Rajasthan Royals
   p_107: "RR", // Jofra Archer
   p_144: "RR", // Yashasvi Jaiswal
-  p_150: "GT", // Dhruv Jurel
+  p_150: "RR", // Dhruv Jurel
   p_159: "RR", // Riyan Parag
   p_181: "RR", // Nandre Burger
   p_264: "RR", // Vaibhav Sooryavanshi
@@ -130,16 +130,21 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_232: "LSG", // Manimaran Siddharth
   p_244: "LSG", // Prince Yadav
   p_268: "LSG", // Yash Thakur
-  p_304: "RR" // Ravi Bishnoi
+  p_304: "RR", // Ravi Bishnoi
   p_119: "GT", // Mohammed Siraj
   p_153: "CSK", // Khaleel Ahmed
   p_220: "LSG", // Digvesh Singh Rathi
   p_410: "SRH", // Sakib Hussain
-  p_349: "PBKS", // Ben Dwarshuis
   p_406: "MI", // Mohammad Izhar
   p_151: "GT", // Glenn Phillips
   p_365: "GT", // Tom Banton
   p_390: "RCB", // Mangesh Yadav
+  p_202: "KKR", // Umran Malik
+  p_223: "CSK", // Gurjapneet Singh
+  p_237: "LSG", // Mohsin Khan
+  p_247: "MI", // Raghu Sharma
+  p_353: "GT", // Jason Holder
+  p_369: "DC" // Kyle Jamieson
 };
 
 export function getPlayerOriginalFranchise(playerId) {
