@@ -153,6 +153,7 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_621: "MI", // Jasprit Bumrah
   p_912: "MI", // Keshav Maharaj
   p_314: "MI", // Mahipal Lomror
+  p_156: "MI", // Mitchell Santner
   p_235: "MI", // Mayank Markande
   p_391: "MI", // Mayank Rawat
   p_406: "MI", // Mohammed Izhar
