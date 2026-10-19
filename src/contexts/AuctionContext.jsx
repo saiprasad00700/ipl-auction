@@ -214,7 +214,15 @@ export const AuctionProvider = ({ children }) => {
           status: roomData.status || 'waiting',
           auction_type: roomData.auctionType || 'mega',
           players: roomData.players || [],
-          settings: roomData.settings || {},
+          settings: {
+            ...(roomData.settings || {}),
+            ...(roomData.winnerRankings ? {
+              winnerRankings: roomData.winnerRankings,
+              winnerAnalysisStatus: roomData.winnerAnalysisStatus || 'completed',
+              winnerAnalysisModel: roomData.winnerAnalysisModel || 'AI',
+              winnerAnalysisCompletedAt: roomData.winnerAnalysisCompletedAt || null
+            } : {})
+          },
           banned_players: roomData.bannedPlayers || [],
           ...(roomData.playerOrder ? { player_order: roomData.playerOrder } : {})
         });
