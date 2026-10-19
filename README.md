@@ -153,3 +153,18 @@ The AI winner-ranking endpoint runs on the same Node service as the frontend; th
 5. Confirm the service health check at `/health` returns `{"ok":true}`.
 
 The winner-analysis API applies a small per-IP request limit. Do not share the API key in chat, screenshots, or client-side code.
+
+## IPL 2026 franchise retention
+
+The auction now includes a five-second retention decision for the verified IPL 2026 franchise of a player, with two retention cards per franchise. Unknown or unverified franchise assignments are intentionally not eligible. The mapping and decision rules are covered by the unit tests.
+
+### Deployment checks
+
+- Render serves the app and exposes `/health`; the GitHub Actions workflow checks this endpoint after pushes to `main`.
+- `database.rules.json` contains the Realtime Database rules. Changes to this file are **not** deployed by a Render build. Deploy the rules to Firebase separately after authenticating the Firebase CLI for project `ipl-auction-friends-3fc71`:
+
+  ```sh
+  firebase deploy --only database --project ipl-auction-friends-3fc71
+  ```
+
+- Never commit Firebase credentials or the Gemini API key to the repository.
