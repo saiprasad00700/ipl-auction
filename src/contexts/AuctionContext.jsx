@@ -1186,7 +1186,7 @@ export const AuctionProvider = ({ children }) => {
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending') return;
+      if (!offer || offer.status !== 'pending' || offer.decision) return;
       if (offer.eligibleUserId !== user.uid) return;
       if (getServerTime() > Number(offer.expiresAt)) return;
       offer.decision = decision;
