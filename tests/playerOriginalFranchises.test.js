@@ -18,6 +18,15 @@ test('known IPL 2026 player franchises are mapped correctly', () => {
   assert.equal(getPlayerOriginalFranchise('p_150'), 'RR');   // Dhruv Jurel
   assert.equal(getPlayerOriginalFranchise('p_296'), 'KKR');  // Matheesha Pathirana
   assert.equal(getPlayerOriginalFranchise('p_369'), 'DC');   // Kyle Jamieson
+  assert.equal(getPlayerOriginalFranchise('p_156'), 'MI');   // Mitchell Santner
+  assert.equal(getPlayerOriginalFranchise('p_285'), 'KKR');  // Finn Allen
+  assert.equal(getPlayerOriginalFranchise('p_268'), 'PBKS'); // Yash Thakur
+  assert.equal(getPlayerOriginalFranchise('p_118'), 'LSG');  // Mohammed Shami
+  assert.equal(getPlayerOriginalFranchise('p_128'), 'LSG');  // Rishabh Pant
+  assert.equal(getPlayerOriginalFranchise('p_163'), 'MI');   // Shardul Thakur
+  assert.equal(getPlayerOriginalFranchise('p_281'), 'RCB');  // Venkatesh Iyer
+  assert.equal(getPlayerOriginalFranchise('p_190'), 'KKR');  // Harshit Rana
+  assert.equal(getPlayerOriginalFranchise('p_131'), 'RR');   // Sam Curran
 });
 
 test('unmapped players are not offered retention and franchise IDs are valid', () => {
@@ -44,6 +53,11 @@ test('retention cards require the exact original franchise, available cards, and
   assert.equal(canUseRetentionCard({ ...base, cardsRemaining: 0 }), false);
   assert.equal(canUseRetentionCard({ ...base, purseRemaining: 14.99 }), false);
   assert.equal(canUseRetentionCard({ ...base, winningBid: Number.NaN }), false);
+});
+
+test('the verified 2026 roster mapping covers the catalogue squads broadly', () => {
+  assert.ok(Object.keys(PLAYER_ORIGINAL_FRANCHISES).length >= 250,
+    'Expected at least 250 verified IPL 2026 roster assignments');
 });
 
 test('every mapped player ID exists in the catalogue', () => {
