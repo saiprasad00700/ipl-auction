@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getPlayerOriginalFranchise, PLAYER_ORIGINAL_FRANCHISES } from '../src/data/playerOriginalFranchises.js';
+import { canUseRetentionCard, RETENTION_CARDS_PER_FRANCHISE, RETENTION_DECISION_MS } from '../src/lib/auctionWinnerRules.js';
 
 test('known IPL 2026 player franchises are mapped correctly', () => {
   assert.equal(getPlayerOriginalFranchise('p_621'), 'MI');   // Jasprit Bumrah
@@ -19,4 +20,21 @@ test('unmapped players are not offered retention and franchise IDs are valid', (
     assert.ok(playerId.startsWith('p_'));
     assert.ok(allowed.has(franchiseId), `Invalid franchise for ${playerId}: ${franchiseId}`);
   }
+});
+
+test('retention cards require the exact original franchise, available cards, and enough purse', () => {
+  assert.equal(RETENTION_CARDS_PER_FRANCHISE, 2);
+  assert.equal(RETENTION_DECISION_MS, 5000);
+  const base = {
+    originalFranchiseId: 'MI',
+    eligibleFranchiseId: 'MI',
+    cardsRemaining: 2,
+    purseRemaining: 20,
+    winningBid: 15
+  };
+  assert.equal(canUseRetentionCard(base), true);
+  assert.equal(canUseRetentionCard({ ...base, eligibleFranchiseId: 'CSK' }), false);
+  assert.equal(canUseRetentionCard({ ...base, cardsRemaining: 0 }), false);
+  assert.equal(canUseRetentionCard({ ...base, purseRemaining: 14.99 }), false);
+  assert.equal(canUseRetentionCard({ ...base, winningBid: Number.NaN }), false);
 });
