@@ -121,6 +121,18 @@ const AuctionRoom = () => {
       return () => clearInterval(timer);
    }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt]);
 
+   // Any connected manager can recover a pending retention sale if its coordinator tab closes.
+   useEffect(() => {
+      if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
+      const timer = setInterval(() => {
+         if (getSyncedTime() >= Number(retentionOffer.expiresAt)) {
+            clearInterval(timer);
+            endPlayerAuction(id).catch(() => {});
+         }
+      }, 250);
+      return () => clearInterval(timer);
+   }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt, endPlayerAuction, getSyncedTime, id]);
+
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
       const tick = () => {
