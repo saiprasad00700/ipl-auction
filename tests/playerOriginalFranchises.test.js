@@ -14,6 +14,10 @@ test('known IPL 2026 player franchises are mapped correctly', () => {
   assert.equal(getPlayerOriginalFranchise('p_410'), 'SRH');  // Sakib Hussain
   assert.equal(getPlayerOriginalFranchise('p_365'), 'GT');   // Tom Banton
   assert.equal(getPlayerOriginalFranchise('p_390'), 'RCB');  // Mangesh Yadav
+  assert.equal(getPlayerOriginalFranchise('p_119'), 'GT');   // Mohammed Siraj
+  assert.equal(getPlayerOriginalFranchise('p_150'), 'RR');   // Dhruv Jurel
+  assert.equal(getPlayerOriginalFranchise('p_296'), 'KKR');  // Matheesha Pathirana
+  assert.equal(getPlayerOriginalFranchise('p_369'), 'DC');   // Kyle Jamieson
 });
 
 test('unmapped players are not offered retention and franchise IDs are valid', () => {
@@ -42,7 +46,7 @@ test('retention cards require the exact original franchise, available cards, and
   assert.equal(canUseRetentionCard({ ...base, winningBid: Number.NaN }), false);
 });
 
-test('every mapped player ID exists in the catalogue and has a matching name comment', () => {
+test('every mapped player ID exists in the catalogue', () => {
   const playersById = new Map(IPL_PLAYERS.map((player) => [player.id, player]));
   const source = PLAYER_ORIGINAL_FRANCHISES;
   for (const playerId of Object.keys(source)) {
