@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { db, getServerTime, rtdb } from '../lib/firebase';
+import { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { IPL_PLAYERS } from '../data/players';
 import { evaluateBotBid } from '../lib/botEngine';
@@ -348,6 +348,8 @@ export const AuctionProvider = ({ children }) => {
   }, [getSyncedTime]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
+    // Never create or expire an RTM offer using an unsynchronized local clock.
+    if (!isServerTimeSynced()) return;
     // Prevent duplicate calls from the timer interval
     if (endingPlayerRef.current) return;
     endingPlayerRef.current = true;
@@ -1290,12 +1292,13 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
+    if (!isServerTimeSynced()) throw new Error('Connecting to auction server time. Please try again in a moment.');
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    const now = getServerTime();
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
       if (!offer || offer.status !== 'pending' || offer.decision) return;
+      const now = getServerTime();
       if (now > Number(offer.expiresAt)) return;
       const isInitialDecision = offer.phase === 'initial_decision';
       const isMatchDecision = offer.phase === 'match_decision';
@@ -1329,6 +1332,7 @@ export const AuctionProvider = ({ children }) => {
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
+    if (!isServerTimeSynced()) throw new Error('Connecting to auction server time. Please try again in a moment.');
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
     const roomData = roomSnap.exists() ? roomSnap.val() : {};

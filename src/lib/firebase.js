@@ -39,6 +39,8 @@ export { analytics };
 
 // ─── Server Time Sync via Firebase RTDB ───
 let _serverTimeOffset = 0;
+let _rtdbConnected = false;
+let _offsetReceivedWhileConnected = false;
 
 export const rtdb = getDatabase(app);
 
@@ -46,9 +48,21 @@ export const rtdb = getDatabase(app);
 try {
   // Start offline by default until entering an active room session
   goOffline(rtdb);
+  const connectedRef = ref(rtdb, '.info/connected');
   const offsetRef = ref(rtdb, '.info/serverTimeOffset');
+  onValue(connectedRef, (snap) => {
+    const connected = snap.val() === true;
+    if (connected !== _rtdbConnected) {
+      _rtdbConnected = connected;
+      _offsetReceivedWhileConnected = false;
+    }
+  });
   onValue(offsetRef, (snap) => {
-    _serverTimeOffset = snap.val() || 0;
+    const offset = Number(snap.val());
+    if (Number.isFinite(offset)) {
+      _serverTimeOffset = offset;
+      if (_rtdbConnected) _offsetReceivedWhileConnected = true;
+    }
   });
 } catch {
   // RTDB sync skipped silently. We default to local machine clock.
@@ -60,6 +74,9 @@ try {
  * All clients calling this will agree on the same absolute time (±50ms).
  */
 export const getServerTime = () => Date.now() + _serverTimeOffset;
+
+/** True only after RTDB connects and supplies an offset during that connection. */
+export const isServerTimeSynced = () => _rtdbConnected && _offsetReceivedWhileConnected;
 
 /**
  * Returns the current server time offset in ms (for debugging).
