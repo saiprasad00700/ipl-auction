@@ -1396,7 +1396,9 @@ export const AuctionProvider = ({ children }) => {
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
-    await ensureServerTimeSync();
+    // Do not spend the short RTM counter-bid window waiting for the server-time
+    // readiness flag. As with decideRetention, the RTDB transaction remains
+    // authoritative; use the cached server-adjusted clock for the expiry check.
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
     const roomData = roomSnap.exists() ? roomSnap.val() : {};
@@ -1407,7 +1409,7 @@ export const AuctionProvider = ({ children }) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
       if (!offer || offer.status !== 'pending' || offer.phase !== 'counter_bid' || offer.buyerId !== user.uid) return;
-      if (getServerTime() > Number(offer.expiresAt)) return;
+      if (getSyncedTime() > Number(offer.expiresAt)) return;
       if (counterBid <= Number(offer.bid)) return;
       if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
       if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120) + Number(teamData.spent || 0)) return;
@@ -1422,7 +1424,7 @@ export const AuctionProvider = ({ children }) => {
     if (!result.committed) {
       throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
     }
-  }, [user, ensureServerTimeSync]);
+  }, [user, getSyncedTime]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
