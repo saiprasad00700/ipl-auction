@@ -1716,10 +1716,11 @@ const AuctionRoom = () => {
          </AnimatePresence>
 
          <AnimatePresence>
-            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && (!displayAuctionState?.retentionOffer?.decision || displayAuctionState?.retentionOffer?.phase === 'counter_bid') && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && locallyDismissedRetentionOffer !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && locallyDismissedRetentionOffer !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
                const offer = displayAuctionState.retentionOffer;
                const eligible = offer.eligibleUserId === user?.uid;
-               const counterBidder = offer.buyerId === user?.uid || (team?.teamId && team.teamId === offer.buyerTeamId);
+               const myFranchiseId = team?.teamId || roomTeams?.find((t) => t.userId === user?.uid)?.teamId;
+               const counterBidder = offer.buyerId === user?.uid || (myFranchiseId && myFranchiseId === offer.buyerTeamId);
                const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
                const secondsLeft = Math.max(0, Math.ceil((Number(offer.expiresAt) - getSyncedTime()) / 1000));
                return (
