@@ -1359,11 +1359,11 @@ export const AuctionProvider = ({ children }) => {
         if (!teamData?.teamId || teamData.teamId === 'NONE') return;
         const squadCount = Array.isArray(teamData.squad) ? teamData.squad.length : 0;
         const disqualified = squadCount < 18;
-        teamUpdates[teamKey] = {
-          disqualified,
-          disqualificationReason: disqualified ? `Only ${squadCount} players bought; at least 18 are required.` : null,
-          squadCountAtEnd: squadCount
-        };
+        teamUpdates[`${teamKey}/disqualified`] = disqualified;
+        teamUpdates[`${teamKey}/disqualificationReason`] = disqualified
+          ? `Only ${squadCount} players bought; at least 18 are required.`
+          : null;
+        teamUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
         if (disqualified) disqualifiedNames.push(`${teamData.teamName || teamData.teamId} (${squadCount}/18)`);
       });
       if (Object.keys(teamUpdates).length) await updateRtdb(teamsRef, teamUpdates);
