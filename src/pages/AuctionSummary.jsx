@@ -345,11 +345,11 @@ const AuctionSummary = () => {
                   const teamInfo = TEAMS.find((t) => t.id === entry.franchiseId);
                   return <div key={entry.franchiseId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 shrink-0 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-xl font-black text-orange-400">#{entry.rank}</div>
+                      <div className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center text-[10px] sm:text-xs font-black text-center ${entry.disqualified ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{entry.disqualified ? 'DQ' : `#${entry.rank}`}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h3 className="font-black uppercase">{teamInfo?.name || entry.franchiseId}</h3>
-                          {Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
+                          {entry.disqualified ? <span className="text-xs font-black text-red-300">DISQUALIFIED</span> : entry.score != null && Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
                         </div>
                         <p className="text-sm text-gray-300 mt-2">{entry.summary || 'AI squad assessment'}</p>
                         {entry.strengths?.length > 0 && <p className="text-xs text-emerald-300 mt-3"><strong>Strengths:</strong> {entry.strengths.join(' · ')}</p>}
