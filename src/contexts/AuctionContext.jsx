@@ -479,6 +479,11 @@ export const AuctionProvider = ({ children }) => {
               finish();
               return;
             }
+            if ((offer.phase === 'initial_decision' && offer.decision === 'decline')
+              || (offer.phase === 'match_decision' && offer.decision)) {
+              finish();
+              return;
+            }
             if (getSyncedTime() >= Number(offer.expiresAt)) finish();
           };
           pollId = setInterval(async () => {
@@ -500,7 +505,13 @@ export const AuctionProvider = ({ children }) => {
           const offer = currentData.retentionOffer;
           if (!offer || offer.status !== 'pending') return;
           const now = getSyncedTime();
-          if (now < Number(offer.expiresAt)) return;
+          const initialDeclined = offer.phase === 'initial_decision'
+            && offer.decision === 'decline'
+            && Number(offer.decidedAt) <= Number(offer.expiresAt);
+          const matchDecisionMade = offer.phase === 'match_decision'
+            && ['match', 'decline_counter'].includes(offer.decision)
+            && Number(offer.decidedAt) <= Number(offer.expiresAt);
+          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt)) return;
           if (offer.phase === 'counter_bid' && offer.rtmUsed) {
             currentData.highBidderId = offer.eligibleUserId;
             currentData.highBidderName = offer.eligibleTeamName;
@@ -532,16 +543,24 @@ export const AuctionProvider = ({ children }) => {
           return;
         }
         auctionState = settleTx.snapshot.val();
-        if (auctionState.retentionOffer?.status !== 'accepted') {
+        if (auctionState.retentionOffer?.status === 'accepted') {
           await push(ref(rtdb, `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
-            text: `Retention declined or timed out. The original winning bid stands.`,
+            text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} through RTM for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
+            type: 'retention_accepted',
+            metadata: { playerId: auctionState.playerId, teamId: auctionState.highBidderTeamId, bid: auctionState.currentBid },
+            timestamp: serverTimestampRtdb()
+          });
+        } else if (auctionState.retentionOffer?.status === 'declined' || auctionState.retentionOffer?.status === 'expired') {
+          await push(ref(rtdb, `auctions/${roomId}/messages`), {
+            userId: 'system', userName: 'System',
+            text: `RTM not matched. ${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
             type: 'log', timestamp: serverTimestampRtdb()
           });
         }
       }
-      if (auctionState.retentionOffer?.status === 'accepted') {
-        const acceptedTeamId = `${roomId}_${auctionState.highBidderId}`;
+      if (auctionState.retentionOffer?.rtmUsed) {
+        const acceptedTeamId = `${roomId}_${auctionState.retentionOffer.eligibleUserId}`;
         const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
         const acceptedTeamSnap = await get(acceptedTeamRef);
         const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
