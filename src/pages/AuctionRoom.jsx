@@ -1716,15 +1716,16 @@ const AuctionRoom = () => {
          </AnimatePresence>
 
          <AnimatePresence>
-            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && !displayAuctionState?.retentionOffer?.decision && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && locallyDismissedRetentionOffer !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && (!displayAuctionState?.retentionOffer?.decision || displayAuctionState?.retentionOffer?.phase === 'counter_bid') && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && locallyDismissedRetentionOffer !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
                const offer = displayAuctionState.retentionOffer;
                const eligible = offer.eligibleUserId === user?.uid;
+               const counterBidder = offer.buyerId === user?.uid || (team?.teamId && team.teamId === offer.buyerTeamId);
                const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
                const secondsLeft = Math.max(0, Math.ceil((Number(offer.expiresAt) - getSyncedTime()) / 1000));
                return (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                      <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
-                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{offer.phase === 'initial_decision' ? (eligible ? 'RTM decision required' : 'RTM decision pending') : offer.phase === 'counter_bid' ? (offer.buyerId === user?.uid ? 'Submit counter-price' : 'Waiting for counter-price') : offer.phase === 'match_decision' ? (eligible ? 'Match counter-price' : 'Counter-price submitted') : 'RTM in progress'}</div>
+                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{offer.phase === 'initial_decision' ? (eligible ? 'RTM decision required' : 'RTM decision pending') : offer.phase === 'counter_bid' ? (counterBidder ? 'Submit counter-price' : 'Waiting for counter-price') : offer.phase === 'match_decision' ? (eligible ? 'Match counter-price' : 'Counter-price submitted') : 'RTM in progress'}</div>
                         <div className="flex items-center gap-4 mb-5">
                            <img src={player?.image} alt={player?.name || 'Player'} className="w-20 h-20 object-contain rounded-2xl bg-white/5 border border-white/10" />
                            <div>
@@ -1754,7 +1755,7 @@ const AuctionRoom = () => {
                               <p className="text-sm text-gray-300">Waiting for {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId} to decide whether to use RTM. Current winning bid is on hold. Time left: {secondsLeft}s.</p>
                            )
                         ) : offer.phase === 'counter_bid' ? (
-                           offer.buyerId === user?.uid ? (
+                           counterBidder ? (
                               <>
                                  <p className="text-sm text-gray-300 mb-3">The original franchise chose YES to RTM. Enter a counter-price strictly greater than ₹{Number(offer.bid).toFixed(2)} Cr. You have up to 15 seconds; submitting early immediately sends the new price to the original franchise. If they do not match, you win at your counter-price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
                                  <form className="space-y-3" onSubmit={async (e) => {
