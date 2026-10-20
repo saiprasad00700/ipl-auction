@@ -58,13 +58,30 @@ export default async function handler(req, res) {
     return json(503, error);
   }
 
-  const prompt = `You are an expert IPL/T20 team strategist. Rank every franchise in this auction from 1 (strongest) to N (weakest), with exactly one unique integer rank per franchise and no ties.
+  const prompt = `You are an expert IPL/T20 analyst, cricket statistician, and franchise team strategist. Rank every franchise in this auction from 1 (strongest) to N (weakest), with exactly one unique integer rank per franchise and no ties.
 
-Evaluate the submitted 11-player starting XI plus one Impact Player (12 considered players). Assess opening pair skill and compatibility, top-order stability, middle-order strength, batting depth, finishers, pace attack, spin attack, all-rounders, wicketkeeping, role coverage, Indian/overseas balance where relevant, and overall T20 suitability. Do not automatically prefer a player just because they are labelled an all-rounder. Use supplied statistics when present; missing statistics are unknown, not zero. If XIs appear similarly strong, compare the entire squads and quality/depth of backups as the tiebreaker. A franchise marked autoSelected had its XI selected from its squad due to missing submission; analyze that XI normally.
+RECENT PERFORMANCE EVIDENCE (ESSENTIAL):
+- Evaluate each relevant player's performance over the most recent 2–3 years, prioritizing the latest seasons and matches available in your reliable knowledge. Consider BOTH IPL cricket and international cricket (Tests, ODIs, and T20Is), with format relevance weighted toward T20/IPL roles.
+- If a player has played international cricket during this period, consider their recent international performances as well as their IPL performances; do not ignore either source. If they have not played international matches, judge them primarily from their recent IPL performance.
+- Judge current/recent form, consistency, role-specific output, impact under pressure, and availability/fitness only where reliable information is known. Do not let old career reputation or lifetime totals outweigh recent form.
+- Use statistics included in the input when present. Never fabricate exact runs, wickets, averages, strike rates, economy rates, match counts, injuries, or recent results. If reliable recent evidence is unavailable for a player, state uncertainty internally and assess them cautiously from the evidence available rather than inventing facts. Missing data is unknown, not zero.
+- Do not claim you browsed live statistics or cite specific matches/seasons unless you can support those details.
+
+RANKING METHOD — FOLLOW THIS ORDER:
+1. First assess each submitted starting XI (11 starters) and its Impact Player as the primary basis. Evaluate role fit and balance: opening pair skill/compatibility, top-order stability, middle-order strength, batting depth, finishers, wicketkeeping, pace, spin, death bowling, all-round options, and sufficient bowling choices. Consider recent IPL and international performance as described above. Do not automatically prefer a player merely because they are labelled an all-rounder; evaluate their actual batting and bowling value.
+2. Compare the starting XIs directly. Give the main weight to the quality, recent form, role coverage, and balance of these 12 selected players. Explain meaningful advantages and weaknesses.
+3. ONLY when two or more starting XIs are equally strong or almost equally strong, compare their backup players and then the overall squad. Assess backup quality by role, bench depth, replacements for weaknesses, injury/rotation cover, and whether the squad can maintain balance if a starter underperforms. Use the full squad as a tie-breaker, not as a reason to overlook a clearly stronger starting XI.
+4. Produce a unique, defensible ranking for every franchise. Do not force artificial differences based on reputation when the teams are genuinely close; use the backup/squad tie-break process and explain the decisive factor. Do not invent player statistics.
+
+EXPLANATION REQUIRED FOR EVERY FRANCHISE:
+- Give a concise, franchise-specific overview explaining why it received that exact rank relative to the other teams.
+- Include its main strengths, main weaknesses/risks, and the most important reason it ranks above the next team or below the team immediately above it.
+- Mention whether its rank was primarily determined by its starting XI/Impact Player or, if the XIs were close, by backup quality and overall squad depth.
+- Be specific to the players and roles in the supplied squad. Avoid generic praise, repetitive summaries, and unsupported statistical claims.
 
 Return ONLY valid JSON in this exact shape:
-{"rankings":[{"franchiseId":"...","rank":1,"score":87,"summary":"...","strengths":["..."],"risks":["..."]}]}
-Every input franchiseId must appear exactly once. Ranks must be a permutation of 1..N with no ties. Do not invent player statistics. Keep summaries concise.
+{"rankings":[{"franchiseId":"...","rank":1,"score":87,"summary":"Concise explanation of why this team earned this rank, including its key strength, weakness, and decisive comparison.","strengths":["..."],"risks":["..."]}]}
+Every input franchiseId must appear exactly once. Ranks must be a permutation of 1..N with no ties. Keep summaries concise but meaningful; strengths and risks must be specific to the supplied franchise squad.
 
 Auction room: ${roomId}
 Franchises:
