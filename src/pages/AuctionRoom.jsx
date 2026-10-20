@@ -141,7 +141,7 @@ const AuctionRoom = () => {
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
       const tick = () => {
-         const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE');
+         const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
             t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
          );
@@ -1937,7 +1937,7 @@ const AuctionRoom = () => {
                         <p className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> Waiting for other franchises to submit</p>
                         <p className="text-xs mt-1 text-emerald-200/80">Your 11 starters and Impact Player are saved. Analysis starts as soon as everyone submits, or when the two-minute deadline expires.</p>
                         {(() => {
-                           const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE');
+                           const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
                            const missingTeams = participatingTeams.filter((t) =>
                               !(t.playingXI?.startingXI?.length === 11 && t.playingXI?.impactPlayer)
                            );
