@@ -470,6 +470,12 @@ export const AuctionProvider = ({ children }) => {
       });
 
       if (!txResult.committed) {
+        console.error('[Auction] Settlement transaction was not committed.', {
+          roomId,
+          liveState: txResult.snapshot?.val() || null,
+          serverTimeSynced: isServerTimeSynced(),
+          serverTime: getSyncedTime()
+        });
         endingPlayerRef.current = false;
         return;
       }
@@ -555,6 +561,12 @@ export const AuctionProvider = ({ children }) => {
           return currentData;
         });
         if (!settleTx.committed) {
+          console.error('[Auction] RTM settlement transaction was not committed.', {
+            roomId,
+            liveState: settleTx.snapshot?.val() || null,
+            serverTimeSynced: isServerTimeSynced(),
+            serverTime: getSyncedTime()
+          });
           endingPlayerRef.current = false;
           return;
         }
@@ -731,7 +743,8 @@ export const AuctionProvider = ({ children }) => {
 
       setTimeout(advanceToNextPlayer, waitTime);
     } catch (err) {
-      // Release the lock on any outer error so future players can be ended
+      // Log the real failure instead of silently swallowing the auction settlement error.
+      console.error('[Auction] endPlayerAuction failed:', err);
       endingPlayerRef.current = false;
     }
   }, [getSyncedTime, flushAuctionToFirestore]);
