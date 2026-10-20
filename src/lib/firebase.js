@@ -39,6 +39,7 @@ export { analytics };
 
 // ─── Server Time Sync via Firebase RTDB ───
 let _serverTimeOffset = 0;
+let _hasServerTimeOffset = false;
 let _rtdbConnected = false;
 let _offsetReceivedWhileConnected = false;
 
@@ -50,37 +51,30 @@ try {
   goOffline(rtdb);
   const connectedRef = ref(rtdb, '.info/connected');
   const offsetRef = ref(rtdb, '.info/serverTimeOffset');
-  onValue(connectedRef, async (snap) => {
-    const connected = snap.val() === true;
-    if (connected !== _rtdbConnected) {
-      _rtdbConnected = connected;
-      _offsetReceivedWhileConnected = false;
-    }
-    // The offset listener may have delivered its initial value before the
-    // connection event. Read it again after connecting so readiness cannot
-    // remain false simply because the offset value did not change.
-    if (connected) {
-      try {
-        const offsetSnap = await get(offsetRef);
-        const offset = Number(offsetSnap.val());
-        if (_rtdbConnected && Number.isFinite(offset)) {
-          _serverTimeOffset = offset;
-          _offsetReceivedWhileConnected = true;
-        }
-      } catch {
-        _offsetReceivedWhileConnected = false;
-      }
-    }
-  });
+
+  // .info/serverTimeOffset is client-side Firebase metadata. Do not call
+  // get() on it: that can issue an invalid server path request and mark
+  // time sync unavailable, preventing expired auctions from settling.
   onValue(offsetRef, (snap) => {
     const offset = Number(snap.val());
     if (Number.isFinite(offset)) {
       _serverTimeOffset = offset;
+      _hasServerTimeOffset = true;
       if (_rtdbConnected) _offsetReceivedWhileConnected = true;
     }
   });
-} catch {
-  // RTDB sync skipped silently. We default to local machine clock.
+
+  onValue(connectedRef, (snap) => {
+    const connected = snap.val() === true;
+    if (connected !== _rtdbConnected) {
+      _rtdbConnected = connected;
+      // Reuse the last valid Firebase-provided offset after reconnecting;
+      // the .info listener may not emit again if the offset did not change.
+      _offsetReceivedWhileConnected = connected && _hasServerTimeOffset;
+    }
+  });
+} catch (err) {
+  console.error('[Firebase] Failed to initialize server-time sync listeners:', err);
 }
 
 /**
