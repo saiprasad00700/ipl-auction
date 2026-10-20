@@ -62,6 +62,7 @@ const AuctionRoom = () => {
       joinRoomDb,
       endPlayerAuction,
       decideRetention,
+      submitRetentionCounterBid,
       pauseAuction,
       resumeAuction,
       endAuction,
@@ -104,6 +105,7 @@ const AuctionRoom = () => {
    const [isBiddingInFlight, setIsBiddingInFlight] = useState(false);
    const [retentionDecisionPendingFor, setRetentionDecisionPendingFor] = useState(null);
    const [locallyDismissedRetentionOffer, setLocallyDismissedRetentionOffer] = useState(null);
+   const [retentionCounterBid, setRetentionCounterBid] = useState('');
    const [spectateMode, setSpectateMode] = useState(() => {
       const params = new URLSearchParams(window.location.search);
       return params.get('spectate') === 'true';
@@ -1731,41 +1733,71 @@ const AuctionRoom = () => {
                               <p className="text-xs text-gray-500 mt-1">Original franchise: {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId}</p>
                            </div>
                         </div>
-                        {eligible ? (
-                           <>
-                              <p className="text-sm text-gray-300 mb-4">Use one of your remaining retention cards to acquire this player at the winning bid. Your decision window closes in <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
-                              <div className="grid grid-cols-2 gap-3">
-                                 <button onClick={async () => {
-                                    const offerKey = String(offer.expiresAt);
-                                    setRetentionDecisionPendingFor(offerKey);
-                                    setLocallyDismissedRetentionOffer(offerKey);
+                        {offer.phase === 'initial_decision' ? (
+                           eligible ? (
+                              <>
+                                 <p className="text-sm text-gray-300 mb-4">Do you want to use your RTM card? If you choose YES, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} gets one chance to raise the price. You then decide whether to match their new price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={async () => {
+                                       setRetentionDecisionPendingFor(String(offer.expiresAt));
+                                       try { await decideRetention(id, 'accept'); setRetentionDecisionPendingFor(null); }
+                                       catch (e) { console.error('RTM choice failed:', e); setRetentionDecisionPendingFor(null); }
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Use RTM</button>
+                                    <button onClick={async () => {
+                                       setRetentionDecisionPendingFor(String(offer.expiresAt));
+                                       try { await decideRetention(id, 'decline'); }
+                                       catch (e) { console.error('RTM decline failed:', e); setRetentionDecisionPendingFor(null); }
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">NO — Decline</button>
+                                 </div>
+                              </>
+                           ) : (
+                              <p className="text-sm text-gray-300">Waiting for {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId} to decide whether to use RTM. Current winning bid is on hold. Time left: {secondsLeft}s.</p>
+                           )
+                        ) : offer.phase === 'counter_bid' ? (
+                           offer.buyerId === user?.uid ? (
+                              <>
+                                 <p className="text-sm text-gray-300 mb-3">The original franchise chose to use RTM. Enter your new price above ₹{Number(offer.bid).toFixed(2)} Cr. If they don't match your price, you win the player at your new price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <form className="space-y-3" onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    setRetentionDecisionPendingFor(String(offer.expiresAt));
                                     try {
-                                       await decideRetention(id, 'accept');
-                                    } catch (decisionError) {
-                                       console.error('Retention accept failed:', decisionError);
+                                       await submitRetentionCounterBid(id, retentionCounterBid);
+                                       setRetentionCounterBid('');
                                        setRetentionDecisionPendingFor(null);
-                                       setLocallyDismissedRetentionOffer(null);
-                                       // Avoid the generic red toast for retention; the offer can still expire normally.
-                                    }
-                                 }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Retain player'}</button>
-                                 <button onClick={async () => {
-                                    const offerKey = String(offer.expiresAt);
-                                    setRetentionDecisionPendingFor(offerKey);
-                                    setLocallyDismissedRetentionOffer(offerKey);
-                                    try {
-                                       await decideRetention(id, 'decline');
-                                    } catch (decisionError) {
-                                       console.error('Retention decline failed:', decisionError);
+                                    } catch (err) {
+                                       console.error('RTM counter-bid failed:', err);
+                                       setError(err.message || 'Could not submit counter-bid.');
                                        setRetentionDecisionPendingFor(null);
-                                       setLocallyDismissedRetentionOffer(null);
-                                       // Avoid the generic red toast for retention; the offer can still expire normally.
                                     }
-                                 }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Decline'}</button>
-                              </div>
-                           </>
-                        ) : (
-                           <p className="text-sm text-gray-300">Only the original franchise manager can decide. The current winning bid is on hold for up to five seconds; other managers cannot accept or decline this offer.</p>
-                        )}
+                                 }}>
+                                    <input type="number" min={(Number(offer.bid) + 0.01).toFixed(2)} step="0.01" value={retentionCounterBid} onChange={(e) => setRetentionCounterBid(e.target.value)} placeholder="Enter new price in Cr" className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-white" required />
+                                    <button type="submit" disabled={!retentionCounterBid || Boolean(retentionDecisionPendingFor)} className="w-full rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor ? 'Submitting…' : 'Submit higher price'}</button>
+                                 </form>
+                              </>
+                           ) : (
+                              <p className="text-sm text-gray-300">RTM has been exercised. Waiting for {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} to submit a higher price. If they do not respond in time, the original franchise gets the player at ₹{Number(offer.bid).toFixed(2)} Cr. Time left: {secondsLeft}s.</p>
+                           )
+                        ) : offer.phase === 'match_decision' ? (
+                           eligible ? (
+                              <>
+                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-yellow-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to match this price? If yes, the player joins your franchise at this price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={async () => {
+                                       setRetentionDecisionPendingFor(String(offer.expiresAt));
+                                       try { await decideRetention(id, 'match'); }
+                                       catch (e) { console.error('RTM match failed:', e); setRetentionDecisionPendingFor(null); }
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Match ₹{Number(offer.counterBid).toFixed(2)} Cr</button>
+                                    <button onClick={async () => {
+                                       setRetentionDecisionPendingFor(String(offer.expiresAt));
+                                       try { await decideRetention(id, 'decline_counter'); }
+                                       catch (e) { console.error('RTM final decline failed:', e); setRetentionDecisionPendingFor(null); }
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">NO — Let them have him</button>
+                                 </div>
+                              </>
+                           ) : (
+                              <p className="text-sm text-gray-300">The price has been raised to ₹{Number(offer.counterBid).toFixed(2)} Cr. Waiting for the original franchise to match or decline. If they decline or time out, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} wins at this price. Time left: {secondsLeft}s.</p>
+                           )
+                        ) : <p className="text-sm text-gray-300">RTM decision in progress…</p>
                      </motion.div>
                   </motion.div>
                );

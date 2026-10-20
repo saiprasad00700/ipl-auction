@@ -374,12 +374,29 @@ export const AuctionProvider = ({ children }) => {
         if (currentData.status === 'processing_sale') {
           const offer = currentData.retentionOffer;
           if (!offer || offer.status !== 'pending' || now < Number(offer.expiresAt)) return;
-          if (offer.decision === 'accept' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
+            // Original franchise exercised RTM but the winning bidder did not raise in time.
             currentData.highBidderId = offer.eligibleUserId;
             currentData.highBidderName = offer.eligibleTeamName;
             currentData.highBidderTeamId = offer.originalFranchiseId;
+            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
             offer.status = 'accepted';
+          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
+            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+              currentData.highBidderId = offer.eligibleUserId;
+              currentData.highBidderName = offer.eligibleTeamName;
+              currentData.highBidderTeamId = offer.originalFranchiseId;
+              currentData.currentBid = Number(offer.counterBid);
+              offer.status = 'accepted';
+            } else {
+              currentData.highBidderId = offer.buyerId;
+              currentData.highBidderName = offer.buyerName;
+              currentData.highBidderTeamId = offer.buyerTeamId;
+              currentData.currentBid = Number(offer.counterBid);
+              offer.status = 'declined';
+            }
           } else {
+            // No RTM, or the initial decision expired: the original winning bid stands.
             offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
           }
           currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
@@ -422,6 +439,9 @@ export const AuctionProvider = ({ children }) => {
               buyerTeamId: buyerFranchiseId,
               buyerName: currentData.highBidderName,
               bid: Number(currentData.currentBid || 0),
+              counterBid: null,
+              phase: 'initial_decision',
+              rtmUsed: false,
               expiresAt: now + RETENTION_DECISION_MS,
               status: 'pending',
               decision: null
@@ -440,30 +460,42 @@ export const AuctionProvider = ({ children }) => {
 
       let auctionState = txResult.snapshot.val();
       if (auctionState.status === 'processing_sale' && auctionState.retentionOffer?.status === 'pending') {
-        const remaining = Math.max(0, Number(auctionState.retentionOffer.expiresAt) - getSyncedTime());
-
-        // Wake as soon as the eligible manager decides instead of sleeping through
-        // the whole five-second window. Keep the expiry timer as the timeout fallback.
+        // Follow all three RTM stages. Each stage has its own expiry, so refresh
+        // the timeout whenever the offer advances instead of settling on the first YES.
         await new Promise((resolve) => {
           let finished = false;
           let unsubscribe = () => {};
-          let timeoutId;
+          let pollId;
           const finish = () => {
             if (finished) return;
             finished = true;
             unsubscribe();
-            if (timeoutId) clearTimeout(timeoutId);
+            if (pollId) clearInterval(pollId);
             resolve();
           };
-          timeoutId = setTimeout(finish, remaining);
-          unsubscribe = onValue(liveRef, (snapshot) => {
-            const latest = snapshot.val();
+          const check = (latest) => {
             const offer = latest?.retentionOffer;
-            if (latest?.status !== 'processing_sale' || !offer || offer.status !== 'pending' || offer.decision) {
+            if (latest?.status !== 'processing_sale' || !offer || offer.status !== 'pending') {
               finish();
+              return;
             }
-          }, (error) => {
-            console.error('Retention decision listener failed; waiting until offer expiry.', error);
+            if ((offer.phase === 'initial_decision' && offer.decision === 'decline')
+              || (offer.phase === 'match_decision' && offer.decision)) {
+              finish();
+              return;
+            }
+            if (getSyncedTime() >= Number(offer.expiresAt)) finish();
+          };
+          pollId = setInterval(async () => {
+            try {
+              const snap = await get(liveRef);
+              check(snap.val());
+            } catch (error) {
+              console.error('Retention stage check failed.', error);
+            }
+          }, 250);
+          unsubscribe = onValue(liveRef, (snapshot) => check(snapshot.val()), (error) => {
+            console.error('Retention decision listener failed.', error);
           });
         });
 
@@ -472,11 +504,34 @@ export const AuctionProvider = ({ children }) => {
           if (!currentData || currentData.status !== 'processing_sale') return;
           const offer = currentData.retentionOffer;
           if (!offer || offer.status !== 'pending') return;
-          if (offer.decision === 'accept' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+          const now = getSyncedTime();
+          const initialDeclined = offer.phase === 'initial_decision'
+            && offer.decision === 'decline'
+            && Number(offer.decidedAt) <= Number(offer.expiresAt);
+          const matchDecisionMade = offer.phase === 'match_decision'
+            && ['match', 'decline_counter'].includes(offer.decision)
+            && Number(offer.decidedAt) <= Number(offer.expiresAt);
+          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt)) return;
+          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
             currentData.highBidderId = offer.eligibleUserId;
             currentData.highBidderName = offer.eligibleTeamName;
             currentData.highBidderTeamId = offer.originalFranchiseId;
+            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
             offer.status = 'accepted';
+          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
+            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+              currentData.highBidderId = offer.eligibleUserId;
+              currentData.highBidderName = offer.eligibleTeamName;
+              currentData.highBidderTeamId = offer.originalFranchiseId;
+              currentData.currentBid = Number(offer.counterBid);
+              offer.status = 'accepted';
+            } else {
+              currentData.highBidderId = offer.buyerId;
+              currentData.highBidderName = offer.buyerName;
+              currentData.highBidderTeamId = offer.buyerTeamId;
+              currentData.currentBid = Number(offer.counterBid);
+              offer.status = 'declined';
+            }
           } else {
             offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
           }
@@ -488,29 +543,31 @@ export const AuctionProvider = ({ children }) => {
           return;
         }
         auctionState = settleTx.snapshot.val();
-        if (auctionState.retentionOffer?.status !== 'accepted') {
+        if (auctionState.retentionOffer?.status === 'accepted') {
           await push(ref(rtdb, `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
-            text: `Retention declined or timed out. The original winning bid stands.`,
+            text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} through RTM for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
+            type: 'retention_accepted',
+            metadata: { playerId: auctionState.playerId, teamId: auctionState.highBidderTeamId, bid: auctionState.currentBid },
+            timestamp: serverTimestampRtdb()
+          });
+        } else if (auctionState.retentionOffer?.status === 'declined' || auctionState.retentionOffer?.status === 'expired') {
+          await push(ref(rtdb, `auctions/${roomId}/messages`), {
+            userId: 'system', userName: 'System',
+            text: `RTM not matched. ${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
             type: 'log', timestamp: serverTimestampRtdb()
           });
         }
       }
-      if (auctionState.retentionOffer?.status === 'accepted') {
-        const acceptedTeamId = `${roomId}_${auctionState.highBidderId}`;
+      if (auctionState.retentionOffer?.rtmUsed) {
+        const acceptedTeamId = `${roomId}_${auctionState.retentionOffer.eligibleUserId}`;
         const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
         const acceptedTeamSnap = await get(acceptedTeamRef);
         const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
         await updateRtdb(acceptedTeamRef, {
           retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
         });
-        await push(ref(rtdb, `auctions/${roomId}/messages`), {
-          userId: 'system', userName: 'System',
-          text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} retained by ${auctionState.retentionOffer.originalFranchiseId} for ₹${auctionState.retentionOffer.bid} Cr.`,
-          type: 'retention_accepted',
-          metadata: { playerId: auctionState.playerId, teamId: auctionState.retentionOffer.originalFranchiseId, bid: auctionState.retentionOffer.bid },
-          timestamp: serverTimestampRtdb()
-        });
+        // Final sale log below records the settled price and winning franchise.
       }
 
       const isSold = auctionState.status === 'sold';
@@ -1230,23 +1287,71 @@ export const AuctionProvider = ({ children }) => {
   }, [currentAuction, user, team, getSyncedTime]);
 
   const decideRetention = useCallback(async (roomId, decision) => {
-    if (!user?.uid || !['accept', 'decline'].includes(decision)) {
-      throw new Error('Invalid retention decision.');
+    if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
+      throw new Error('Invalid RTM decision.');
     }
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    const now = getServerTime();
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
       if (!offer || offer.status !== 'pending' || offer.decision) return;
-      if (offer.eligibleUserId !== user.uid) return;
-      if (getServerTime() > Number(offer.expiresAt)) return;
-      offer.decision = decision;
-      offer.decidedBy = user.uid;
-      offer.decidedAt = getServerTime();
+      if (now > Number(offer.expiresAt)) return;
+      const isInitialDecision = offer.phase === 'initial_decision';
+      const isMatchDecision = offer.phase === 'match_decision';
+      if (isInitialDecision) {
+        if (offer.eligibleUserId !== user.uid || !['accept', 'decline'].includes(decision)) return;
+        if (decision === 'accept') {
+          // Exercise RTM: challenger must now submit a higher price.
+          offer.rtmUsed = true;
+          offer.phase = 'counter_bid';
+          offer.decision = null;
+          offer.expiresAt = now + 15000;
+        } else {
+          offer.decision = 'decline';
+          offer.decidedBy = user.uid;
+          offer.decidedAt = now;
+        }
+      } else if (isMatchDecision) {
+        if (offer.eligibleUserId !== user.uid || !['match', 'decline_counter'].includes(decision)) return;
+        offer.decision = decision;
+        offer.decidedBy = user.uid;
+        offer.decidedAt = now;
+      } else {
+        return;
+      }
       return currentData;
     });
     if (!result.committed) {
-      throw new Error('This retention offer has expired or is not assigned to your franchise.');
+      throw new Error('This RTM decision has expired or is not assigned to your franchise.');
+    }
+  }, [user]);
+
+  const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
+    if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
+    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+    const roomData = roomSnap.exists() ? roomSnap.val() : {};
+    const teamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`));
+    const teamData = teamSnap.exists() ? teamSnap.val() : {};
+    const counterBid = Number(Number(amount).toFixed(2));
+    const result = await runTransactionRtdb(liveRef, (currentData) => {
+      if (!currentData || currentData.status !== 'processing_sale') return;
+      const offer = currentData.retentionOffer;
+      if (!offer || offer.status !== 'pending' || offer.phase !== 'counter_bid' || offer.buyerId !== user.uid) return;
+      if (getServerTime() > Number(offer.expiresAt)) return;
+      if (counterBid <= Number(offer.bid)) return;
+      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
+      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120) + Number(teamData.spent || 0)) return;
+      offer.counterBid = counterBid;
+      offer.phase = 'match_decision';
+      offer.decision = null;
+      offer.expiresAt = getServerTime() + 15000;
+      currentData.currentBid = counterBid;
+      return currentData;
+    });
+    if (!result.committed) {
+      throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
     }
   }, [user]);
 
@@ -1817,6 +1922,7 @@ export const AuctionProvider = ({ children }) => {
     startAuction,
     endPlayerAuction,
     decideRetention,
+    submitRetentionCounterBid,
     pauseAuction,
     resumeAuction,
     endAuction,
