@@ -567,13 +567,7 @@ export const AuctionProvider = ({ children }) => {
         await updateRtdb(acceptedTeamRef, {
           retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
         });
-        await push(ref(rtdb, `auctions/${roomId}/messages`), {
-          userId: 'system', userName: 'System',
-          text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} retained by ${auctionState.retentionOffer.originalFranchiseId} for ₹${auctionState.retentionOffer.bid} Cr.`,
-          type: 'retention_accepted',
-          metadata: { playerId: auctionState.playerId, teamId: auctionState.retentionOffer.originalFranchiseId, bid: auctionState.retentionOffer.bid },
-          timestamp: serverTimestampRtdb()
-        });
+        // Final sale log below records the settled price and winning franchise.
       }
 
       const isSold = auctionState.status === 'sold';
