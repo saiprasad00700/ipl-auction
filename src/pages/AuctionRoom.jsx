@@ -1747,13 +1747,26 @@ const AuctionRoom = () => {
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
-                                       try { await decideRetention(id, 'accept'); setRetentionDecisionPendingFor(null); }
-                                       catch (e) { console.error('RTM choice failed:', e); setRetentionDecisionPendingFor(null); }
+                                       try {
+                                          await decideRetention(id, 'accept');
+                                          setRetentionDecisionPendingFor(null);
+                                          setError('');
+                                       } catch (e) {
+                                          console.error('RTM choice failed:', e);
+                                          setError(e?.message || 'RTM choice failed. Please try again before the timer expires.');
+                                          setRetentionDecisionPendingFor(null);
+                                       }
                                     }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Use RTM</button>
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
-                                       try { await decideRetention(id, 'decline'); }
-                                       catch (e) { console.error('RTM decline failed:', e); setRetentionDecisionPendingFor(null); }
+                                       try {
+                                          await decideRetention(id, 'decline');
+                                          setError('');
+                                       } catch (e) {
+                                          console.error('RTM decline failed:', e);
+                                          setError(e?.message || 'RTM decline failed. Please try again before the timer expires.');
+                                          setRetentionDecisionPendingFor(null);
+                                       }
                                     }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">NO — Decline</button>
                                  </div>
                               </>
