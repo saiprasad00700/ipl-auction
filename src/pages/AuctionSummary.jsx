@@ -349,7 +349,7 @@ const AuctionSummary = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h3 className="font-black uppercase">{teamInfo?.name || entry.franchiseId}</h3>
-                          {entry.disqualified ? <span className="text-xs font-black text-red-300">DISQUALIFIED</span> : Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
+                          {entry.disqualified ? <span className="text-xs font-black text-red-300">DISQUALIFIED</span> : entry.score != null && Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
                         </div>
                         <p className="text-sm text-gray-300 mt-2">{entry.summary || 'AI squad assessment'}</p>
                         {entry.strengths?.length > 0 && <p className="text-xs text-emerald-300 mt-3"><strong>Strengths:</strong> {entry.strengths.join(' · ')}</p>}
