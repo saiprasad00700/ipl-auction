@@ -86,7 +86,7 @@
             "bid": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "expiresAt": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "status": {
-              ".validate": "!data.exists() || newData.val() == data.val() || now >= data.parent().child('expiresAt').val()"
+              ".validate": "!data.exists() || newData.val() == data.val() || now >= data.parent().child('expiresAt').val() || data.parent().child('decision').exists()"
             }
           }
         },
