@@ -84,7 +84,7 @@
             "buyerTeamId": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "buyerName": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "bid": { ".validate": "!data.exists() || newData.val() == data.val()" },
-            "expiresAt": { ".validate": "!data.exists() || newData.val() == data.val() || (data.parent().child('phase').val() == 'initial_decision' && newData.parent().child('phase').val() == 'counter_bid' && newData.parent().child('decision').val() == 'accept' && newData.isNumber() && newData.val() > data.val()) || (data.parent().child('phase').val() == 'counter_bid' && newData.parent().child('phase').val() == 'match_decision' && newData.parent().child('counterBid').isNumber() && newData.isNumber() && newData.val() > data.val())" },
+            "expiresAt": { ".validate": "!data.exists() || newData.val() == data.val() || (data.parent().child('phase').val() == 'initial_decision' && newData.parent().child('phase').val() == 'counter_bid' && newData.parent().child('decision').val() == 'accept' && newData.isNumber() && newData.val() > data.val()) || (data.parent().child('phase').val() == 'counter_bid' && newData.parent().child('phase').val() == 'match_decision' && newData.parent().child('counterBid').isNumber() && newData.isNumber() && newData.val() > now && newData.val() <= now + 12000)" },
             "status": {
               ".validate": "!data.exists() || newData.val() == data.val() || now >= data.parent().child('expiresAt').val() || data.parent().child('decision').exists()"
             }
