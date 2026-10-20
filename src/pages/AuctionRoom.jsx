@@ -126,6 +126,18 @@ const AuctionRoom = () => {
       : (optimisticState || liveAuctionState);
 
    const retentionOffer = displayAuctionState?.retentionOffer;
+
+   // RTM pending state is local, but offers are shared and change stages.
+   // Clear a completed action's stale lock so later offers remain interactive.
+   useEffect(() => {
+      if (!retentionDecisionPendingFor) return;
+      const currentExpiry = displayAuctionState?.status === 'processing_sale'
+         && retentionOffer?.status === 'pending'
+         ? String(retentionOffer.expiresAt)
+         : null;
+      if (currentExpiry !== retentionDecisionPendingFor) setRetentionDecisionPendingFor(null);
+   }, [retentionDecisionPendingFor, displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt]);
+
    const [, setRetentionClockTick] = useState(0);
    useEffect(() => {
       if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
@@ -1777,6 +1789,7 @@ const AuctionRoom = () => {
                                        } catch (e) {
                                           console.error('RTM decline failed:', e);
                                           setError(e?.message || 'RTM decline failed. Please try again before the timer expires.');
+                                       } finally {
                                           setRetentionDecisionPendingFor(null);
                                        }
                                     }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">NO — Decline</button>
@@ -1824,12 +1837,14 @@ const AuctionRoom = () => {
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
                                        try { await decideRetention(id, 'match'); }
-                                       catch (e) { console.error('RTM match failed:', e); setRetentionDecisionPendingFor(null); }
+                                       catch (e) { console.error('RTM match failed:', e); setError(e?.message || 'RTM match failed.'); }
+                                       finally { setRetentionDecisionPendingFor(null); }
                                     }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Match ₹{Number(offer.counterBid).toFixed(2)} Cr</button>
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
                                        try { await decideRetention(id, 'decline_counter'); }
-                                       catch (e) { console.error('RTM final decline failed:', e); setRetentionDecisionPendingFor(null); }
+                                       catch (e) { console.error('RTM final decline failed:', e); setError(e?.message || 'RTM final decline failed.'); }
+                                       finally { setRetentionDecisionPendingFor(null); }
                                     }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">NO — Let them have him</button>
                                  </div>
                               </>
