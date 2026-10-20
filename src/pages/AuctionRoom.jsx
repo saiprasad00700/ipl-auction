@@ -102,6 +102,7 @@ const AuctionRoom = () => {
    const [joiningTeam, setJoiningTeam] = useState(null);
    const [banError, setBanError] = useState(null);
    const [isBiddingInFlight, setIsBiddingInFlight] = useState(false);
+   const [retentionDecisionPendingFor, setRetentionDecisionPendingFor] = useState(null);
    const [spectateMode, setSpectateMode] = useState(() => {
       const params = new URLSearchParams(window.location.search);
       return params.get('spectate') === 'true';
@@ -1706,7 +1707,7 @@ const AuctionRoom = () => {
          </AnimatePresence>
 
          <AnimatePresence>
-            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && (() => {
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && !displayAuctionState?.retentionOffer?.decision && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
                const offer = displayAuctionState.retentionOffer;
                const eligible = offer.eligibleUserId === user?.uid;
                const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
@@ -1727,8 +1728,24 @@ const AuctionRoom = () => {
                            <>
                               <p className="text-sm text-gray-300 mb-4">Use one of your remaining retention cards to acquire this player at the winning bid. Your decision window closes in <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
                               <div className="grid grid-cols-2 gap-3">
-                                 <button onClick={() => decideRetention(id, 'accept').catch((e) => setError(e.message))} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3">Retain player</button>
-                                 <button onClick={() => decideRetention(id, 'decline').catch((e) => setError(e.message))} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3">Decline</button>
+                                 <button onClick={async () => {
+                                    const offerKey = String(offer.expiresAt);
+                                    setRetentionDecisionPendingFor(offerKey);
+                                    try {
+                                       await decideRetention(id, 'accept');
+                                    } catch {
+                                       setRetentionDecisionPendingFor(null);
+                                    }
+                                 }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Retain player'}</button>
+                                 <button onClick={async () => {
+                                    const offerKey = String(offer.expiresAt);
+                                    setRetentionDecisionPendingFor(offerKey);
+                                    try {
+                                       await decideRetention(id, 'decline');
+                                    } catch {
+                                       setRetentionDecisionPendingFor(null);
+                                    }
+                                 }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Decline'}</button>
                               </div>
                            </>
                         ) : (
