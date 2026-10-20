@@ -733,7 +733,8 @@ const AuctionRoom = () => {
       lastBeepedSecRef.current = -1;
 
       const interval = setInterval(() => {
-         const rawMs = displayAuctionState.timerEndsAt - getSyncedTime();
+         const rawTimerEndsAt = displayAuctionState.timerEndsAt;
+         const rawMs = rawTimerEndsAt - getSyncedTime();
          const diff = Math.max(0, Math.ceil(rawMs / 1000));
 
          if (diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
@@ -748,9 +749,20 @@ const AuctionRoom = () => {
             const shouldTrigger = (isAdmin || rawMs < -1500) && displayAuctionState.status === 'bidding' && !endTriggeredRef.current;
             if (shouldTrigger) {
                endTriggeredRef.current = true;
-               clearInterval(interval);
-               setTimeout(() => {
-                  endPlayerAuction(id);
+               // Keep the countdown watchdog alive. If settlement cannot run (for
+               // example while RTDB time sync is reconnecting), re-arm it and retry
+               // instead of leaving every client stuck at 0 seconds permanently.
+               setTimeout(async () => {
+                  try {
+                     await endPlayerAuction(id);
+                  } catch (err) {
+                     console.error('[Auction] Failed to end expired player auction:', err);
+                  } finally {
+                     if (displayAuctionState.status === 'bidding'
+                        && displayAuctionState.timerEndsAt === rawTimerEndsAt) {
+                        endTriggeredRef.current = false;
+                     }
+                  }
                }, 300);
             }
          }
