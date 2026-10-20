@@ -90,6 +90,27 @@ export const AuctionProvider = ({ children }) => {
     return getServerTime();
   }, []);
 
+  // RTM actions can be clicked immediately after a room reconnects. Wait briefly
+  // for Firebase's server-time metadata instead of rejecting the user's click
+  // during the short connection/sync window.
+  const ensureServerTimeSync = useCallback(async () => {
+    if (isServerTimeSynced()) return;
+    try { goOnline(rtdb); } catch (e) {}
+    await new Promise((resolve) => {
+      let attempts = 0;
+      const retry = setInterval(() => {
+        attempts += 1;
+        if (isServerTimeSynced() || attempts >= 50) {
+          clearInterval(retry);
+          resolve();
+        }
+      }, 100);
+    });
+    if (!isServerTimeSynced()) {
+      throw new Error('Auction server time is still connecting. Please try again in a moment.');
+    }
+  }, []);
+
   // Create a new room in DB (RTDB + Supabase index, zero Firestore load)
   const createRoom = useCallback(async (roomId, userId, playerDetails, auctionType = 'mega', isPublic = true) => {
     // Explicitly connect RTDB WebSocket for room creation
@@ -1319,7 +1340,7 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
-    if (!isServerTimeSynced()) throw new Error('Connecting to auction server time. Please try again in a moment.');
+    await ensureServerTimeSync();
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
@@ -1355,11 +1376,11 @@ export const AuctionProvider = ({ children }) => {
     if (!result.committed) {
       throw new Error('This RTM decision has expired or is not assigned to your franchise.');
     }
-  }, [user]);
+  }, [user, ensureServerTimeSync]);
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
-    if (!isServerTimeSynced()) throw new Error('Connecting to auction server time. Please try again in a moment.');
+    await ensureServerTimeSync();
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
     const roomData = roomSnap.exists() ? roomSnap.val() : {};
@@ -1385,7 +1406,7 @@ export const AuctionProvider = ({ children }) => {
     if (!result.committed) {
       throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
     }
-  }, [user]);
+  }, [user, ensureServerTimeSync]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
