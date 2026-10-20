@@ -1400,9 +1400,13 @@ export const AuctionProvider = ({ children }) => {
     // readiness flag. As with decideRetention, the RTDB transaction remains
     // authoritative; use the cached server-adjusted clock for the expiry check.
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+    // These reads are independent. Run them together so a short RTM window is
+    // not consumed by two sequential network round trips before the transaction.
+    const [roomSnap, teamSnap] = await Promise.all([
+      get(ref(rtdb, `auctions/${roomId}/room`)),
+      get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`))
+    ]);
     const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const teamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`));
     const teamData = teamSnap.exists() ? teamSnap.val() : {};
     const counterBid = Number(Number(amount).toFixed(2));
     const result = await runTransactionRtdb(liveRef, (currentData) => {
@@ -1417,7 +1421,7 @@ export const AuctionProvider = ({ children }) => {
       offer.phase = 'match_decision';
       offer.decision = null;
       // The original franchise gets 10 seconds to match or decline the counter-bid.
-      offer.expiresAt = getServerTime() + 10000;
+      offer.expiresAt = getSyncedTime() + 10000;
       currentData.currentBid = counterBid;
       return currentData;
     });
