@@ -141,12 +141,18 @@ const AuctionRoom = () => {
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
       const tick = () => {
-         if (getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline)) finalizeWinnerAnalysis(id).catch(() => {});
+         const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE');
+         const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
+            t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
+         );
+         if (getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
+            finalizeWinnerAnalysis(id).catch((err) => console.error('Could not start winner analysis:', err));
+         }
       };
       tick();
       const timer = setInterval(tick, 1000);
       return () => clearInterval(timer);
-   }, [currentAuction?.status, currentAuction?.xiSubmissionDeadline, finalizeWinnerAnalysis, getSyncedTime, id]);
+   }, [currentAuction?.status, currentAuction?.xiSubmissionDeadline, roomTeams, finalizeWinnerAnalysis, getSyncedTime, id]);
 
    const mySquadPlayers = useMemo(() => (team?.squad || []).map((item) => {
       const playerId = typeof item === 'string' ? item : item?.id;
@@ -1928,8 +1934,32 @@ const AuctionRoom = () => {
                   <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
                   {xiAlreadySubmitted ? (
                      <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">
-                        <p className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> Playing XI submitted successfully</p>
-                        <p className="text-xs mt-1 text-emerald-200/80">Your 11 starters and Impact Player are saved. Waiting for the other franchises or the 2-minute deadline.</p>
+                        <p className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> Waiting for other franchises to submit</p>
+                        <p className="text-xs mt-1 text-emerald-200/80">Your 11 starters and Impact Player are saved. Analysis starts as soon as everyone submits, or when the two-minute deadline expires.</p>
+                        {(() => {
+                           const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE');
+                           const missingTeams = participatingTeams.filter((t) =>
+                              !(t.playingXI?.startingXI?.length === 11 && t.playingXI?.impactPlayer)
+                           );
+                           return (
+                              <div className="mt-3 border-t border-emerald-500/20 pt-3">
+                                 <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80 mb-2">
+                                    {missingTeams.length ? `Not submitted yet (${missingTeams.length})` : 'All franchises submitted'}
+                                 </p>
+                                 {missingTeams.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                       {missingTeams.map((missingTeam) => (
+                                          <span key={missingTeam.id || missingTeam.teamId} className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white">
+                                             {missingTeam.teamName || missingTeam.teamId}
+                                          </span>
+                                       ))}
+                                    </div>
+                                 ) : (
+                                    <p className="text-xs text-emerald-200">All submitted. Starting AI analysis…</p>
+                                 )}
+                              </div>
+                           );
+                        })()}
                      </div>
                   ) : (
                      <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>

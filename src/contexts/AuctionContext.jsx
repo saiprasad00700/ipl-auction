@@ -1390,9 +1390,23 @@ export const AuctionProvider = ({ children }) => {
     const roomSnap = await get(roomRef);
     if (!roomSnap.exists()) return;
     const roomData = roomSnap.val();
-    if (roomData.status !== 'awaiting_xi' || getSyncedTime() < Number(roomData.xiSubmissionDeadline || 0)) return;
+    if (roomData.status !== 'awaiting_xi') return;
+
+    // Let analysis begin as soon as every participating franchise has submitted,
+    // while retaining the two-minute deadline as the fallback for late/missing teams.
+    const readinessSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
+    const readinessTeams = Object.values(readinessSnap.val() || {})
+      .filter((t) => t?.teamId && t.teamId !== 'NONE');
+    const allSubmitted = readinessTeams.length >= 2 && readinessTeams.every((t) =>
+      t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
+    );
+    const deadlinePassed = getSyncedTime() >= Number(roomData.xiSubmissionDeadline || 0);
+    if (!deadlinePassed && !allSubmitted) return;
+
     const claim = await runTransactionRtdb(roomRef, (current) => {
-      if (!current || current.status !== 'awaiting_xi' || getSyncedTime() < Number(current.xiSubmissionDeadline || 0)) return;
+      if (!current || current.status !== 'awaiting_xi') return;
+      const stillBeforeDeadline = getSyncedTime() < Number(current.xiSubmissionDeadline || 0);
+      if (stillBeforeDeadline && !allSubmitted) return;
       return { ...current, status: 'analyzing', winnerAnalysisStatus: 'analyzing' };
     });
     if (!claim.committed) return;
