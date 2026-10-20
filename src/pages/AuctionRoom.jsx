@@ -103,6 +103,7 @@ const AuctionRoom = () => {
    const [banError, setBanError] = useState(null);
    const [isBiddingInFlight, setIsBiddingInFlight] = useState(false);
    const [retentionDecisionPendingFor, setRetentionDecisionPendingFor] = useState(null);
+   const [locallyDismissedRetentionOffer, setLocallyDismissedRetentionOffer] = useState(null);
    const [spectateMode, setSpectateMode] = useState(() => {
       const params = new URLSearchParams(window.location.search);
       return params.get('spectate') === 'true';
@@ -1707,7 +1708,7 @@ const AuctionRoom = () => {
          </AnimatePresence>
 
          <AnimatePresence>
-            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && !displayAuctionState?.retentionOffer?.decision && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
+            {displayAuctionState?.status === 'processing_sale' && displayAuctionState?.retentionOffer?.status === 'pending' && !displayAuctionState?.retentionOffer?.decision && retentionDecisionPendingFor !== String(displayAuctionState?.retentionOffer?.expiresAt) && locallyDismissedRetentionOffer !== String(displayAuctionState?.retentionOffer?.expiresAt) && (() => {
                const offer = displayAuctionState.retentionOffer;
                const eligible = offer.eligibleUserId === user?.uid;
                const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
@@ -1731,19 +1732,27 @@ const AuctionRoom = () => {
                                  <button onClick={async () => {
                                     const offerKey = String(offer.expiresAt);
                                     setRetentionDecisionPendingFor(offerKey);
+                                    setLocallyDismissedRetentionOffer(offerKey);
                                     try {
                                        await decideRetention(id, 'accept');
-                                    } catch {
+                                    } catch (decisionError) {
+                                       console.error('Retention accept failed:', decisionError);
                                        setRetentionDecisionPendingFor(null);
+                                       setLocallyDismissedRetentionOffer(null);
+                                       // Avoid the generic red toast for retention; the offer can still expire normally.
                                     }
                                  }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Retain player'}</button>
                                  <button onClick={async () => {
                                     const offerKey = String(offer.expiresAt);
                                     setRetentionDecisionPendingFor(offerKey);
+                                    setLocallyDismissedRetentionOffer(offerKey);
                                     try {
                                        await decideRetention(id, 'decline');
-                                    } catch {
+                                    } catch (decisionError) {
+                                       console.error('Retention decline failed:', decisionError);
                                        setRetentionDecisionPendingFor(null);
+                                       setLocallyDismissedRetentionOffer(null);
+                                       // Avoid the generic red toast for retention; the offer can still expire normally.
                                     }
                                  }} disabled={retentionDecisionPendingFor === String(offer.expiresAt)} className="rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor === String(offer.expiresAt) ? 'Processing…' : 'Decline'}</button>
                               </div>
