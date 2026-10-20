@@ -1791,9 +1791,16 @@ const AuctionRoom = () => {
                                  <p className="text-sm text-gray-300 mb-3">The original franchise chose YES to RTM. Enter a counter-price strictly greater than ₹{Number(offer.bid).toFixed(2)} Cr. You have up to 15 seconds; submitting early immediately sends the new price to the original franchise. If they do not match, you win at your counter-price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
                                  <form className="space-y-3" onSubmit={async (e) => {
                                     e.preventDefault();
+                                    const enteredCounterBid = Number(retentionCounterBid);
+                                    const minimumCounterBid = Number(offer.bid) + 0.01;
+                                    if (!Number.isFinite(enteredCounterBid) || enteredCounterBid < minimumCounterBid) {
+                                       setError(`Counter-price must be at least ₹${minimumCounterBid.toFixed(2)} Cr because the current winning bid is ₹${Number(offer.bid).toFixed(2)} Cr.`);
+                                       return;
+                                    }
+                                    setError('');
                                     setRetentionDecisionPendingFor(String(offer.expiresAt));
                                     try {
-                                       await submitRetentionCounterBid(id, retentionCounterBid);
+                                       await submitRetentionCounterBid(id, enteredCounterBid);
                                        setRetentionCounterBid('');
                                        setRetentionDecisionPendingFor(null);
                                     } catch (err) {
