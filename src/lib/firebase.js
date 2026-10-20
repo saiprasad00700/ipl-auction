@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getDatabase, ref, onValue, goOffline } from "firebase/database";
+import { getDatabase, ref, onValue, get, goOffline } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -50,11 +50,26 @@ try {
   goOffline(rtdb);
   const connectedRef = ref(rtdb, '.info/connected');
   const offsetRef = ref(rtdb, '.info/serverTimeOffset');
-  onValue(connectedRef, (snap) => {
+  onValue(connectedRef, async (snap) => {
     const connected = snap.val() === true;
     if (connected !== _rtdbConnected) {
       _rtdbConnected = connected;
       _offsetReceivedWhileConnected = false;
+    }
+    // The offset listener may have delivered its initial value before the
+    // connection event. Read it again after connecting so readiness cannot
+    // remain false simply because the offset value did not change.
+    if (connected) {
+      try {
+        const offsetSnap = await get(offsetRef);
+        const offset = Number(offsetSnap.val());
+        if (_rtdbConnected && Number.isFinite(offset)) {
+          _serverTimeOffset = offset;
+          _offsetReceivedWhileConnected = true;
+        }
+      } catch {
+        _offsetReceivedWhileConnected = false;
+      }
     }
   });
   onValue(offsetRef, (snap) => {
