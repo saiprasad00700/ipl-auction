@@ -1797,7 +1797,7 @@ const AuctionRoom = () => {
                            ) : (
                               <p className="text-sm text-gray-300">The price has been raised to ₹{Number(offer.counterBid).toFixed(2)} Cr. Waiting for the original franchise to match or decline. If they decline or time out, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} wins at this price. Time left: {secondsLeft}s.</p>
                            )
-                        ) : <p className="text-sm text-gray-300">RTM decision in progress…</p>
+                        ) : <p className="text-sm text-gray-300">RTM decision in progress…</p>}
                      </motion.div>
                   </motion.div>
                );
