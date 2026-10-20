@@ -1340,23 +1340,30 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
-    await ensureServerTimeSync();
+
+    // Do not wait for the sync-readiness flag after the RTM countdown has begun.
+    // That wait can consume the entire short initial decision window. The RTDB
+    // transaction is the authority; use the cached server-adjusted clock and
+    // record the phase transition atomically.
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending' || offer.decision) return;
-      const now = getServerTime();
+      if (!offer || offer.status !== 'pending') return;
+      const now = getSyncedTime();
       if (now > Number(offer.expiresAt)) return;
       const isInitialDecision = offer.phase === 'initial_decision';
       const isMatchDecision = offer.phase === 'match_decision';
       if (isInitialDecision) {
         if (offer.eligibleUserId !== user.uid || !['accept', 'decline'].includes(decision)) return;
         if (decision === 'accept') {
-          // Exercise RTM: challenger must now submit a higher price.
+          // Persist the affirmative choice as well as advancing the phase, so
+          // every client can distinguish an exercised RTM from an unanswered offer.
           offer.rtmUsed = true;
           offer.phase = 'counter_bid';
-          offer.decision = null;
+          offer.decision = 'accept';
+          offer.decidedBy = user.uid;
+          offer.decidedAt = now;
           offer.expiresAt = now + 15000;
         } else {
           offer.decision = 'decline';
@@ -1373,10 +1380,19 @@ export const AuctionProvider = ({ children }) => {
       }
       return currentData;
     });
+
     if (!result.committed) {
-      throw new Error('This RTM decision has expired or is not assigned to your franchise.');
+      const latest = result.snapshot?.val();
+      const offer = latest?.retentionOffer;
+      console.error('[RTM] Decision transaction not committed', {
+        roomId, decision, uid: user.uid, status: latest?.status,
+        phase: offer?.phase, offerStatus: offer?.status,
+        eligibleUserId: offer?.eligibleUserId, expiresAt: offer?.expiresAt,
+        serverTime: getSyncedTime()
+      });
+      throw new Error('Your RTM decision was not saved. Please try again immediately if the offer is still open.');
     }
-  }, [user, ensureServerTimeSync]);
+  }, [user, getSyncedTime]);
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
