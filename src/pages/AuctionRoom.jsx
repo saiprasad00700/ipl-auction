@@ -1724,7 +1724,7 @@ const AuctionRoom = () => {
                return (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                      <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
-                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{eligible ? 'Retention decision required' : 'Retention offer in progress'}</div>
+                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{offer.phase === 'initial_decision' ? (eligible ? 'RTM decision required' : 'RTM decision pending') : offer.phase === 'counter_bid' ? (offer.buyerId === user?.uid ? 'Submit counter-price' : 'Waiting for counter-price') : offer.phase === 'match_decision' ? (eligible ? 'Match counter-price' : 'Counter-price submitted') : 'RTM in progress'}</div>
                         <div className="flex items-center gap-4 mb-5">
                            <img src={player?.image} alt={player?.name || 'Player'} className="w-20 h-20 object-contain rounded-2xl bg-white/5 border border-white/10" />
                            <div>
@@ -1756,7 +1756,7 @@ const AuctionRoom = () => {
                         ) : offer.phase === 'counter_bid' ? (
                            offer.buyerId === user?.uid ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-3">The original franchise chose to use RTM. Enter your new price above ₹{Number(offer.bid).toFixed(2)} Cr. If they don't match your price, you win the player at your new price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-3">The original franchise chose YES to RTM. Enter a counter-price strictly greater than ₹{Number(offer.bid).toFixed(2)} Cr. You have up to 15 seconds; submitting early immediately sends the new price to the original franchise. If they do not match, you win at your counter-price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
                                  <form className="space-y-3" onSubmit={async (e) => {
                                     e.preventDefault();
                                     setRetentionDecisionPendingFor(String(offer.expiresAt));
@@ -1780,7 +1780,7 @@ const AuctionRoom = () => {
                         ) : offer.phase === 'match_decision' ? (
                            eligible ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-yellow-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to match this price? If yes, the player joins your franchise at this price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-yellow-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to use your RTM card to match this price? You have up to 10 seconds. Choosing YES or NO immediately advances the auction. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));

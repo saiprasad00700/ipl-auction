@@ -1346,7 +1346,8 @@ export const AuctionProvider = ({ children }) => {
       offer.counterBid = counterBid;
       offer.phase = 'match_decision';
       offer.decision = null;
-      offer.expiresAt = getServerTime() + 15000;
+      // The original franchise gets 10 seconds to match or decline the counter-bid.
+      offer.expiresAt = getServerTime() + 10000;
       currentData.currentBid = counterBid;
       return currentData;
     });
