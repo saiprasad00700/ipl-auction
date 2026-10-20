@@ -348,8 +348,22 @@ export const AuctionProvider = ({ children }) => {
   }, [getSyncedTime]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
-    // Never create or expire an RTM offer using an unsynchronized local clock.
-    if (!isServerTimeSynced()) return;
+    // A single missed sync check must not permanently stall the lot at 0 seconds.
+    // Reconnect RTDB and briefly wait for its server-time offset before giving up.
+    if (!isServerTimeSynced()) {
+      try { goOnline(rtdb); } catch (e) {}
+      await new Promise((resolve) => {
+        let attempts = 0;
+        const retry = setInterval(() => {
+          attempts += 1;
+          if (isServerTimeSynced() || attempts >= 50) {
+            clearInterval(retry);
+            resolve();
+          }
+        }, 100);
+      });
+      if (!isServerTimeSynced()) return;
+    }
     // Prevent duplicate calls from the timer interval
     if (endingPlayerRef.current) return;
     endingPlayerRef.current = true;
