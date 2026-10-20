@@ -582,11 +582,20 @@ export const AuctionProvider = ({ children }) => {
           return currentData;
         });
         if (!settleTx.committed) {
+          const failedState = settleTx.snapshot?.val() || null;
+          const failedOffer = failedState?.retentionOffer || null;
           console.error('[Auction] RTM settlement transaction was not committed.', {
             roomId,
-            liveState: settleTx.snapshot?.val() || null,
+            liveStatus: failedState?.status ?? null,
+            offerPhase: failedOffer?.phase ?? null,
+            offerStatus: failedOffer?.status ?? null,
+            offerDecision: failedOffer?.decision ?? null,
+            offerExpiresAt: failedOffer?.expiresAt ?? null,
+            offerDecidedAt: failedOffer?.decidedAt ?? null,
+            hasCounterBid: failedOffer?.counterBid != null,
             serverTimeSynced: isServerTimeSynced(),
-            serverTime: getSyncedTime()
+            serverTime: getSyncedTime(),
+            liveState: failedState
           });
           endingPlayerRef.current = false;
           return;
