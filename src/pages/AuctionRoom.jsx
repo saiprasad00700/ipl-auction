@@ -118,7 +118,12 @@ const AuctionRoom = () => {
       }
    }, [currentAuction?.currentAuction?.currentBid, optimisticState]);
 
-   const displayAuctionState = optimisticState || currentAuction?.currentAuction;
+   // RTM stages are authoritative shared state. Never let a stale optimistic bid snapshot
+   // shadow a live processing_sale transition (especially after the original franchise clicks YES).
+   const liveAuctionState = currentAuction?.currentAuction;
+   const displayAuctionState = liveAuctionState?.status === 'processing_sale'
+      ? liveAuctionState
+      : (optimisticState || liveAuctionState);
 
    const retentionOffer = displayAuctionState?.retentionOffer;
    const [, setRetentionClockTick] = useState(0);
