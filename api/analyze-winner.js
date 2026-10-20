@@ -89,7 +89,7 @@ ${JSON.stringify(normalized)}`;
 
   try {
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(apiKey),
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,7 +162,7 @@ ${JSON.stringify(normalized)}`;
       }))
       .sort((a, b) => a.rank - b.rank);
 
-    const result = { roomId, rankings, model: "gemini-2.5-flash" };
+    const result = { roomId, rankings, model: "gemini-3.8-flash" };
     if (res?.status) return res.status(200).json(result);
     return json(200, result);
   } catch (error) {
