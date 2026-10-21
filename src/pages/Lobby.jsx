@@ -366,7 +366,7 @@ const Lobby = () => {
 
                 <div className="relative py-2 flex items-center justify-center">
                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5" /></div>
-                  <span className="relative bg-[#0c0c0c] px-4 text-[9px] font-black text-gray-700 uppercase tracking-widest italic">Or enter as temporary guest</span>
+                  <span className="relative bg-[#08111d] px-4 text-[9px] font-black text-gray-700 uppercase tracking-widest italic">Or enter as temporary guest</span>
                 </div>
 
                 <button
@@ -445,7 +445,7 @@ const Lobby = () => {
           </p>
           <button
             onClick={() => navigate('/')}
-            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-[0_10px_30px_rgba(255,85,0,0.3)]"
+            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-[0_10px_30px_rgba(16,185,129,0.24)]"
           >
             <Home size={16} /> Back to Base
           </button>
@@ -565,7 +565,7 @@ const Lobby = () => {
             <button
               onClick={handleStartAuction}
               disabled={isStarting}
-              className="relative overflow-hidden group shrink-0 px-3 sm:px-4 md:px-8 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider md:tracking-widest shadow-[0_10px_30px_rgba(255,85,0,0.3)] disabled:opacity-50 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              className="relative overflow-hidden group shrink-0 px-3 sm:px-4 md:px-8 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-emerald-400 to-teal-300 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider md:tracking-widest shadow-[0_10px_30px_rgba(16,185,129,0.24)] disabled:opacity-50 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               <div className="relative flex items-center gap-1 sm:gap-1.5 md:gap-2">
@@ -585,7 +585,7 @@ const Lobby = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.02] via-[#ff5500]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
         <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
 
-        <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
+        <div className="bg-[#08111d] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
 
           {/* Left Column: Management Hub */}
           <div className="lg:col-span-5 w-full flex flex-col p-6 md:p-8 relative gap-6">
@@ -710,7 +710,7 @@ const Lobby = () => {
             <div>
               <button
                 onClick={() => setShowBotInfo(true)}
-                className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-white/[0.03] to-transparent hover:from-[#ff5500]/10 hover:to-transparent border border-white/5 hover:border-[#ff5500]/30 rounded-2xl transition-all duration-300 group cursor-pointer text-left"
+                className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-white/[0.03] to-transparent hover:from-emerald-300/[0.08] hover:to-transparent border border-white/5 hover:border-emerald-300/25 rounded-2xl transition-all duration-300 group cursor-pointer text-left"
               >
                 <div className="flex items-center gap-2.5">
                   <div>
@@ -861,10 +861,10 @@ const Lobby = () => {
             <motion.div
               {...enterProps({ opacity: 0, scale: 0.95, y: 20 }, { transition: { type: 'spring', damping: 25, stiffness: 300 } })}
               {...exitProps({ opacity: 0, scale: 0.95, y: 20 })}
-              className="relative w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] bg-[#0c0c0c] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-10 flex flex-col my-auto overflow-hidden"
+              className="relative w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] bg-[#08111d] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-10 flex flex-col my-auto overflow-hidden"
             >
               {/* Background Glows */}
-              <div className="absolute -top-20 -right-20 w-40 h-40 sm:w-56 sm:h-56 bg-[#ff5500]/20 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
+              <div className="absolute -top-20 -right-20 w-40 h-40 sm:w-56 sm:h-56 bg-emerald-400/15 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
               <div className="absolute -bottom-20 -left-20 w-40 h-40 sm:w-56 sm:h-56 bg-blue-500/10 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
 
               {/* Close Button */}
@@ -925,7 +925,7 @@ const Lobby = () => {
                 </div>
 
                 {/* How to add box */}
-                <div className="p-3 sm:p-4 bg-gradient-to-r from-[#ff5500]/10 to-transparent border border-[#ff5500]/30 rounded-xl sm:rounded-2xl">
+                <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-300/10 to-transparent border border-emerald-300/20 rounded-xl sm:rounded-2xl">
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-1.5">
                     <Zap size={13} className="text-[#ff5500] sm:w-[14px] sm:h-[14px]" />
                     <h5 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-[#ff5500]">How to Add Bots</h5>
