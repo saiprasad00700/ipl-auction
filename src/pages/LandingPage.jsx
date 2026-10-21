@@ -513,7 +513,7 @@ const LandingPage = () => {
 
   // ─── Signed In: Show Create / Join / History ───
   return (
-    <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-center pt-10 px-4 font-sans text-white overflow-x-hidden">
+    <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-start pt-8 sm:pt-12 px-4 sm:px-6 font-sans text-white overflow-x-hidden">
       <GithubStarButton />
       <BuyMeACoffee />
 
@@ -524,18 +524,22 @@ const LandingPage = () => {
       </div>
 
       {/* Hero */}
-      <div className="text-center mb-4 z-10 relative max-w-3xl px-4 mt-10">
+      <div className="text-center mb-5 sm:mb-7 z-10 relative w-full max-w-5xl px-2 sm:px-4 mt-6 sm:mt-8">
         <h1 className="sr-only">
           IPL Auction Simulator & Game - Live IPL Mega Auction 2026
         </h1>
-        <div className="text-2xl sm:text-4xl md:text-5xl lg:text-[64px] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
-          CREATE YOUR
+        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/[0.08] px-3.5 py-2 mb-5 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">
+          <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></span>
+          The ultimate multiplayer auction arena
         </div>
-        <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[88px] font-pixel text-[#10b981] leading-none uppercase text-balance mt-1 drop-shadow-[0_4px_12px_rgba(16,185,129,0.2)]">
-          AUCTION ROOM
+        <div className="text-3xl sm:text-5xl md:text-6xl lg:text-[76px] font-pixel leading-[1.08] text-balance bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-slate-400">
+          BUILD YOUR
+        </div>
+        <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[92px] font-pixel leading-[1.08] uppercase text-balance mt-1 bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-emerald-400 to-cyan-300 drop-shadow-[0_8px_35px_rgba(16,185,129,0.18)]">
+          DREAM SQUAD
         </div>
 
-        <p className="text-[13px] sm:text-sm text-gray-400 font-medium max-w-xl mx-auto mt-3.5 leading-relaxed px-1">
+        <p className="text-sm sm:text-base text-slate-400 font-medium max-w-2xl mx-auto mt-5 leading-relaxed px-1">
           The ultimate multiplayer IPL auction simulator and game. Host live IPL
           mega auctions with friends in real-time, choose your favorite
           franchise, bid strategically, and build a championship T20 squad.
@@ -557,21 +561,30 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* Subtle gradient line / Faded Divider */}
-      <div className="w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-4 mt-10 z-10 relative" />
-
-      <div className="w-full max-w-6xl bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 relative mt-2">
+      {/* Feature strip */}
+      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-5xl mb-8">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3.5 backdrop-blur transition-all hover:border-emerald-400/25 hover:bg-emerald-400/[0.04]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300"><Users size={18} /></div><div><p className="text-xs font-black uppercase tracking-wide text-white">Play together</p><p className="mt-1 text-[10px] text-slate-500">Real-time multiplayer rooms</p></div>
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3.5 backdrop-blur transition-all hover:border-cyan-400/25 hover:bg-cyan-400/[0.04]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-300"><Zap size={18} /></div><div><p className="text-xs font-black uppercase tracking-wide text-white">Every bid counts</p><p className="mt-1 text-[10px] text-slate-500">Tactical purse management</p></div>
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3.5 backdrop-blur transition-all hover:border-violet-400/25 hover:bg-violet-400/[0.04]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-300"><Trophy size={18} /></div><div><p className="text-xs font-black uppercase tracking-wide text-white">Build champions</p><p className="mt-1 text-[10px] text-slate-500">Create your winning squad</p></div>
+        </div>
+      </div>
+      <div className="w-full max-w-7xl bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-emerald-400/[0.035] border border-white/[0.11] rounded-[1.75rem] sm:rounded-[2.5rem] p-2 sm:p-3 shadow-[0_30px_100px_rgba(0,0,0,0.45)] z-10 relative mt-1 backdrop-blur-xl">
         {/* Subtle Orange Glow behind panel */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#10b981]/[0.02] via-[#10b981]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
         <div className="absolute -inset-2 bg-gradient-to-r from-[#10b981]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
-        <div className="bg-[#0b1220] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
+        <div className="bg-[#080f1d]/95 rounded-[1.35rem] sm:rounded-[2rem] border border-white/[0.07] grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/[0.07] overflow-hidden">
           {/* Left Side: Live signings */}
-          <div className="lg:col-span-5 w-full flex flex-col p-6 md:p-8 relative">
+          <div className="lg:col-span-5 w-full flex flex-col p-5 sm:p-7 md:p-8 relative bg-gradient-to-b from-white/[0.025] to-transparent">
             <AuctionActivityFeed activeCount={publicRooms.length} />
           </div>
 
           {/* Right Side: Create/Join/History form */}
-          <div className="lg:col-span-7 w-full p-4 sm:p-6 md:p-8 flex flex-col">
+          <div className="lg:col-span-7 w-full p-4 sm:p-6 md:p-8 flex flex-col bg-[#0a1221]/70">
             {/* Flat Tab Bar Navigation: Create / Join / History */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/5 mb-5 sm:mb-8 gap-3 sm:gap-4">
               <div className="flex">
