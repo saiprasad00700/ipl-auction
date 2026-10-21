@@ -40,7 +40,7 @@ test('unmapped players are not offered retention and franchise IDs are valid', (
 
 test('retention cards require the exact original franchise, available cards, and enough purse', () => {
   assert.equal(RETENTION_CARDS_PER_FRANCHISE, 2);
-  assert.equal(RETENTION_DECISION_MS, 5000);
+  assert.equal(RETENTION_DECISION_MS, 10000);
   const base = {
     originalFranchiseId: 'MI',
     eligibleFranchiseId: 'MI',
