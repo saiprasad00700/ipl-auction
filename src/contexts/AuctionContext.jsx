@@ -727,7 +727,9 @@ export const AuctionProvider = ({ children }) => {
       }));
       await Promise.all(syncPromises);
 
-      const waitTime = isSold ? 5000 : 2000;
+      // Keep a short reveal pause after a sale, but avoid making the auction feel stalled.
+      // RTM decisions have already settled before reaching this point.
+      const waitTime = isSold ? 2500 : 1000;
 
       // Player order from the single room snapshot already fetched above
       let playerOrder = roomData.playerOrder;
