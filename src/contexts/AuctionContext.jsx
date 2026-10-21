@@ -498,6 +498,13 @@ export const AuctionProvider = ({ children }) => {
           serverTime: getSyncedTime()
         });
         endingPlayerRef.current = false;
+        // A competing client or a clock boundary can make an otherwise valid
+        // settlement transaction return uncommitted. Retry from fresh RTDB state
+        // instead of leaving the lot stuck at 0 seconds.
+        if (txResult.snapshot?.val()?.status === 'bidding'
+          || txResult.snapshot?.val()?.status === 'processing_sale') {
+          setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+        }
         return;
       }
 
@@ -598,6 +605,12 @@ export const AuctionProvider = ({ children }) => {
             liveState: failedState
           });
           endingPlayerRef.current = false;
+          // Keep recovering if the lot is still awaiting RTM settlement. Another
+          // connected client may have raced this transaction or its clock may
+          // have reached the expiry boundary slightly later.
+          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending') {
+            setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+          }
           return;
         }
         auctionState = settleTx.snapshot.val();
