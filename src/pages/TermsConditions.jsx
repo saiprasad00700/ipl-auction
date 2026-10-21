@@ -91,7 +91,7 @@ const TermsConditions = () => {
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
-                className={`text-sm text-left pl-4 -ml-[1px] border-l ${activeSection === s.id ? 'border-[#ff5500] text-white' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-white/30'} transition-colors`}
+                className={`text-sm text-left pl-4 -ml-[1px] border-l ${activeSection === s.id ? 'border-emerald-300 text-white' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-white/30'} transition-colors`}
               >
                 {s.label}
               </button>
@@ -108,7 +108,7 @@ const TermsConditions = () => {
                 <button
                   key={s.id}
                   onClick={() => scrollTo(s.id)}
-                  className={`text-sm text-left pl-3 -ml-[1px] border-l ${activeSection === s.id ? 'border-[#ff5500] text-white' : 'border-transparent text-gray-400'} transition-colors`}
+                  className={`text-sm text-left pl-3 -ml-[1px] border-l ${activeSection === s.id ? 'border-emerald-300 text-white' : 'border-transparent text-gray-400'} transition-colors`}
                 >
                   {s.label}
                 </button>
