@@ -9,6 +9,6 @@ The source files, workflow/configuration files, and documentation changed or add
 
 ## JSON configuration note
 
-Strict JSON files cannot contain comments without becoming invalid JSON. The changed `.firebaserc` file is therefore documented here rather than having a comment inserted into its JSON structure, which could break Firebase tooling. The changed `package.json` carries a metadata notice, and `database.rules.json` includes a comment notice supported by the rules file format.
+Strict JSON files cannot contain comments without becoming invalid JSON. The changed `.firebaserc` and `package.json` files therefore carry a metadata notice while remaining valid JSON. `database.rules.json` includes a comment notice supported by the Firebase Realtime Database rules format.
 
 This file records the approach taken; it is not a legal opinion that every file-format edge case is conclusively resolved. Review the final distribution and applicable third-party licences before release.
