@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
