@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useEffect, useRef } from 'react';
 import { Home, RefreshCw, ServerOff, WifiOff } from 'lucide-react';
 import { useConnectionAlert } from '../contexts/ConnectionAlertContext';
