@@ -40,6 +40,18 @@ test('XI validation rejects duplicate or out-of-squad selections', () => {
   assert.equal(validatePlayingXI(selection.startingXI, { id: 'not-in-squad' }, squad), false);
 });
 
+test('Playing XI allows at most four overseas players while squad can contain more', () => {
+  const mixedCatalog = [
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `overseas${i}`, country: 'AUS', role: 'Batter' })),
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `indian${i}`, country: 'IND', role: 'Batter' })),
+  ];
+  const mixedSquad = mixedCatalog.map((p) => ({ id: p.id, bid: 1 }));
+  const validXI = [...mixedCatalog.slice(0, 4), ...mixedCatalog.slice(5, 12)];
+  assert.equal(validatePlayingXI(validXI, mixedCatalog[4], mixedSquad, mixedCatalog), true);
+  const invalidXI = mixedCatalog.slice(0, 5).concat(mixedCatalog.slice(5, 11));
+  assert.equal(validatePlayingXI(invalidXI, mixedCatalog[11], mixedSquad, mixedCatalog), false);
+});
+
 test('ranking validation requires every franchise exactly once and ranks 1..N without ties', () => {
   const ids = ['MI', 'CSK', 'RCB'];
   assert.equal(validateUniqueRankings(ids.map((franchiseId, i) => ({ franchiseId, rank: i + 1 })), ids), true);
