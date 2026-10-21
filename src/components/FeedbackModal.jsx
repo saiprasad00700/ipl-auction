@@ -84,7 +84,7 @@ const FeedbackModal = () => {
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
-        className="fixed bottom-20 right-6 z-[90] flex items-center gap-2 bg-[#0a0a0a]/80 hover:bg-[#ff5500]/10 text-white px-3.5 py-2 rounded-full border border-white/10 hover:border-[#ff5500]/30 backdrop-blur-xl shadow-2xl transition-all duration-300 group cursor-pointer"
+        className="fixed bottom-20 right-6 z-[90] flex items-center gap-2 bg-[#0a0a0a]/80 hover:bg-emerald-400/10 text-white px-3.5 py-2 rounded-full border border-white/10 hover:border-[#6ee7b7]/30 backdrop-blur-xl shadow-2xl transition-all duration-300 group cursor-pointer"
       >
         <MessageSquarePlus className="w-3.5 h-3.5" />
         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/70 group-hover:text-white transition-colors duration-300">
@@ -111,10 +111,10 @@ const FeedbackModal = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-              className="relative w-full max-w-[380px] bg-[#0c0c0c] border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.8)]"
+              className="relative w-full max-w-[380px] bg-[#08111d] border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.8)]"
             >
               {/* Glow orbs */}
-              <div className="absolute -top-[15%] -left-[10%] w-[40%] h-[40%] bg-[#ff5500]/10 blur-[60px] rounded-full pointer-events-none" />
+              <div className="absolute -top-[15%] -left-[10%] w-[40%] h-[40%] bg-emerald-400/10 blur-[60px] rounded-full pointer-events-none" />
               <div className="absolute -bottom-[10%] -right-[10%] w-[35%] h-[35%] bg-blue-600/5 blur-[60px] rounded-full pointer-events-none" />
 
               {/* Close */}
@@ -143,7 +143,7 @@ const FeedbackModal = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="py-8 text-center space-y-3"
                   >
-                    <div className="w-14 h-14 mx-auto rounded-full bg-[#ff5500]/10 text-[#ff5500] flex items-center justify-center border border-[#ff5500]/20 shadow-[0_0_25px_rgba(255,85,0,0.15)]">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/10 text-emerald-300 flex items-center justify-center border border-[#6ee7b7]/20 shadow-[0_0_25px_rgba(16,185,129,0.15)]">
                       <CheckCircle2 className="w-7 h-7" />
                     </div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-white mt-2">Submitted!</p>
@@ -154,7 +154,7 @@ const FeedbackModal = () => {
                       onClick={handleClose}
                       className="mt-3 w-full h-10 relative overflow-hidden group/close rounded-xl cursor-pointer active:scale-[0.98] transition-all"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/close:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-300 transition-transform duration-500 group-hover/close:scale-105" />
                       <span className="relative text-[9px] font-black uppercase tracking-[0.2em] text-white">Close</span>
                     </button>
                   </motion.div>
@@ -178,14 +178,14 @@ const FeedbackModal = () => {
                             <Star
                               className={`w-5 h-5 transition-colors ${
                                 star <= (hoverRating || rating)
-                                  ? 'text-[#ff5500] fill-[#ff5500] drop-shadow-[0_0_6px_rgba(255,85,0,0.5)]'
+                                  ? 'text-emerald-300 fill-[#6ee7b7] drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]'
                                   : 'text-gray-700'
                               }`}
                             />
                           </button>
                         ))}
                         {(hoverRating || rating) > 0 && (
-                          <span className="ml-1 text-[8px] font-black uppercase tracking-widest text-[#ff5500]">
+                          <span className="ml-1 text-[8px] font-black uppercase tracking-widest text-emerald-300">
                             {hoverRating || rating} / 5
                           </span>
                         )}
@@ -205,12 +205,12 @@ const FeedbackModal = () => {
                             onClick={() => setCategory(cat.id)}
                             className={`px-3 py-2 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
                               category === cat.id
-                                ? 'border-[#ff5500]/50 bg-[#ff5500]/10 shadow-[0_0_12px_rgba(255,85,0,0.1)]'
+                                ? 'border-[#6ee7b7]/50 bg-emerald-400/10 shadow-[0_0_12px_rgba(16,185,129,0.1)]'
                                 : 'border-white/5 hover:border-white/10 bg-white/[0.01]'
                             }`}
                           >
                             <span className={`text-[8px] font-black uppercase tracking-wider ${
-                              category === cat.id ? 'text-[#ff5500]' : 'text-gray-500'
+                              category === cat.id ? 'text-emerald-300' : 'text-gray-500'
                             }`}>
                               {cat.label}
                             </span>
@@ -227,7 +227,7 @@ const FeedbackModal = () => {
                             {user.photoURL ? (
                               <img src={user.photoURL} alt={user.displayName} className="w-5 h-5 rounded-full border border-white/20" />
                             ) : (
-                              <div className="w-5 h-5 rounded-full bg-[#ff5500]/20 text-[#ff5500] font-black text-[9px] flex items-center justify-center">
+                              <div className="w-5 h-5 rounded-full bg-emerald-400/20 text-emerald-300 font-black text-[9px] flex items-center justify-center">
                                 {(user.displayName || 'G')[0].toUpperCase()}
                               </div>
                             )}
@@ -240,7 +240,7 @@ const FeedbackModal = () => {
                               </span>
                             </div>
                           </div>
-                          <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-full border ${user.email ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                          <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-full border ${user.email ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-emerald-300/10 text-emerald-300 border-emerald-300/20'}`}>
                             {user.email ? 'Google' : 'Guest'}
                           </span>
                         </div>
@@ -256,7 +256,7 @@ const FeedbackModal = () => {
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               placeholder="your@email.com"
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#ff5500]/50 transition-all"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#6ee7b7]/50 transition-all"
                             />
                           </div>
                         )}
@@ -271,7 +271,7 @@ const FeedbackModal = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="your@email.com"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#ff5500]/50 transition-all"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#6ee7b7]/50 transition-all"
                         />
                       </div>
                     )}
@@ -279,7 +279,7 @@ const FeedbackModal = () => {
                     {/* Feedback Text */}
                     <div className="space-y-1.5">
                       <label className="block text-[7.5px] font-black text-gray-600 uppercase tracking-widest ml-1">
-                        Message <span className="text-[#ff5500]">*</span>
+                        Message <span className="text-emerald-300">*</span>
                       </label>
                       <textarea
                         required
@@ -287,7 +287,7 @@ const FeedbackModal = () => {
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
                         placeholder="Bugs, ideas, improvements..."
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black uppercase tracking-widest placeholder:text-gray-800 placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-[#ff5500]/50 transition-all resize-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black uppercase tracking-widest placeholder:text-gray-800 placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-[#6ee7b7]/50 transition-all resize-none"
                       />
                     </div>
 
@@ -303,7 +303,7 @@ const FeedbackModal = () => {
                       disabled={isSubmitting || !feedbackText.trim()}
                       className="w-full h-11 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(255,85,0,0.2)] cursor-pointer transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/submit:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-300 transition-transform duration-500 group-hover/submit:scale-105" />
                       <div className="relative flex items-center justify-center gap-2 text-white font-black uppercase tracking-[0.2em] text-[9px]">
                         {isSubmitting ? (
                           <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Sending...</span></>

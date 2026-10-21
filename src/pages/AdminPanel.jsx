@@ -553,8 +553,8 @@ const AdminPanel = () => {
   // ─── Render Authentication Lock Screen if Not Admin ───
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-96 h-72 sm:h-96 bg-[#ff5500]/10 blur-[140px] rounded-full pointer-events-none" />
+      <div className="min-h-screen bg-[#050914] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-96 h-72 sm:h-96 bg-emerald-400/10 blur-[140px] rounded-full pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-48 sm:w-72 h-48 sm:h-72 bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
 
         <motion.div
@@ -562,7 +562,7 @@ const AdminPanel = () => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           className="relative max-w-sm sm:max-w-md w-full bg-[#0c0c0c] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,0.8)] backdrop-blur-xl"
         >
-          <div className="w-14 sm:w-16 h-14 sm:h-16 mx-auto rounded-2xl bg-[#ff5500]/10 border border-[#ff5500]/30 flex items-center justify-center text-[#ff5500] mb-5 sm:mb-6 shadow-[0_0_30px_rgba(255,85,0,0.2)]">
+          <div className="w-14 sm:w-16 h-14 sm:h-16 mx-auto rounded-2xl bg-emerald-400/10 border border-emerald-300/30 flex items-center justify-center text-emerald-300 mb-5 sm:mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
             <Lock className="w-7 sm:w-8 h-7 sm:h-8" />
           </div>
 
@@ -575,7 +575,7 @@ const AdminPanel = () => {
 
           <button
             onClick={loginWithGoogle}
-            className="w-full py-3.5 px-5 sm:px-6 rounded-2xl bg-gradient-to-r from-[#ff5500] to-[#ff8c00] text-white font-black uppercase tracking-[0.15em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(255,85,0,0.3)] flex items-center justify-center gap-3 cursor-pointer"
+            className="w-full py-3.5 px-5 sm:px-6 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-300 text-white font-black uppercase tracking-[0.15em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(16,185,129,0.24)] flex items-center justify-center gap-3 cursor-pointer"
           >
             <LogIn className="w-4 h-4" />
             <span>Sign In with Google</span>
@@ -596,7 +596,7 @@ const AdminPanel = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-[#050914] text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-96 h-72 sm:h-96 bg-red-600/10 blur-[150px] rounded-full pointer-events-none" />
 
         <motion.div
@@ -628,7 +628,7 @@ const AdminPanel = () => {
             </button>
             <Link
               to="/"
-              className="block w-full py-3 px-4 rounded-xl bg-[#ff5500]/10 border border-[#ff5500]/20 text-[#ff5500] font-black uppercase tracking-wider text-xs hover:bg-[#ff5500]/20 transition-all text-center"
+              className="block w-full py-3 px-4 rounded-xl bg-emerald-400/10 border border-emerald-300/20 text-emerald-300 font-black uppercase tracking-wider text-xs hover:bg-emerald-400/20 transition-all text-center"
             >
               Return to Landing Page
             </Link>
@@ -640,13 +640,13 @@ const AdminPanel = () => {
 
   // ─── Admin Dashboard Interface ───
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col selection:bg-[#ff5500] selection:text-white relative">
+    <div className="min-h-screen bg-[#050914] text-white flex flex-col selection:bg-emerald-400 selection:text-white relative">
       {/* Background Glow ambient layers */}
-      <div className="fixed top-0 left-1/4 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-[#ff5500]/5 blur-[180px] rounded-full pointer-events-none z-0" />
+      <div className="fixed top-0 left-1/4 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-emerald-400/5 blur-[180px] rounded-full pointer-events-none z-0" />
       <div className="fixed bottom-0 right-1/4 translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-blue-600/5 blur-[180px] rounded-full pointer-events-none z-0" />
 
       {/* Top Header Bar */}
-      <header className="sticky top-0 z-50 bg-[#050505]/85 backdrop-blur-2xl border-b border-white/10 px-4 sm:px-6 py-3.5 sm:py-4">
+      <header className="sticky top-0 z-50 bg-[#050914]/85 backdrop-blur-2xl border-b border-white/10 px-4 sm:px-6 py-3.5 sm:py-4">
         <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-4">
             <button
@@ -673,12 +673,12 @@ const AdminPanel = () => {
               className="p-2 sm:px-3.5 sm:py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold uppercase tracking-wider text-gray-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
               title="Refresh Data"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#ff5500]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-300' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
 
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2.5 sm:px-3 py-1.5 rounded-xl">
-              <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-[#ff5500]" />
+              <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-emerald-400" />
               <span className="text-[10px] sm:text-xs font-bold text-gray-300 truncate max-w-[90px] xs:max-w-[130px] sm:max-w-[180px]">
                 {user.email}
               </span>
@@ -724,12 +724,12 @@ const AdminPanel = () => {
             whileHover={{ y: -2 }}
             className="bg-[#0c0c0c] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
           >
-            <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-[#ff5500]/5 rounded-bl-full pointer-events-none group-hover:bg-[#ff5500]/10 transition-colors" />
+            <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-emerald-400/5 rounded-bl-full pointer-events-none group-hover:bg-emerald-400/10 transition-colors" />
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
                 Firestore Rooms
               </span>
-              <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-[#ff5500]/10 border border-[#ff5500]/20 flex items-center justify-center text-[#ff5500]">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-400/10 border border-emerald-300/20 flex items-center justify-center text-emerald-300">
                 <Flame className="w-4 sm:w-5 h-4 sm:h-5" />
               </div>
             </div>
@@ -737,7 +737,7 @@ const AdminPanel = () => {
               {loading ? <span className="animate-pulse text-gray-600">---</span> : stats.totalFirestoreAuctions}
             </div>
             <p className="text-[8px] sm:text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-2 flex items-center gap-1.5">
-              <Database className="w-3 h-3 text-[#ff5500]" /> Legacy Room Docs
+              <Database className="w-3 h-3 text-emerald-300" /> Legacy Room Docs
             </p>
           </motion.div>
 
@@ -822,7 +822,7 @@ const AdminPanel = () => {
                   key={tabItem.id}
                   onClick={() => navigate(tabItem.id === 'overview' ? '/admin' : `/admin/${tabItem.id}`)}
                   className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all duration-200 shrink-0 cursor-pointer ${isActive
-                    ? 'bg-[#ff5500] text-white shadow-[0_4px_20px_rgba(255,85,0,0.3)]'
+                    ? 'bg-emerald-400 text-white shadow-[0_4px_20px_rgba(16,185,129,0.24)]'
                     : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5'
                     }`}
                 >
@@ -835,7 +835,7 @@ const AdminPanel = () => {
 
           {lastUpdated && (
             <span className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
-              <Clock className="w-3 h-3 text-[#ff5500]" />
+              <Clock className="w-3 h-3 text-emerald-300" />
               Updated: {lastUpdated.toLocaleTimeString()}
             </span>
           )}
