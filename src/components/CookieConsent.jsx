@@ -38,7 +38,7 @@ export default function CookieConsent() {
             {/* Top Row: Icon, Title & Close */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-emerald-400/10 border border-[#ff5500]/30 rounded-lg text-emerald-300">
+                <div className="p-1.5 bg-emerald-400/10 border border-[#6ee7b7]/30 rounded-lg text-emerald-300">
                   <Cookie className="w-4 h-4" />
                 </div>
                 <h4 className="font-black text-xs uppercase tracking-wider text-white">
