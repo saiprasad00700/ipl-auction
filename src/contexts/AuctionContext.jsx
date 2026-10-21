@@ -391,7 +391,21 @@ export const AuctionProvider = ({ children }) => {
 
     try {
       const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-      
+
+      // Avoid treating an active RTM decision window as a failed settlement.
+      // The timer can call this handler repeatedly while RTM is waiting; aborting
+      // a transaction on every tick produced a flood of false errors and retries.
+      const initialLiveSnap = await get(liveRef);
+      const initialLive = initialLiveSnap.exists() ? initialLiveSnap.val() : null;
+      if (!initialLive) return;
+      if (initialLive.status === 'sold' || initialLive.status === 'unsold') return;
+      if (initialLive.status === 'processing_sale') {
+        const offer = initialLive.retentionOffer;
+        if (offer?.status === 'pending' && getSyncedTime() < Number(offer.expiresAt) + 1500) {
+          return;
+        }
+      }
+
       // Read the room and franchise roster before claiming the expired lot.
       const preRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
       const preRoomData = preRoomSnap.exists() ? preRoomSnap.val() : {};
@@ -410,7 +424,10 @@ export const AuctionProvider = ({ children }) => {
         // any connected client can settle it after its deadline.
         if (currentData.status === 'processing_sale') {
           const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending' || now < Number(offer.expiresAt) + 1500) return;
+          if (!offer || offer.status !== 'pending') return;
+          // Another client may still be inside the current RTM decision window.
+          // Do not abort the transaction just because this timer tick arrived early.
+          if (now < Number(offer.expiresAt) + 1500) return;
           if (offer.phase === 'counter_bid' && offer.rtmUsed) {
             // Original franchise exercised RTM but the winning bidder did not raise in time.
             currentData.highBidderId = offer.eligibleUserId;
@@ -491,6 +508,17 @@ export const AuctionProvider = ({ children }) => {
       });
 
       if (!txResult.committed) {
+        const latestState = txResult.snapshot?.val();
+        const latestOffer = latestState?.retentionOffer;
+        const genuinelyExpired = latestState?.status === 'bidding'
+          ? (!latestState.timerEndsAt || getSyncedTime() >= Number(latestState.timerEndsAt))
+          : latestState?.status === 'processing_sale'
+            && latestOffer?.status === 'pending'
+            && getSyncedTime() >= Number(latestOffer.expiresAt) + 1500;
+        if (!genuinelyExpired) {
+          endingPlayerRef.current = false;
+          return;
+        }
         console.error('[Auction] Settlement transaction was not committed.', {
           roomId,
           liveState: txResult.snapshot?.val() || null,
