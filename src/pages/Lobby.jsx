@@ -582,8 +582,8 @@ const Lobby = () => {
         className="w-full max-w-6xl bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 relative mt-2"
       >
         {/* Subtle Glow behind panel */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.02] via-[#ff5500]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
-        <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-300/[0.02] via-emerald-300/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
+        <div className="absolute -inset-2 bg-gradient-to-r from-emerald-300/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
 
         <div className="bg-[#08111d] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
 
@@ -720,7 +720,7 @@ const Lobby = () => {
                     <p className="text-[9px] text-gray-500 font-medium">How automated bidders work</p>
                   </div>
                 </div>
-                <Info size={16} className="text-gray-500 group-hover:text-[#ff5500] transition-colors" />
+                <Info size={16} className="text-gray-500 group-hover:text-emerald-300 transition-colors" />
               </button>
             </div>
 
@@ -738,7 +738,7 @@ const Lobby = () => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 py-3 flex flex-col items-center justify-center gap-1.5 transition-all rounded-xl cursor-pointer ${activeTab === tab.id
-                    ? 'bg-white/5 text-[#ff5500] border border-white/10 shadow-inner'
+                    ? 'bg-white/5 text-emerald-300 border border-white/10 shadow-inner'
                     : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.01]'
                     }`}
                 >
@@ -927,8 +927,8 @@ const Lobby = () => {
                 {/* How to add box */}
                 <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-300/10 to-transparent border border-emerald-300/20 rounded-xl sm:rounded-2xl">
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-1.5">
-                    <Zap size={13} className="text-[#ff5500] sm:w-[14px] sm:h-[14px]" />
-                    <h5 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-[#ff5500]">How to Add Bots</h5>
+                    <Zap size={13} className="text-emerald-300 sm:w-[14px] sm:h-[14px]" />
+                    <h5 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-emerald-300">How to Add Bots</h5>
                   </div>
                   {isAdmin ? (
                     <p className="text-[10px] sm:text-xs text-gray-300 font-medium leading-relaxed">
