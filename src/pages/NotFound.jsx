@@ -12,10 +12,10 @@ export default function NotFound() {
   )
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-[#ff5500] selection:text-black flex flex-col justify-between relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#050914] text-white font-sans selection:bg-emerald-300 selection:text-black flex flex-col justify-between relative overflow-x-hidden">
       {/* Dynamic Background Glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-600/15 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-400/12 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03]" />
       </div>
