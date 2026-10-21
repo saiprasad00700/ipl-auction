@@ -617,7 +617,10 @@ export const AuctionProvider = ({ children }) => {
           });
         }
       }
-      if (auctionState.retentionOffer?.rtmUsed) {
+      // RTM is only charged when the original franchise actually wins the player.
+      // Choosing YES merely opens the counter-bid stage; if the counter-price is
+      // declined, the player goes to the bidder and the retention card is preserved.
+      if (auctionState.retentionOffer?.rtmUsed && auctionState.retentionOffer?.status === 'accepted') {
         const acceptedTeamId = `${roomId}_${auctionState.retentionOffer.eligibleUserId}`;
         const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
         const acceptedTeamSnap = await get(acceptedTeamRef);
