@@ -1082,8 +1082,8 @@ const AuctionRoom = () => {
          </header>
 
          <div className="w-full flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden relative">
-            <aside className={`${mobileTab === 'squad' ? 'flex' : 'hidden'} md:flex w-full md:w-80 bg-black/40 border-r border-white/5 flex-col h-full max-h-[calc(100dvh-7.5rem)] md:max-h-[calc(100dvh-3.5rem)] overflow-hidden`}>
-               <div className="h-14 border-b border-white/5 bg-white/[0.01] flex items-center px-6 shrink-0">
+            <aside className={`${mobileTab === 'squad' ? 'flex' : 'hidden'} md:flex w-full md:w-80 bg-[#07111d]/80 backdrop-blur-xl border-r border-emerald-300/10 flex-col h-full max-h-[calc(100dvh-7.5rem)] md:max-h-[calc(100dvh-3.5rem)] overflow-hidden`}>
+               <div className="h-14 border-b border-emerald-300/10 bg-white/[0.025] flex items-center px-6 shrink-0">
                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">Auction Teams</span>
                </div>
 
@@ -1099,7 +1099,7 @@ const AuctionRoom = () => {
                         <div key={idx} className="border-b border-white/5 last:border-b-0 py-1">
                            <button
                               onClick={() => setSelectedTeamId(isSelected ? null : (manager?.id || t.id))}
-                              className={`w-full text-left py-3 px-2 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'bg-slate-900/45' : 'hover:bg-white/[0.02]'}`}
+                              className={`w-full text-left py-3 px-2 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'bg-emerald-300/[0.07] border border-emerald-300/10' : 'hover:bg-white/[0.02]'}`}
                            >
                               <div className="flex items-center gap-2.5">
                                  <span className="w-4 text-[10px] font-black text-gray-500 text-center shrink-0">{idx + 1}</span>
@@ -1409,7 +1409,7 @@ const AuctionRoom = () => {
                                           </div>
                                           <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 ${timeLeft < 5
                                              ? 'border-red-500 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                                             : 'border-green-500/30 bg-green-500/5 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                                             : 'border-green-500/30 bg-green-500/5 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                                              }`}>
                                              <span className="text-base sm:text-lg md:text-xl font-black leading-none">{timeLeft}</span>
                                              <span className="text-[6px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
@@ -1427,7 +1427,7 @@ const AuctionRoom = () => {
                                        const totalBudget = currentAuction?.settings?.budget || 120;
 
                                        return (
-                                          <div className="flex md:hidden items-center justify-between bg-slate-900/45 border border-white/10 px-2.5 sm:px-4 py-2 rounded-xl text-[9px] sm:text-xs font-bold text-gray-300">
+                                          <div className="flex md:hidden items-center justify-between bg-emerald-300/[0.07] border border-emerald-300/10 border border-white/10 px-2.5 sm:px-4 py-2 rounded-xl text-[9px] sm:text-xs font-bold text-gray-300">
                                              <div className="flex items-center gap-1" title="Squad Count">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Squad:</span>
                                                 <span className="text-blue-400 font-extrabold">{team.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
@@ -1479,13 +1479,13 @@ const AuctionRoom = () => {
                </main>
             </div>
 
-            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-black/40 border-l border-white/5 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
+            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-[#07111d]/80 backdrop-blur-xl border-l border-emerald-300/10 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
                {/* Premium Tabs Header */}
-               <div className="h-14 bg-white/[0.01] border-b border-white/5 flex items-center shrink-0 w-full">
+               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full">
                   <button
                      onClick={() => setSidebarTab('activity')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'activity'
-                        ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                        ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                         }`}
                   >
@@ -1495,7 +1495,7 @@ const AuctionRoom = () => {
                   <button
                      onClick={() => setSidebarTab('chat')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
-                        ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                        ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                         }`}
                   >
