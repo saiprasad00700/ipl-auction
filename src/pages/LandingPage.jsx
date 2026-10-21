@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
 import { rtdb } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
-import { ref, remove } from "firebase/database";
+import { ref, remove, get } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
 import { TEAMS } from "../data/teams";
 import {
@@ -73,57 +73,60 @@ const LandingPage = () => {
     }
   }, []);
 
-  // Fetch Public Lobbies directly from Supabase (0 RTDB bandwidth download cost)
+  // Fetch public lobbies from Firebase Realtime Database, the source of truth
+  // for live rooms. This keeps lobby discovery working even when the optional
+  // Supabase index is unavailable or has not been configured.
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      if (supabase) {
-        const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-        const threeHoursAgoISO = new Date(
-          Date.now() - THREE_HOURS_MS,
-        ).toISOString();
-
-        const { data: supabaseRooms, error } = await supabase
-          .from("auctions")
-          .select("*")
-          .in("status", ["waiting", "active"])
-          .eq("is_public", true)
-          .eq("host_online", true)
-          .gte("created_at", threeHoursAgoISO)
-          .order("created_at", { ascending: false })
-          
-        if (!error && supabaseRooms && supabaseRooms.length > 0) {
-          const list = supabaseRooms.map((r) => {
-            const players = r.players || [];
-            const uniquePlayers = [];
-            const seenIds = new Set();
-            players.forEach((p) => {
-              const pid = p?.id || p?.userId;
-              if (pid && !seenIds.has(pid)) {
-                seenIds.add(pid);
-                uniquePlayers.push(p);
-              }
-            });
-
-            const host =
-              uniquePlayers.find((p) => p.isHost) || uniquePlayers[0];
-            return {
-              roomId: r.id,
-              hostName: r.host_name || host?.name || "Manager",
-              status: r.status,
-              auctionType: r.auction_type || "mega",
-              players: uniquePlayers,
-              squadLimit: r.squad_limit || 25,
-              settings: r.settings || {},
-            };
+      const snapshot = await get(ref(rtdb, "auctions"));
+      const allAuctions = snapshot.exists() ? snapshot.val() : {};
+      const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+      const cutoff = Date.now() - THREE_HOURS_MS;
+      const list = Object.entries(allAuctions)
+        .map(([roomId, roomEntry]) => {
+          const room = roomEntry?.room || {};
+          const live = roomEntry?.live || {};
+          const presence = roomEntry?.presence || {};
+          const hostPresence = presence[room.hostId] || {};
+          const lastSeen = Number(hostPresence.lastSeen || 0);
+          const hostOnline = hostPresence.online === true
+            || (lastSeen > 0 && Date.now() - lastSeen < 90_000);
+          const createdAt = Number(room.createdAt || roomEntry.createdAt || 0);
+          return { roomId, room, live, hostOnline, createdAt };
+        })
+        .filter(({ room, live, hostOnline, createdAt }) =>
+          room.isPublic === true
+          && hostOnline
+          && ["waiting", "active"].includes(room.status || live.status)
+          && (!createdAt || createdAt >= cutoff)
+        )
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(({ roomId, room, live }) => {
+          const players = Array.isArray(room.players) ? room.players : [];
+          const uniquePlayers = [];
+          const seenIds = new Set();
+          players.forEach((player) => {
+            const pid = player?.id || player?.userId;
+            if (pid && !seenIds.has(pid)) {
+              seenIds.add(pid);
+              uniquePlayers.push(player);
+            }
           });
-          setPublicRooms(list);
-          setLobbiesLoading(false);
-          return;
-        }
-      }
-      setPublicRooms([]);
-    } catch {
+          const host = uniquePlayers.find((player) => player.isHost) || uniquePlayers[0];
+          return {
+            roomId,
+            hostName: room.hostName || host?.name || "Manager",
+            status: room.status || live.status || "waiting",
+            auctionType: room.auctionType || "mega",
+            players: uniquePlayers,
+            squadLimit: room.squadLimit || 25,
+            settings: room.settings || {},
+          };
+        });
+      setPublicRooms(list);
+    } catch (error) {
+      console.error("Unable to load public auction rooms from Firebase:", error);
       setPublicRooms([]);
     } finally {
       setLobbiesLoading(false);
