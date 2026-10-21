@@ -3,7 +3,7 @@
  * Kept independent of React/Firebase so the rules can be unit-tested.
  */
 export const PLAYING_XI_DEADLINE_MS = 2 * 60 * 1000;
-export const RETENTION_DECISION_MS = 5 * 1000;
+export const RETENTION_DECISION_MS = 10 * 1000;
 export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
