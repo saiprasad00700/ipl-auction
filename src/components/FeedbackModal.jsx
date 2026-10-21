@@ -84,7 +84,7 @@ const FeedbackModal = () => {
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
-        className="fixed bottom-20 right-6 z-[90] flex items-center gap-2 bg-[#0a0a0a]/80 hover:bg-emerald-400/10 text-white px-3.5 py-2 rounded-full border border-white/10 hover:border-[#ff5500]/30 backdrop-blur-xl shadow-2xl transition-all duration-300 group cursor-pointer"
+        className="fixed bottom-20 right-6 z-[90] flex items-center gap-2 bg-[#0a0a0a]/80 hover:bg-emerald-400/10 text-white px-3.5 py-2 rounded-full border border-white/10 hover:border-[#6ee7b7]/30 backdrop-blur-xl shadow-2xl transition-all duration-300 group cursor-pointer"
       >
         <MessageSquarePlus className="w-3.5 h-3.5" />
         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/70 group-hover:text-white transition-colors duration-300">
@@ -143,7 +143,7 @@ const FeedbackModal = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="py-8 text-center space-y-3"
                   >
-                    <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/10 text-emerald-300 flex items-center justify-center border border-[#ff5500]/20 shadow-[0_0_25px_rgba(255,85,0,0.15)]">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-emerald-400/10 text-emerald-300 flex items-center justify-center border border-[#6ee7b7]/20 shadow-[0_0_25px_rgba(16,185,129,0.15)]">
                       <CheckCircle2 className="w-7 h-7" />
                     </div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-white mt-2">Submitted!</p>
@@ -178,7 +178,7 @@ const FeedbackModal = () => {
                             <Star
                               className={`w-5 h-5 transition-colors ${
                                 star <= (hoverRating || rating)
-                                  ? 'text-emerald-300 fill-[#ff5500] drop-shadow-[0_0_6px_rgba(255,85,0,0.5)]'
+                                  ? 'text-emerald-300 fill-[#6ee7b7] drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]'
                                   : 'text-gray-700'
                               }`}
                             />
@@ -205,7 +205,7 @@ const FeedbackModal = () => {
                             onClick={() => setCategory(cat.id)}
                             className={`px-3 py-2 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
                               category === cat.id
-                                ? 'border-[#ff5500]/50 bg-emerald-400/10 shadow-[0_0_12px_rgba(255,85,0,0.1)]'
+                                ? 'border-[#6ee7b7]/50 bg-emerald-400/10 shadow-[0_0_12px_rgba(16,185,129,0.1)]'
                                 : 'border-white/5 hover:border-white/10 bg-white/[0.01]'
                             }`}
                           >
@@ -256,7 +256,7 @@ const FeedbackModal = () => {
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               placeholder="your@email.com"
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#ff5500]/50 transition-all"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#6ee7b7]/50 transition-all"
                             />
                           </div>
                         )}
@@ -271,7 +271,7 @@ const FeedbackModal = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="your@email.com"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#ff5500]/50 transition-all"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black normal-case tracking-normal placeholder:text-gray-800 focus:outline-none focus:border-[#6ee7b7]/50 transition-all"
                         />
                       </div>
                     )}
@@ -287,7 +287,7 @@ const FeedbackModal = () => {
                         value={feedbackText}
                         onChange={(e) => setFeedbackText(e.target.value)}
                         placeholder="Bugs, ideas, improvements..."
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black uppercase tracking-widest placeholder:text-gray-800 placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-[#ff5500]/50 transition-all resize-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-[10px] font-black uppercase tracking-widest placeholder:text-gray-800 placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-[#6ee7b7]/50 transition-all resize-none"
                       />
                     </div>
 
