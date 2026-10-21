@@ -113,10 +113,10 @@ const PageLoader = ({ isGame = false }) => {
   if (isGameMode && !skippedIntro) {
     return (
       <motion.div
-        className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col justify-end p-6 md:p-12 overflow-hidden select-none font-sans text-white"
+        className="fixed inset-0 z-[9999] bg-[#050914] flex flex-col justify-end p-6 md:p-12 overflow-hidden select-none font-sans text-white"
       >
 
-        {/* Dynamic HTML/CSS Gaming Backdrop (Matches Landing Page Theme) */}
+        {/* Dynamic gaming backdrop aligned with the navy and emerald landing page theme */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {/* Ambient Glowing Orbs */}
           <motion.div
@@ -126,7 +126,7 @@ const PageLoader = ({ isGame = false }) => {
               y: [0, -20, 0]
             }}
             transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] bg-[#ff5500]/15 blur-[130px] rounded-full"
+            className="absolute -top-[10%] -left-[10%] w-[60%] h-[60%] bg-[#10b981]/15 blur-[130px] rounded-full"
           />
           <motion.div
             animate={{
@@ -175,8 +175,8 @@ const PageLoader = ({ isGame = false }) => {
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
 
             {/* Game Tip / Trivia */}
-            <div className="max-w-2xl bg-white/[0.02] border-l-4 border-orange-500 p-4 rounded-r-md backdrop-blur-md border border-white/5 border-l-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-              <span className="text-[9px] font-black tracking-widest text-orange-500 uppercase block mb-1">
+            <div className="max-w-2xl bg-white/[0.02] border-l-4 border-emerald-400 p-4 rounded-r-md backdrop-blur-md border border-white/5 border-l-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+              <span className="text-[9px] font-black tracking-widest text-emerald-300 uppercase block mb-1">
                 Loading Tip
               </span>
               <div className="min-h-[40px] flex items-center">
@@ -222,7 +222,7 @@ const PageLoader = ({ isGame = false }) => {
                   >
                     <button
                       onClick={handleContinue}
-                      className="group relative overflow-hidden flex items-center gap-2.5 bg-[#ff5500] text-white font-black uppercase tracking-[0.2em] text-[11px] px-7 py-3.5 rounded-2xl border border-white/10 transition-all cursor-pointer duration-200 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#ff5500]/50 focus:ring-offset-2 focus:ring-offset-[#050505]"
+                      className="group relative overflow-hidden flex items-center gap-2.5 bg-[#10b981] text-white font-black uppercase tracking-[0.2em] text-[11px] px-7 py-3.5 rounded-2xl border border-white/10 transition-all cursor-pointer duration-200 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#10b981]/50 focus:ring-offset-2 focus:ring-offset-[#050914]"
                     >
                       <span className="relative z-10">Enter Auction Room</span>
                       <ChevronRight size={15} className="relative z-10 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -236,7 +236,7 @@ const PageLoader = ({ isGame = false }) => {
 
           {/* Minimal full-width loading line at the very bottom */}
           <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-            <div className="h-full w-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+            <div className="h-full w-full bg-emerald-400 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
           </div>
 
         </div>
@@ -246,10 +246,10 @@ const PageLoader = ({ isGame = false }) => {
 
   // Original Minimal Loader for other pages/sections
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9999] bg-[#050914] flex flex-col items-center justify-center p-4">
       {/* Background Match */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03]" />
       </div>
@@ -257,7 +257,7 @@ const PageLoader = ({ isGame = false }) => {
       <div className="relative z-10 flex flex-col items-center text-center">
         <div className="relative flex items-center justify-center w-12 h-12 mb-6">
           <motion.div
-            className="absolute inset-0 rounded-full border-2 border-white/10 border-t-orange-500"
+            className="absolute inset-0 rounded-full border-2 border-white/10 border-t-emerald-300"
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           />
