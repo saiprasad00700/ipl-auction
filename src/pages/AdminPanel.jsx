@@ -560,7 +560,7 @@ const AdminPanel = () => {
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="relative max-w-sm sm:max-w-md w-full bg-[#0c0c0c] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,0.8)] backdrop-blur-xl"
+          className="relative max-w-sm sm:max-w-md w-full bg-[#08111f] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,0.8)] backdrop-blur-xl"
         >
           <div className="w-14 sm:w-16 h-14 sm:h-16 mx-auto rounded-2xl bg-emerald-400/10 border border-emerald-300/30 flex items-center justify-center text-emerald-300 mb-5 sm:mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
             <Lock className="w-7 sm:w-8 h-7 sm:h-8" />
@@ -602,7 +602,7 @@ const AdminPanel = () => {
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="relative max-w-sm sm:max-w-md w-full bg-[#0c0c0c] border border-red-500/20 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,0.8)] backdrop-blur-xl"
+          className="relative max-w-sm sm:max-w-md w-full bg-[#08111f] border border-red-500/20 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 text-center shadow-[0_25px_70px_rgba(0,0,0,0.8)] backdrop-blur-xl"
         >
           <div className="w-14 sm:w-16 h-14 sm:h-16 mx-auto rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 mb-5 sm:mb-6 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
             <ShieldAlert className="w-7 sm:w-8 h-7 sm:h-8" />
@@ -722,7 +722,7 @@ const AdminPanel = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           <motion.div
             whileHover={{ y: -2 }}
-            className="bg-[#0c0c0c] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
+            className="bg-[#08111f] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
           >
             <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-emerald-400/5 rounded-bl-full pointer-events-none group-hover:bg-emerald-400/10 transition-colors" />
             <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -743,7 +743,7 @@ const AdminPanel = () => {
 
           <motion.div
             whileHover={{ y: -2 }}
-            className="bg-[#0c0c0c] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
+            className="bg-[#08111f] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
           >
             <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-blue-500/5 rounded-bl-full pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
             <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -764,7 +764,7 @@ const AdminPanel = () => {
 
           <motion.div
             whileHover={{ y: -2 }}
-            className="bg-[#0c0c0c] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
+            className="bg-[#08111f] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
           >
             <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-amber-500/5 rounded-bl-full pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
             <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -785,7 +785,7 @@ const AdminPanel = () => {
 
           <motion.div
             whileHover={{ y: -2 }}
-            className="bg-[#0c0c0c] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
+            className="bg-[#08111f] border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl group"
           >
             <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-emerald-500/5 rounded-bl-full pointer-events-none group-hover:bg-emerald-500/10 transition-colors" />
             <div className="flex items-center justify-between mb-3 sm:mb-4">
