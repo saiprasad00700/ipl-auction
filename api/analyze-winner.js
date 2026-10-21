@@ -89,20 +89,53 @@ Franchises:
 ${JSON.stringify(normalized)}`;
 
   try {
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(apiKey),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-          },
-        }),
-      },
-    );
+    // Gemini can temporarily return 503 during demand spikes. Retry transient failures,
+    // then fall back to a widely supported Flash model instead of failing immediately.
+    const models = ["gemini-3.8-flash", "gemini-2.5-flash"];
+    let response = null;
+    let activeModel = models[0];
+    let lastDetail = "";
+    for (const model of models) {
+      activeModel = model;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          response = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(apiKey),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  responseMimeType: "application/json",
+                },
+              }),
+            },
+          );
+        } catch (error) {
+          lastDetail = getText(error?.message);
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+            continue;
+          }
+          response = null;
+          break;
+        }
+        if (response.ok) break;
+        lastDetail = await response.text();
+        if (![429, 500, 502, 503, 504].includes(response.status)) break;
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+          continue;
+        }
+      }
+      if (response?.ok) break;
+      if (response && ![429, 500, 502, 503, 504, 404].includes(response.status)) break;
+    }
+    if (!response) {
+      throw new Error("Gemini is temporarily unavailable. Please retry the analysis in a moment.");
+    }
 
     if (!response.ok) {
       const detail = await response.text();
@@ -163,7 +196,7 @@ ${JSON.stringify(normalized)}`;
       }))
       .sort((a, b) => a.rank - b.rank);
 
-    const result = { roomId, rankings, model: "gemini-3.8-flash" };
+    const result = { roomId, rankings, model: activeModel };
     if (res?.status) return res.status(200).json(result);
     return json(200, result);
   } catch (error) {

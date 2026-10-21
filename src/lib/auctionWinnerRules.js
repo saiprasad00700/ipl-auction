@@ -7,6 +7,7 @@ export const RETENTION_DECISION_MS = 5 * 1000;
 export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
+export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
 
 const normalizeRole = (player) => {
   const role = String(player?.role || player?.playingRole || '').toLowerCase();
@@ -58,13 +59,20 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   return { startingXI, impactPlayer: impact, autoSelected: true };
 }
 
-export function validatePlayingXI(startingXI, impactPlayer, squad) {
+export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog = []) {
   if (!Array.isArray(startingXI) || startingXI.length !== PLAYING_XI_SIZE || !impactPlayer) return false;
   const squadIds = new Set((squad || []).map(playerId).filter(Boolean));
   const selectedIds = [...startingXI.map(playerId), playerId(impactPlayer)];
-  return selectedIds.every(Boolean)
-    && new Set(selectedIds).size === PLAYING_XI_SIZE + IMPACT_PLAYER_COUNT
-    && selectedIds.every((id) => squadIds.has(id));
+  if (!selectedIds.every(Boolean)
+    || new Set(selectedIds).size !== PLAYING_XI_SIZE + IMPACT_PLAYER_COUNT
+    || !selectedIds.every((id) => squadIds.has(id))) return false;
+
+  // IPL's four-overseas-player restriction applies to the starting XI, not the full squad.
+  const overseasInXI = startingXI.reduce((count, item) => {
+    const player = toPlayer(item, playerCatalog);
+    return count + (player && player.country !== 'IND' ? 1 : 0);
+  }, 0);
+  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI;
 }
 
 /** Deterministic validation of the no-ties 1..N ranking contract. */
