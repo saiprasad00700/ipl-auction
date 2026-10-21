@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';

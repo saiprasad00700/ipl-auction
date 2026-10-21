@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuction } from '../contexts/AuctionContext';

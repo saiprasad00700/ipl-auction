@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 // If a deployment changes hashed JS chunks while a client has an older page open,
 // Vite can fail to import a chunk that no longer exists. Reload once to fetch the
 // current HTML and asset manifest; the session guard prevents a reload loop.

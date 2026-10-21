@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 /**
  * IPL 2026 franchise ownership for catalogue player IDs.
  * Based on the IPL 2026 squad list and confirmed 2026 franchise assignments.

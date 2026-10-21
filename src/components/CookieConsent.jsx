@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Cookie, X, Check } from 'lucide-react'

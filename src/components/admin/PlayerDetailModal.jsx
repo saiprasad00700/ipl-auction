@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity } from 'lucide-react';

@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useEffect } from "react";
 import { Trash2, X, Loader2 } from "lucide-react";
 

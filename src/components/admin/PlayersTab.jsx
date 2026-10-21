@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
