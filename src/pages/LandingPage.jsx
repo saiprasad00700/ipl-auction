@@ -73,68 +73,11 @@ const LandingPage = () => {
     }
   }, []);
 
-  // Fetch public lobbies from Firebase Realtime Database, the source of truth
-  // for live rooms. This keeps lobby discovery working even when the optional
-  // Supabase index is unavailable or has not been configured.
-  const fetchPublicLobbies = async () => {
-    setLobbiesLoading(true);
-    try {
-      const snapshot = await get(ref(rtdb, "auctions"));
-      const allAuctions = snapshot.exists() ? snapshot.val() : {};
-      const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-      const cutoff = Date.now() - THREE_HOURS_MS;
-      const list = Object.entries(allAuctions)
-        .map(([roomId, roomEntry]) => {
-          const room = roomEntry?.room || {};
-          const live = roomEntry?.live || {};
-          const presence = roomEntry?.presence || {};
-          const hostPresence = presence[room.hostId] || {};
-          const lastSeen = Number(hostPresence.lastSeen || 0);
-          const hostOnline = hostPresence.online === true
-            || (lastSeen > 0 && Date.now() - lastSeen < 90_000);
-          const createdAt = Number(room.createdAt || roomEntry.createdAt || 0);
-          return { roomId, room, live, hostOnline, createdAt };
-        })
-        .filter(({ room, live, hostOnline, createdAt }) =>
-          room.isPublic === true
-          && hostOnline
-          && ["waiting", "active"].includes(room.status || live.status)
-          && (!createdAt || createdAt >= cutoff)
-        )
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .map(({ roomId, room, live }) => {
-          const players = Array.isArray(room.players) ? room.players : [];
-          const uniquePlayers = [];
-          const seenIds = new Set();
-          players.forEach((player) => {
-            const pid = player?.id || player?.userId;
-            if (pid && !seenIds.has(pid)) {
-              seenIds.add(pid);
-              uniquePlayers.push(player);
-            }
-          });
-          const host = uniquePlayers.find((player) => player.isHost) || uniquePlayers[0];
-          return {
-            roomId,
-            hostName: room.hostName || host?.name || "Manager",
-            status: room.status || live.status || "waiting",
-            auctionType: room.auctionType || "mega",
-            players: uniquePlayers,
-            squadLimit: room.squadLimit || 25,
-            settings: room.settings || {},
-          };
-        });
-      setPublicRooms(list);
-    } catch (error) {
-      console.error("Unable to load public auction rooms from Firebase:", error);
-      setPublicRooms([]);
-    } finally {
-      setLobbiesLoading(false);
-    }
-  };
-
+  // Public-room discovery is intentionally disabled. Rooms are joined by invite link/code,
+  // so do not read the entire Firebase auctions tree (which is not publicly readable).
   useEffect(() => {
-    fetchPublicLobbies();
+    setPublicRooms([]);
+    setLobbiesLoading(false);
   }, []);
 
   // Fetch auction history directly from Supabase
