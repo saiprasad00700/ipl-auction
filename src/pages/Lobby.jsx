@@ -519,7 +519,7 @@ const Lobby = () => {
 
   // ─── Authenticated State ───
   return (
-    <div className="relative min-h-screen bg-[#050914] flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden">
+    <div className="relative min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.13),_transparent_45%),linear-gradient(145deg,#071521_0%,#050914_55%,#02040a_100%)] flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden">
 
       {/* Premium Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
