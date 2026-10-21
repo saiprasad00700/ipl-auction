@@ -346,12 +346,12 @@ const LandingPage = () => {
   // ─── Not Signed In: Show Google / Guest Login ───
   if (!user) {
     return (
-      <main className="relative min-h-screen bg-[#050505] flex flex-col items-center justify-center pt-10 px-4 font-sans text-white overflow-x-hidden">
+      <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-center pt-10 px-4 font-sans text-white overflow-x-hidden">
         <GithubStarButton />
         <BuyMeACoffee />
 
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-800/20  md:bg-orange-700/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-800/20  md:bg-emerald-700/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -363,7 +363,7 @@ const LandingPage = () => {
           <div className="text-2xl sm:text-4xl md:text-5xl lg:text-[64px] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
             CREATE YOUR
           </div>
-          <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[88px] font-pixel text-[#ff5500] leading-none uppercase text-balance mt-1 drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
+          <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[88px] font-pixel text-[#10b981] leading-none uppercase text-balance mt-1 drop-shadow-[0_4px_12px_rgba(16,185,129,0.2)]">
             AUCTION ROOM
           </div>
 
@@ -375,15 +375,15 @@ const LandingPage = () => {
 
           {/* Three-step visual story */}
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 sm:gap-x-6 mt-5 px-2 text-[9px] sm:text-[10px] font-black tracking-wider sm:tracking-widest text-gray-400 uppercase select-none">
-            <span className="hover:text-orange-500/80 transition-colors">
+            <span className="hover:text-emerald-400/80 transition-colors">
               ① Create Room
             </span>
             <span className="text-gray-800">➔</span>
-            <span className="hover:text-orange-500/80 transition-colors">
+            <span className="hover:text-emerald-400/80 transition-colors">
               ② Invite Friends
             </span>
             <span className="text-gray-800">➔</span>
-            <span className="hover:text-orange-500/80 transition-colors">
+            <span className="hover:text-emerald-400/80 transition-colors">
               ③ Start Bidding
             </span>
           </div>
@@ -394,9 +394,9 @@ const LandingPage = () => {
 
         <div className="w-full max-w-6xl bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 relative mt-2">
           {/* Subtle Orange Glow behind panel */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.02] via-[#ff5500]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
-          <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
-          <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-[#10b981]/[0.02] via-[#10b981]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
+          <div className="absolute -inset-2 bg-gradient-to-r from-[#10b981]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
+          <div className="bg-[#0b1220] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
             {/* Left Side: Live Activity Feed */}
             <div className="lg:col-span-7 w-full flex flex-col p-6 md:p-8 relative">
               <AuctionActivityFeed activeCount={publicRooms.length} />
@@ -417,9 +417,9 @@ const LandingPage = () => {
                 <div className="w-full space-y-4">
                   <button
                     onClick={handleGoogleSignIn}
-                    className="w-full h-12 sm:h-14 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(255,85,0,0.2)] cursor-pointer transition-all active:scale-[0.98]"
+                    className="w-full h-12 sm:h-14 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.18)] cursor-pointer transition-all active:scale-[0.98]"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/submit:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#10b981] to-[#34d399] transition-transform duration-500 group-hover/submit:scale-105" />
                     <div className="relative flex items-center justify-center gap-2.5 sm:gap-3 text-white font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-xs sm:text-sm">
                       <svg
                         viewBox="0 0 24 24"
@@ -440,7 +440,7 @@ const LandingPage = () => {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-white/5" />
                     </div>
-                    <span className="relative bg-[#0c0c0c] px-4 text-[9px] font-black text-gray-400 uppercase tracking-widest italic">
+                    <span className="relative bg-[#0b1220] px-4 text-[9px] font-black text-gray-400 uppercase tracking-widest italic">
                       Wait, I'm a guest
                     </span>
                   </div>
@@ -463,7 +463,7 @@ const LandingPage = () => {
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
                       placeholder="e.g. MS Dhoni"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white font-black uppercase text-sm tracking-widest placeholder:text-gray-800 focus:outline-none focus:border-orange-500/50 transition-all"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white font-black uppercase text-sm tracking-widest placeholder:text-gray-800 focus:outline-none focus:border-emerald-400/50 transition-all"
                       autoFocus
                     />
                   </div>
@@ -471,9 +471,9 @@ const LandingPage = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-14 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(255,85,0,0.2)] cursor-pointer transition-all active:scale-[0.98]"
+                    className="w-full h-14 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.18)] cursor-pointer transition-all active:scale-[0.98]"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/submit:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#10b981] to-[#34d399] transition-transform duration-500 group-hover/submit:scale-105" />
                     <div className="relative flex items-center justify-center gap-3 text-white font-black uppercase tracking-[0.2em] text-sm">
                       {isSubmitting ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -513,12 +513,12 @@ const LandingPage = () => {
 
   // ─── Signed In: Show Create / Join / History ───
   return (
-    <main className="relative min-h-screen bg-[#050505] flex flex-col items-center justify-center pt-10 px-4 font-sans text-white overflow-x-hidden">
+    <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-center pt-10 px-4 font-sans text-white overflow-x-hidden">
       <GithubStarButton />
       <BuyMeACoffee />
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-800/20  md:bg-orange-700/20 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-800/20  md:bg-emerald-700/20 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
       </div>
@@ -531,7 +531,7 @@ const LandingPage = () => {
         <div className="text-2xl sm:text-4xl md:text-5xl lg:text-[64px] font-pixel leading-none text-balance bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
           CREATE YOUR
         </div>
-        <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[88px] font-pixel text-[#ff5500] leading-none uppercase text-balance mt-1 drop-shadow-[0_4px_12px_rgba(255,85,0,0.2)]">
+        <div className="text-4xl sm:text-6xl md:text-7xl lg:text-[88px] font-pixel text-[#10b981] leading-none uppercase text-balance mt-1 drop-shadow-[0_4px_12px_rgba(16,185,129,0.2)]">
           AUCTION ROOM
         </div>
 
@@ -543,15 +543,15 @@ const LandingPage = () => {
 
         {/* Three-step visual story */}
         <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 sm:gap-x-6 mt-5 px-2 text-[9px] sm:text-[10px] font-black tracking-wider sm:tracking-widest text-gray-400 uppercase select-none">
-          <span className="hover:text-orange-500/80 transition-colors">
+          <span className="hover:text-emerald-400/80 transition-colors">
             ① Create Room
           </span>
           <span className="text-gray-800">➔</span>
-          <span className="hover:text-orange-500/80 transition-colors">
+          <span className="hover:text-emerald-400/80 transition-colors">
             ② Invite Friends
           </span>
           <span className="text-gray-800">➔</span>
-          <span className="hover:text-orange-500/80 transition-colors">
+          <span className="hover:text-emerald-400/80 transition-colors">
             ③ Start Bidding
           </span>
         </div>
@@ -562,9 +562,9 @@ const LandingPage = () => {
 
       <div className="w-full max-w-6xl bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 relative mt-2">
         {/* Subtle Orange Glow behind panel */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.02] via-[#ff5500]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
-        <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
-        <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#10b981]/[0.02] via-[#10b981]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
+        <div className="absolute -inset-2 bg-gradient-to-r from-[#10b981]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
+        <div className="bg-[#0b1220] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
           {/* Left Side: Live signings */}
           <div className="lg:col-span-5 w-full flex flex-col p-6 md:p-8 relative">
             <AuctionActivityFeed activeCount={publicRooms.length} />
@@ -580,7 +580,7 @@ const LandingPage = () => {
                   onClick={() => setActiveTab("new")}
                   className={`pb-3 px-4 sm:pb-3.5 sm:px-6 font-black text-[10px] sm:text-[11px] uppercase tracking-wider transition-all duration-200 border-b-2 relative ${
                     activeTab === "new"
-                      ? "border-[#ff5500] text-[#ff5500]"
+                      ? "border-[#10b981] text-[#10b981]"
                       : "border-transparent text-gray-400 hover:text-gray-300"
                   }`}
                 >
@@ -591,13 +591,13 @@ const LandingPage = () => {
                   onClick={() => setActiveTab("join")}
                   className={`pb-3 px-4 sm:pb-3.5 sm:px-6 font-black text-[10px] sm:text-[11px] uppercase tracking-wider transition-all duration-200 border-b-2 relative flex items-center gap-1.5 ${
                     activeTab === "join"
-                      ? "border-[#ff5500] text-[#ff5500]"
+                      ? "border-[#10b981] text-[#10b981]"
                       : "border-transparent text-gray-400 hover:text-gray-300"
                   }`}
                 >
                   <span>Join</span>
                   {publicRooms.length > 0 && (
-                    <span className="bg-[#ff5500]/20 text-[#ff5500] text-[9px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
+                    <span className="bg-[#10b981]/20 text-[#10b981] text-[9px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
                       {publicRooms.length}
                     </span>
                   )}
@@ -607,7 +607,7 @@ const LandingPage = () => {
                   onClick={() => setActiveTab("history")}
                   className={`pb-3 px-4 sm:pb-3.5 sm:px-6 font-black text-[10px] sm:text-[11px] uppercase tracking-wider transition-all duration-200 border-b-2 relative ${
                     activeTab === "history"
-                      ? "border-[#ff5500] text-[#ff5500]"
+                      ? "border-[#10b981] text-[#10b981]"
                       : "border-transparent text-gray-400 hover:text-gray-300"
                   }`}
                 >
@@ -842,7 +842,7 @@ const LandingPage = () => {
                     aria-label="Toggle public room visibility"
                     className={`w-10 h-5 sm:w-12 sm:h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer shrink-0 ${
                       isPublicRoom
-                        ? "bg-orange-600 justify-end"
+                        ? "bg-emerald-600 justify-end"
                         : "bg-white/10 justify-start"
                     }`}
                   >
@@ -854,9 +854,9 @@ const LandingPage = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-10 sm:h-12 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(255,85,0,0.2)] disabled:opacity-50 cursor-pointer transition-all active:scale-[0.98]"
+                    className="w-full h-10 sm:h-12 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.18)] disabled:opacity-50 cursor-pointer transition-all active:scale-[0.98]"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/submit:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#10b981] to-[#34d399] transition-transform duration-500 group-hover/submit:scale-105" />
                     <div className="relative flex items-center justify-center gap-2 text-white font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[10px] sm:text-xs">
                       {isSubmitting ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -890,7 +890,7 @@ const LandingPage = () => {
                       type="text"
                       value={roomCode}
                       onChange={(e) => setRoomCode(e.target.value)}
-                      className="w-full bg-[#111] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 focus:outline-none focus:border-orange-500/50 transition-all text-white font-black uppercase tracking-[0.35em] sm:tracking-[0.5em] text-center text-sm sm:text-lg placeholder:tracking-normal placeholder:text-[10px] sm:placeholder:text-xs placeholder:text-gray-400"
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 focus:outline-none focus:border-emerald-400/50 transition-all text-white font-black uppercase tracking-[0.35em] sm:tracking-[0.5em] text-center text-sm sm:text-lg placeholder:tracking-normal placeholder:text-[10px] sm:placeholder:text-xs placeholder:text-gray-400"
                       placeholder="Enter Room Code"
                     />
                   </div>
@@ -898,9 +898,9 @@ const LandingPage = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting || !roomCode.trim()}
-                    className="w-full h-10 sm:h-12 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(255,85,0,0.2)] disabled:opacity-50 cursor-pointer"
+                    className="w-full h-10 sm:h-12 relative overflow-hidden group/submit rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.18)] disabled:opacity-50 cursor-pointer"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/submit:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#10b981] to-[#34d399] transition-transform duration-500 group-hover/submit:scale-105" />
                     <div className="relative flex items-center justify-center gap-2 sm:gap-3 text-white font-black uppercase tracking-[0.16em] sm:tracking-[0.2em] text-[10px] sm:text-xs">
                       {isSubmitting ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -921,7 +921,7 @@ const LandingPage = () => {
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/5" />
                   </div>
-                  <span className="relative bg-[#0c0c0c] px-3 sm:px-4 text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="relative bg-[#0b1220] px-3 sm:px-4 text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
                     Or join a public lobby
                   </span>
                 </div>
@@ -936,11 +936,11 @@ const LandingPage = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search room code or manager..."
-                        className="w-full bg-white/[0.03] border border-white/10 focus:border-orange-500/50 rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white placeholder:text-gray-400 focus:outline-none transition-all font-medium"
+                        className="w-full bg-white/[0.03] border border-white/10 focus:border-emerald-400/50 rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white placeholder:text-gray-400 focus:outline-none transition-all font-medium"
                       />
                       <button
                         onClick={fetchPublicLobbies}
-                        className="flex items-center justify-center gap-1.5 bg-orange-500/20 hover:bg-orange-500 text-orange-500 hover:text-white border border-orange-500/30 hover:border-orange-500 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0"
+                        className="flex items-center justify-center gap-1.5 bg-emerald-400/20 hover:bg-emerald-400 text-emerald-400 hover:text-white border border-emerald-400/30 hover:border-emerald-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0"
                         title="Refresh Lobbies"
                       >
                         <RefreshCw
@@ -979,7 +979,7 @@ const LandingPage = () => {
                     <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-gray-400">
                       <Loader2
                         size={18}
-                        className="animate-spin mb-2 text-orange-500"
+                        className="animate-spin mb-2 text-emerald-400"
                       />
                       <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-gray-400">
                         Scanning active rooms...
@@ -1004,7 +1004,7 @@ const LandingPage = () => {
                         >
                           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                             {/* Clean Room Code Pill */}
-                            <div className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 font-mono font-black text-[9px] sm:text-xs tracking-wider shrink-0">
+                            <div className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 font-mono font-black text-[9px] sm:text-xs tracking-wider shrink-0">
                               {room.roomId}
                             </div>
 
@@ -1041,7 +1041,7 @@ const LandingPage = () => {
                             onClick={() => {
                               navigate(`/lobby/${room.roomId}`);
                             }}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-orange-500 hover:bg-orange-600 text-white font-black text-[8px] sm:text-[10px] uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-md"
+                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-emerald-400 hover:bg-emerald-600 text-white font-black text-[8px] sm:text-[10px] uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-md"
                           >
                             <span>Join</span>
                             <ChevronRight
@@ -1311,7 +1311,7 @@ const LandingPage = () => {
                                         onClick={() =>
                                           navigate(`/lobby/${session.roomId}`)
                                         }
-                                        className="w-full mt-1.5 sm:mt-2 py-2 sm:py-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-500 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                        className="w-full mt-1.5 sm:mt-2 py-2 sm:py-3 bg-emerald-400/10 border border-emerald-400/20 rounded-xl text-emerald-400 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400/20 transition-all cursor-pointer flex items-center justify-center gap-2"
                                       >
                                         <Zap size={12} /> Resume Auction
                                       </button>
@@ -1338,7 +1338,7 @@ const LandingPage = () => {
                                         onClick={() =>
                                           navigate(`/lobby/${session.roomId}`)
                                         }
-                                        className="w-full mt-1.5 sm:mt-2 py-2 sm:py-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-500 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-orange-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                        className="w-full mt-1.5 sm:mt-2 py-2 sm:py-3 bg-emerald-400/10 border border-emerald-400/20 rounded-xl text-emerald-400 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-emerald-400/20 transition-all cursor-pointer flex items-center justify-center gap-2"
                                       >
                                         <Zap size={12} /> Resume / Join Auction
                                       </button>
