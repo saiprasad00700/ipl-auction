@@ -454,6 +454,7 @@ export const AuctionProvider = ({ children }) => {
             offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
           }
           currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
+          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
           return currentData;
         }
 
@@ -503,6 +504,9 @@ export const AuctionProvider = ({ children }) => {
           }
         }
         currentData.status = retentionOffer ? 'processing_sale' : (isSold ? 'sold' : 'unsold');
+        // Shared deadline lets another connected client recover if the coordinator tab closes.
+        if (!retentionOffer) currentData.transitionDeadline = now + (isSold ? 5000 : 2000) + 2500;
+        else delete currentData.transitionDeadline;
         if (retentionOffer) currentData.retentionOffer = retentionOffer;
         return currentData;
       });
@@ -614,6 +618,7 @@ export const AuctionProvider = ({ children }) => {
             offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
           }
           currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
+          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
           return currentData;
         });
         if (!settleTx.committed) {
@@ -797,13 +802,20 @@ export const AuctionProvider = ({ children }) => {
 
           if (nextIndexInOrder !== undefined && IPL_PLAYERS[nextIndexInOrder]) {
             const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-            await set(liveRef, {
-              playerId: nextPlayer.id,
-              currentBid: 0,
-              highBidderId: '',
-              highBidderName: 'No Bids',
-              timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
-              status: 'bidding'
+            // Guard the local timeout with the same settled-lot identity as the
+            // recovery path. If another client already advanced it, do not reset
+            // the next player's timer or overwrite newer live state.
+            await runTransactionRtdb(liveRef, (current) => {
+              if (!current || current.playerId !== currentPlayerId
+                || !['sold', 'unsold'].includes(current.status)) return;
+              return {
+                playerId: nextPlayer.id,
+                currentBid: 0,
+                highBidderId: '',
+                highBidderName: 'No Bids',
+                timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
+                status: 'bidding'
+              };
             });
           } else {
             // Natural end of bidding must enter the same shared XI phase as host-triggered end.
@@ -833,6 +845,69 @@ export const AuctionProvider = ({ children }) => {
       endingPlayerRef.current = false;
     }
   }, [getSyncedTime, flushAuctionToFirestore]);
+
+  // Recover an overdue sold/unsold transition from shared RTDB state. The
+  // transaction checks the player, status and deadline again, so only one client
+  // can advance a given settled lot.
+  const recoverPlayerTransition = useCallback(async (roomId) => {
+    if (!isServerTimeSynced()) return;
+    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    const liveSnap = await get(liveRef);
+    const live = liveSnap.exists() ? liveSnap.val() : null;
+    if (!live || !['sold', 'unsold'].includes(live.status)) return;
+    if (!Number.isFinite(Number(live.transitionDeadline)) || getSyncedTime() < Number(live.transitionDeadline)) return;
+
+    const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
+    if (!roomSnap.exists()) return;
+    const roomData = roomSnap.val();
+    if (roomData.status !== 'active') return;
+
+    let playerOrder = roomData.playerOrder;
+    if (!playerOrder) {
+      const orderSnap = await get(ref(rtdb, `auctions/${roomId}/playerOrder`));
+      if (orderSnap.exists()) playerOrder = orderSnap.val();
+    }
+    const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
+    const currentIndex = order.findIndex((idx) => IPL_PLAYERS[idx]?.id === live.playerId);
+    const nextIndex = currentIndex >= 0 ? order[currentIndex + 1] : order[0];
+
+    if (nextIndex === undefined || !IPL_PLAYERS[nextIndex]) {
+      const claim = await runTransactionRtdb(liveRef, (current) => {
+        if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
+        if (Number(current.transitionDeadline) > getSyncedTime()) return;
+        current.status = 'awaiting_xi';
+        current.transitionDeadline = null;
+        return current;
+      });
+      if (!claim.committed) return;
+      const now = getSyncedTime();
+      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
+        status: 'awaiting_xi',
+        xiSubmissionStartedAt: now,
+        xiSubmissionDeadline: now + PLAYING_XI_DEADLINE_MS,
+        winnerAnalysisStatus: 'collecting'
+      });
+      await push(ref(rtdb, `auctions/${roomId}/messages`), {
+        userId: 'system', userName: 'System',
+        text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+        type: 'log', timestamp: serverTimestampRtdb()
+      });
+      return;
+    }
+
+    await runTransactionRtdb(liveRef, (current) => {
+      if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
+      if (Number(current.transitionDeadline) > getSyncedTime()) return;
+      return {
+        playerId: IPL_PLAYERS[nextIndex].id,
+        currentBid: 0,
+        highBidderId: '',
+        highBidderName: 'No Bids',
+        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || 10) * 1000,
+        status: 'bidding'
+      };
+    });
+  }, [getSyncedTime]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     // Explicitly connect RTDB WebSocket when joining a room
@@ -2074,6 +2149,7 @@ export const AuctionProvider = ({ children }) => {
     updateRoomSettings,
     startAuction,
     endPlayerAuction,
+    recoverPlayerTransition,
     decideRetention,
     submitRetentionCounterBid,
     pauseAuction,

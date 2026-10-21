@@ -61,6 +61,7 @@ const AuctionRoom = () => {
       joinAuction,
       joinRoomDb,
       endPlayerAuction,
+      recoverPlayerTransition,
       decideRetention,
       submitRetentionCounterBid,
       pauseAuction,
@@ -156,6 +157,17 @@ const AuctionRoom = () => {
       }, 250);
       return () => clearInterval(timer);
    }, [displayAuctionState?.status, retentionOffer?.status, retentionOffer?.expiresAt, endPlayerAuction, getSyncedTime, id]);
+
+   // Recover a stalled sold/unsold transition from any connected client.
+   useEffect(() => {
+      if (!id || !['sold', 'unsold'].includes(displayAuctionState?.status)) return;
+      const timer = setInterval(() => {
+         void recoverPlayerTransition(id).catch((err) => {
+            console.error('[Auction] Transition recovery failed:', err);
+         });
+      }, 1000);
+      return () => clearInterval(timer);
+   }, [id, displayAuctionState?.status, displayAuctionState?.playerId, displayAuctionState?.transitionDeadline, recoverPlayerTransition]);
 
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
