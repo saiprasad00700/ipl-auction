@@ -105,7 +105,7 @@ export default function ConnectionAlertModal() {
     >
       {/* Ambient glow, matching the landing page / quota modal */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute bottom-0 left-1/2 h-[320px] w-[320px] -translate-x-1/2 translate-y-1/3 rounded-full bg-[#ff5500]/20 blur-[110px] sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2" />
+        <div className="absolute bottom-0 left-1/2 h-[320px] w-[320px] -translate-x-1/2 translate-y-1/3 rounded-full bg-emerald-400/20 blur-[110px] sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2" />
         <div className="absolute right-0 top-0 h-[200px] w-[200px] rounded-full bg-blue-600/10 blur-[100px]" />
       </div>
 
@@ -120,19 +120,19 @@ export default function ConnectionAlertModal() {
         {/* Glass frame */}
         <div className="relative flex min-h-0 flex-col rounded-t-[2rem] border border-white/10 bg-white/[0.04] p-2.5 shadow-[0_-20px_60px_rgba(0,0,0,0.85)] backdrop-blur-3xl sm:rounded-[2.5rem] sm:p-3">
           {/* Solid card: scrolling body + pinned actions */}
-          <div className="relative flex min-h-0 flex-col overflow-hidden rounded-t-[1.7rem] border border-white/5 bg-[#0c0c0c] sm:rounded-[2.2rem]">
+          <div className="relative flex min-h-0 flex-col overflow-hidden rounded-t-[1.7rem] border border-white/5 bg-[#08111d] sm:rounded-[2.2rem]">
             <div className="absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-[#ff5500]/50 to-transparent" />
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-6 text-center sm:px-8 sm:pt-8">
-              <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ff5500]/25 bg-[#ff5500]/10 shadow-[0_0_28px_rgba(255,85,0,0.18)] sm:mb-4 sm:h-14 sm:w-14">
+              <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ff5500]/25 bg-emerald-400/10 shadow-[0_0_28px_rgba(255,85,0,0.18)] sm:mb-4 sm:h-14 sm:w-14">
                 {isCapacity ? (
-                  <ServerOff className="h-6 w-6 text-[#ff5500] sm:h-7 sm:w-7" aria-hidden="true" />
+                  <ServerOff className="h-6 w-6 text-emerald-300 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
-                  <WifiOff className="h-6 w-6 text-[#ff5500] sm:h-7 sm:w-7" aria-hidden="true" />
+                  <WifiOff className="h-6 w-6 text-emerald-300 sm:h-7 sm:w-7" aria-hidden="true" />
                 )}
               </div>
 
-              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-orange-500/25 bg-orange-500/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-orange-300 sm:mb-4 sm:px-4 sm:py-1.5 sm:text-[10px]">
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-orange-300 sm:mb-4 sm:px-4 sm:py-1.5 sm:text-[10px]">
                 <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-70 motion-reduce:animate-none" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-400" />
@@ -142,7 +142,7 @@ export default function ConnectionAlertModal() {
 
               <h2
                 id="connection-alert-title"
-                className="mb-2.5 break-words text-[1.65rem] font-black uppercase italic leading-[1.05] tracking-tight text-[#ff5500] drop-shadow-[0_4px_12px_rgba(255,85,0,0.25)] sm:mb-3 sm:text-3xl sm:tracking-tighter"
+                className="mb-2.5 break-words text-[1.65rem] font-black uppercase italic leading-[1.05] tracking-tight text-emerald-300 drop-shadow-[0_4px_12px_rgba(16,185,129,0.24)] sm:mb-3 sm:text-3xl sm:tracking-tighter"
               >
                 {copy.title}
               </h2>
@@ -155,7 +155,7 @@ export default function ConnectionAlertModal() {
               </p>
 
               <div className="space-y-2 rounded-2xl border border-white/10 bg-black/60 p-3.5 text-left sm:p-4">
-                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#ff5500] sm:text-[10px]">
+                <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[10px]">
                   <span>{copy.nextTitle}</span>
                 </div>
                 <p className="text-[12.5px] font-medium leading-relaxed text-gray-400 sm:text-xs">
@@ -174,9 +174,9 @@ export default function ConnectionAlertModal() {
                   ref={retryButtonRef}
                   type="button"
                   onClick={retry}
-                  className="group/retry relative flex h-12 w-full touch-manipulation items-center justify-center overflow-hidden rounded-xl border border-orange-500/30 shadow-[0_10px_30px_rgba(255,85,0,0.25)] transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0c0c] sm:flex-1"
+                  className="group/retry relative flex h-12 w-full touch-manipulation items-center justify-center overflow-hidden rounded-xl border border-emerald-300/30 shadow-[0_10px_30px_rgba(16,185,129,0.24)] transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0c0c] sm:flex-1"
                 >
-                  <span className="absolute inset-0 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] transition-transform duration-500 group-hover/retry:scale-105" />
+                  <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-300 transition-transform duration-500 group-hover/retry:scale-105" />
                   <span className="relative flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.15em] text-white">
                     <RefreshCw
                       className="h-4 w-4 transition-transform duration-500 group-hover/retry:rotate-180"
