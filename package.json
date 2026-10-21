@@ -34,5 +34,6 @@
     "globals": "^17.4.0",
     "tailwindcss": "^4.2.2",
     "vite": "^6.0.0"
-  }
+  },
+  "_modification_notice": "Modified from the upstream project by saiprasad00700."
 }
