@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Home, HelpCircle, Trophy, Gavel, ArrowLeft } from 'lucide-react'
