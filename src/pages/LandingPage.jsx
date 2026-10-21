@@ -45,6 +45,12 @@ const LandingPage = () => {
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
   const [lobbiesLoading, setLobbiesLoading] = useState(false);
+
+  // Public-room discovery is disabled; keep the legacy refresh button safe.
+  const fetchPublicLobbies = () => {
+    setPublicRooms([]);
+    setLobbiesLoading(false);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
 
