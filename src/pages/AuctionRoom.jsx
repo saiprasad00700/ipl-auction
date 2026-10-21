@@ -1129,8 +1129,8 @@ const AuctionRoom = () => {
                                     <span className="text-[10px] font-bold block leading-none text-gray-200">
                                        ₹{(teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120.0)).toFixed(1)} Cr
                                     </span>
-                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
-                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25} players</span>
+                                    <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wider mt-1 block">RTM: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
                                  </div>
                                  <ChevronDown size={12} className={`text-gray-500 transition-transform duration-300 ${isSelected ? 'rotate-180' : ''}`} />
                               </div>
@@ -1427,20 +1427,20 @@ const AuctionRoom = () => {
                                        const totalBudget = currentAuction?.settings?.budget || 120;
 
                                        return (
-                                          <div className="flex md:hidden items-center justify-between bg-emerald-300/[0.07] border border-emerald-300/10 border border-white/10 px-2.5 sm:px-4 py-2 rounded-xl text-[9px] sm:text-xs font-bold text-gray-300">
+                                          <div className="flex md:hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-[#07111d]/90 border border-emerald-300/15 px-3 sm:px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold text-gray-300 shadow-inner shadow-emerald-300/[0.03]">
                                              <div className="flex items-center gap-1" title="Squad Count">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Squad:</span>
-                                                <span className="text-blue-400 font-extrabold">{team.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
+                                                <span className="text-emerald-300 font-extrabold">{team.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Overseas Players">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">OS:</span>
-                                                <span className="text-purple-400 font-extrabold">{osCount}/{currentAuction?.overseasLimit || 8}</span>
+                                                <span className="text-sky-300 font-extrabold">{osCount}/{currentAuction?.overseasLimit || 8}</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Purse Left out of Total Budget">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Purse:</span>
-                                                <span className="text-green-400 font-extrabold">₹{(team.budgetRemaining || 0).toFixed(1)}/{totalBudget}Cr</span>
+                                                <span className="text-emerald-300 font-extrabold">₹{(team.budgetRemaining || 0).toFixed(1)}/{totalBudget}Cr</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10 hidden xs:block" />
                                              <div className="items-center gap-1 hidden xs:flex" title="Total Spent">
