@@ -26,15 +26,15 @@ export default function NotFound() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
-          className="max-w-md w-full bg-[#0a0a0b] border border-white/10 rounded-[2.5rem] p-8 text-center backdrop-blur-2xl shadow-2xl relative"
+          className="max-w-md w-full bg-[#08111d] border border-white/10 rounded-[2.5rem] p-8 text-center backdrop-blur-2xl shadow-2xl relative"
         >
           {/* Out of Bounds Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 font-black text-xs uppercase tracking-[0.2em] mb-6">
-            <Trophy className="w-4 h-4 text-[#ff5500]" /> OUT OF BOUNDS!
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-300/10 border border-emerald-300/25 text-emerald-200 font-black text-xs uppercase tracking-[0.2em] mb-6">
+            <Trophy className="w-4 h-4 text-emerald-300" /> OUT OF BOUNDS!
           </div>
 
           {/* Big 404 Text */}
-          <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#ff5500] via-amber-300 to-[#ffaa00] mb-2 tracking-tight">
+          <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300 mb-2 tracking-tight">
             404
           </h1>
 
@@ -50,7 +50,7 @@ export default function NotFound() {
           <div className="flex flex-col gap-3">
             <Link
               to="/"
-              className="flex items-center justify-center gap-2 w-full py-4 px-6 rounded-xl bg-gradient-to-r from-[#ff5500] to-[#ff8c00] text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(255,85,0,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="flex items-center justify-center gap-2 w-full py-4 px-6 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-300 text-white font-black text-xs uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(16,185,129,0.24)] hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               <Home className="w-4 h-4" /> Return to Auction Hub
             </Link>
@@ -59,7 +59,7 @@ export default function NotFound() {
               to="/guide"
               className="flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl bg-white/[0.03] border border-white/10 text-gray-300 font-black text-xs uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all"
             >
-              <HelpCircle className="w-4 h-4 text-[#ff5500]" /> Read Game Guide
+              <HelpCircle className="w-4 h-4 text-emerald-300" /> Read Game Guide
             </Link>
           </div>
         </motion.div>
