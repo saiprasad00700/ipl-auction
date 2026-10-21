@@ -299,7 +299,7 @@ const AuctionSummary = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.08 }}
                     key={player.id}
-                    className="group relative bg-white/[0.03] border border-white/5 p-3.5 sm:p-6 rounded-2xl sm:rounded-[2rem] transition-all hover:bg-white/5 hover:border-emerald-400/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-6"
+                    className="group relative bg-white/[0.03] border border-emerald-300/10 p-3.5 sm:p-6 rounded-2xl sm:rounded-[2rem] transition-all bg-[#08111d]/65 hover:bg-[#0c1a28] hover:border-emerald-300/25 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-6"
                   >
                     <div className="flex items-center gap-3 sm:gap-8">
                       <span className="text-2xl sm:text-5xl font-black text-white/10 group-hover:text-emerald-400/20 transition-colors shrink-0">#{idx + 1}</span>
@@ -333,7 +333,7 @@ const AuctionSummary = () => {
                     </div>
                     <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-white/5 flex sm:block items-center justify-between">
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest sm:hidden">Winning Bid</p>
-                      <div className="text-2xl sm:text-4xl font-black text-[#10b981] tracking-tighter">
+                      <div className="text-2xl sm:text-4xl font-black text-emerald-300 tracking-tighter">
                         ₹{player.bidVal.toFixed(2)}<span className="text-xs ml-1 font-bold not-italic text-gray-500">Cr</span>
                       </div>
                     </div>
@@ -401,7 +401,7 @@ const AuctionSummary = () => {
                     {/* Team Accordion Toggle */}
                     <button
                       onClick={() => setExpandedTeam(isExpanded ? null : t.id)}
-                      className={`w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-[#0c0c0c] border transition-all duration-300 relative overflow-hidden group active:scale-[0.99] touch-manipulation gap-4 ${
+                      className={`w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-[#08111d] border transition-all duration-300 relative overflow-hidden group active:scale-[0.99] touch-manipulation gap-4 ${
                         isExpanded ? 'border-emerald-400/50 bg-white/5 shadow-2xl' : 'border-white/5 hover:border-white/10'
                       }`}
                     >
@@ -454,7 +454,7 @@ const AuctionSummary = () => {
                         >
                           <div 
                              ref={el => teamCardRefs.current[t.id] = el}
-                             className="bg-[#0b0c10] border-x border-b border-white/10 rounded-b-2xl sm:rounded-b-[3rem] p-4 sm:p-8 space-y-6 sm:space-y-12 relative overflow-hidden"
+                             className="bg-[#07111d] border-x border-b border-white/10 rounded-b-2xl sm:rounded-b-[3rem] p-4 sm:p-8 space-y-6 sm:space-y-12 relative overflow-hidden"
                           >
                              {/* Watermark Logo for Exported Image */}
                              <div className="absolute right-4 top-4 w-32 h-32 opacity-5 pointer-events-none grayscale">
@@ -466,13 +466,13 @@ const AuctionSummary = () => {
                                <div className="bg-white/5 border border-white/10 p-1 rounded-xl flex items-center gap-1">
                                  <button 
                                    onClick={() => setSquadViewMode('grid')} 
-                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'grid' ? 'bg-emerald-400 text-white shadow-lg shadow-emerald-400/20' : 'text-gray-400 hover:text-white'}`}
+                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'grid' ? 'bg-emerald-300 text-[#04120f] shadow-lg shadow-emerald-300/20' : 'text-gray-400 hover:text-white'}`}
                                  >
                                    List
                                  </button>
                                  <button 
                                    onClick={() => setSquadViewMode('card')} 
-                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'card' ? 'bg-emerald-400 text-white shadow-lg shadow-emerald-400/20' : 'text-gray-400 hover:text-white'}`}
+                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'card' ? 'bg-emerald-300 text-[#04120f] shadow-lg shadow-emerald-300/20' : 'text-gray-400 hover:text-white'}`}
                                  >
                                    Cards
                                  </button>
