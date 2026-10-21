@@ -1613,7 +1613,15 @@ export const AuctionProvider = ({ children }) => {
     if (teamData.disqualified) {
       throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
     }
-    if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [])) {
+    if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [], IPL_PLAYERS)) {
+      const overseasCount = (startingXI || []).filter((item) => {
+        const playerId = typeof item === 'string' ? item : item?.id;
+        const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
+        return player && player.country !== 'IND';
+      }).length;
+      if (overseasCount > 4) {
+        throw new Error('An IPL Playing XI can include a maximum of 4 overseas players. Please replace an overseas player with an Indian player.');
+      }
       throw new Error('Choose 11 unique players and one different Impact Player from your squad');
     }
     await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
