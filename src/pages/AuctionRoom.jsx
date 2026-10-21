@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { TEAM_SLOGANS } from '../data/slogans';
