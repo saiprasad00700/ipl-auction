@@ -1337,12 +1337,12 @@ const AuctionRoom = () => {
                             );
                          })() : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className="bg-gradient-to-b from-[#161616] to-[#0f0f0f] border border-white/[0.08] rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative min-h-[400px]">
+                              <div className="bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]">
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-60 md:h-80 bg-gradient-to-b from-white/10 to-transparent rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/10 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
+                                    <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.16),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.01))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/15 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
@@ -1417,7 +1417,7 @@ const AuctionRoom = () => {
                                        </div>
                                     </div>
                                  </div>
-                                 <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex flex-col gap-3">
+                                 <div className="bg-[#040a12]/75 backdrop-blur-xl border-t border-emerald-300/10 p-3 sm:p-4 md:p-6 flex flex-col gap-3">
                                     {/* Franchise Quick Stats Bar right above Bid button (Mobile view only) */}
                                     {team && (() => {
                                        const osCount = (team.squad || []).filter(s => {
