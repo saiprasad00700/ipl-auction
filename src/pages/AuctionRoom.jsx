@@ -925,7 +925,7 @@ const AuctionRoom = () => {
             <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
                {availableTeams.length > 0 ? (
                   <>
-                     <div className="w-20 h-20 bg-yellow-500/10 border border-yellow-500/20 rounded-3xl flex items-center justify-center text-yellow-500 mb-6 shadow-2xl">
+                     <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl flex items-center justify-center text-emerald-500 mb-6 shadow-2xl">
                         <Gavel size={40} strokeWidth={2.5} />
                      </div>
                      <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2">Claim Your Franchise</h2>
@@ -942,16 +942,16 @@ const AuctionRoom = () => {
                                  onClick={() => !isTaken && handleQuickJoin(t)}
                                  disabled={isTaken || !!joiningTeam}
                                  className={`relative group flex flex-col items-center justify-center p-3 md:p-4 rounded-2xl transition-all duration-300 border cursor-pointer ${isJoining
-                                    ? 'border-yellow-400 bg-yellow-400/10 shadow-[0_0_25px_rgba(250,204,21,0.2)] scale-105'
+                                    ? 'border-emerald-400 bg-emerald-400/10 shadow-[0_0_25px_rgba(250,204,21,0.2)] scale-105'
                                     : isTaken
                                        ? 'border-white/5 opacity-25 grayscale cursor-not-allowed'
-                                       : 'border-white/10 hover:border-yellow-500/30 hover:bg-white/5 hover:scale-105 active:scale-95'
+                                       : 'border-white/10 hover:border-emerald-500/30 hover:bg-white/5 hover:scale-105 active:scale-95'
                                     }`}
                               >
                                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white/5 border border-white/10 p-1.5 flex items-center justify-center ${isJoining ? 'animate-pulse' : ''}`}>
                                     <img src={t.logo} alt={`${t.name} Logo`} className="w-full h-full object-contain" />
                                  </div>
-                                 <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-tight ${isJoining ? 'text-yellow-400' : isTaken ? 'text-gray-600' : 'text-gray-400 group-hover:text-white'}`}>
+                                 <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-tight ${isJoining ? 'text-emerald-400' : isTaken ? 'text-gray-600' : 'text-gray-400 group-hover:text-white'}`}>
                                     {isJoining ? 'Joining...' : isTaken ? 'Taken' : t.id}
                                  </span>
                               </button>
@@ -1147,7 +1147,7 @@ const AuctionRoom = () => {
                                     <div className="space-y-3 pt-2 pl-1">
                                        {/* Header Stats */}
                                        <div className="flex items-center justify-between text-[9px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 pb-2">
-                                          <span>Spent: <span className="text-yellow-500">₹{((currentAuction?.settings?.budget || 120) - (teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120))).toFixed(2)} Cr</span></span>
+                                          <span>Spent: <span className="text-emerald-500">₹{((currentAuction?.settings?.budget || 120) - (teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120))).toFixed(2)} Cr</span></span>
                                           
                                           <span>Overseas: <span className="text-white">{(teamDoc?.squad?.filter(s => {
                                              const pid = typeof s === 'string' ? s : s.id;
@@ -1186,7 +1186,7 @@ const AuctionRoom = () => {
                                                                         <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5> </div>
                                                                   </div>
                                                                </div>
-                                                               <span className="text-[9px] font-bold text-yellow-500">
+                                                               <span className="text-[9px] font-bold text-emerald-500">
                                                                   ₹{p?.bidVal ? p.bidVal.toFixed(2) : (p?.basePrice || 0).toFixed(2)} Cr
                                                                </span>
                                                             </div>
@@ -1216,8 +1216,8 @@ const AuctionRoom = () => {
                <div className="min-h-12 border-b border-white/5 bg-white/[0.01] flex items-center px-2.5 sm:px-6 md:px-8 w-full shrink-0 py-2 md:py-0 overflow-x-auto no-scrollbar">
                   <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3 md:gap-4 min-w-0">
                      <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 min-w-0 flex-1">
-                        <div className="px-2 sm:px-2.5 py-0.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full shrink-0 flex items-center">
-                           <span className="text-[7.5px] sm:text-[9px] font-extrabold text-yellow-400/90 uppercase tracking-widest whitespace-nowrap">{currentPlayer?.set}</span>
+                        <div className="px-2 sm:px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full shrink-0 flex items-center">
+                           <span className="text-[7.5px] sm:text-[9px] font-extrabold text-emerald-400/90 uppercase tracking-widest whitespace-nowrap">{currentPlayer?.set}</span>
                         </div>
                         <div className="w-px h-3.5 sm:h-4 bg-white/10 shrink-0" />
                         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -1273,7 +1273,7 @@ const AuctionRoom = () => {
                                            )}
 
                                            <div className="text-right uppercase tracking-[0.15em] sm:tracking-[0.2em]">
-                                              <span className="text-[7.5px] sm:text-[8.5px] font-black text-yellow-500 block">IPL Auction 2026</span>
+                                              <span className="text-[7.5px] sm:text-[8.5px] font-black text-emerald-500 block">IPL Auction 2026</span>
                                               {isSold ? (
                                                  <>
                                                     <span className="text-[9px] sm:text-[10px] font-bold text-white/50 leading-none block">Sold to</span>
@@ -1313,7 +1313,7 @@ const AuctionRoom = () => {
                                         <div className="space-y-2.5">
                                            {isSold && slogan && (
                                               <div className="text-center">
-                                                 <p className="text-xs sm:text-sm font-black italic uppercase tracking-wider text-yellow-400 drop-shadow-md">
+                                                 <p className="text-xs sm:text-sm font-black italic uppercase tracking-wider text-emerald-400 drop-shadow-md">
                                                     #{slogan.slogan}
                                                  </p>
                                               </div>
@@ -1374,7 +1374,7 @@ const AuctionRoom = () => {
                                                        hs: 'Highest Score', bb: 'Best Bowling'
                                                     };
                                                     const colorMap = {
-                                                       wickets: 'text-green-400', runs: 'text-yellow-500', 
+                                                       wickets: 'text-green-400', runs: 'text-emerald-500', 
                                                        econ: 'text-cyan-400', avg: 'text-emerald-300',
                                                        sr: 'text-purple-400', matches: 'text-gray-100',
                                                        hs: 'text-pink-400', bb: 'text-emerald-400'
@@ -1445,7 +1445,7 @@ const AuctionRoom = () => {
                                              <div className="w-px h-3 bg-white/10 hidden xs:block" />
                                              <div className="items-center gap-1 hidden xs:flex" title="Total Spent">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Spent:</span>
-                                                <span className="text-yellow-400 font-extrabold">₹{(team.spent || 0).toFixed(1)}Cr</span>
+                                                <span className="text-emerald-400 font-extrabold">₹{(team.spent || 0).toFixed(1)}Cr</span>
                                              </div>
                                           </div>
                                        );
@@ -1459,7 +1459,7 @@ const AuctionRoom = () => {
                                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                              : displayAuctionState?.highBidderId === user?.uid
                                                 ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
-                                                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050505] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
+                                                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-[#050914] shadow-[0_4px_20px_rgba(34,197,94,0.2)] hover:shadow-[0_8px_30px_rgba(34,197,94,0.3)]'
                                              }`}
                                        >
                                           {spectateMode ? (
@@ -1622,11 +1622,11 @@ const AuctionRoom = () => {
                </button>
 
                <button onClick={() => setMobileTab('arena')} className="flex flex-col items-center justify-center w-20 relative -mt-3 group z-10 transition-transform active:scale-95">
-                  <div className={`p-2.5 rounded-xl transition-all duration-500 border relative overflow-hidden ${mobileTab === 'arena' ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_6px_15px_rgba(234,179,8,0.4)] scale-105' : 'bg-[#151515] border-white/10 text-gray-400 shadow-lg'}`}>
+                  <div className={`p-2.5 rounded-xl transition-all duration-500 border relative overflow-hidden ${mobileTab === 'arena' ? 'bg-emerald-500 text-black border-emerald-400 shadow-[0_6px_15px_rgba(16,185,129,0.4)] scale-105' : 'bg-[#0d1a2b] border-white/10 text-gray-400 shadow-lg'}`}>
                      {mobileTab === 'arena' && <div className="absolute inset-0 bg-white/20 blur-md pointer-events-none" />}
                      <Gavel size={18} strokeWidth={2.5} className="relative z-10" />
                   </div>
-                  <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-yellow-500' : 'text-gray-500'}`}>Arena</span>
+                  <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-emerald-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
                <button onClick={() => setMobileTab('activity')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
@@ -1654,7 +1654,7 @@ const AuctionRoom = () => {
                               key={tab}
                               onClick={() => setActiveOverlayTab(tab)}
                               className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-full transition-all uppercase text-xs sm:text-sm font-black whitespace-nowrap snap-start cursor-pointer border ${activeOverlayTab === tab
-                                 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
+                                 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                                  : 'bg-white/5 text-gray-400 border-transparent hover:text-white hover:bg-white/10'
                                  }`}
                            >
@@ -1683,11 +1683,11 @@ const AuctionRoom = () => {
                               {Object.entries(groupedUpcomingPlayers || {}).map(([setName, players]) => (
                                  <div key={setName} className="space-y-4 sm:space-y-6">
                                     <div className="flex items-center gap-4 sm:gap-6">
-                                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-                                       <h3 className="text-xs sm:text-sm font-black text-yellow-500 uppercase tracking-[0.2em] sm:tracking-[0.3em] bg-yellow-500/5 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-yellow-500/10 whitespace-nowrap">
+                                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+                                       <h3 className="text-xs sm:text-sm font-black text-emerald-500 uppercase tracking-[0.2em] sm:tracking-[0.3em] bg-emerald-500/5 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full border border-emerald-500/10 whitespace-nowrap">
                                           {setName}
                                        </h3>
-                                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
+                                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4">
                                        {players.map(p => (
@@ -1704,7 +1704,7 @@ const AuctionRoom = () => {
                                                 </div>
                                              </div>
                                              <div className="bg-black/40 px-2 py-1 rounded-lg border border-white/5 text-center">
-                                                <span className="text-[9px] sm:text-[10px] font-black text-yellow-500">
+                                                <span className="text-[9px] sm:text-[10px] font-black text-emerald-500">
                                                    ₹{p.basePrice.toFixed(2)} Cr
                                                 </span>
                                              </div>
@@ -1730,7 +1730,7 @@ const AuctionRoom = () => {
                                        </div>
                                     </div>
                                     <div className="bg-black/40 px-2 py-1 rounded-lg border border-white/5 text-center">
-                                       <span className="text-[9px] sm:text-[10px] font-black text-yellow-500">
+                                       <span className="text-[9px] sm:text-[10px] font-black text-emerald-500">
                                           ₹{(activeOverlayTab === 'sold' || activeOverlayTab === 'leaderboard' ? p.bid : p.basePrice).toFixed(2)} Cr
                                        </span>
                                     </div>
@@ -1754,20 +1754,20 @@ const AuctionRoom = () => {
                const secondsLeft = Math.max(0, Math.ceil((Number(offer.expiresAt) - getSyncedTime()) / 1000));
                return (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                     <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-yellow-500/30 rounded-3xl p-6 shadow-2xl">
-                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-yellow-400 mb-2">{offer.phase === 'initial_decision' ? (eligible ? 'RTM decision required' : 'RTM decision pending') : offer.phase === 'counter_bid' ? (counterBidder ? 'Submit counter-price' : 'Waiting for counter-price') : offer.phase === 'match_decision' ? (eligible ? 'Match counter-price' : 'Counter-price submitted') : 'RTM in progress'}</div>
+                     <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-md bg-[#11131a] border border-emerald-500/30 rounded-3xl p-6 shadow-2xl">
+                        <div className="text-[10px] font-black tracking-[0.2em] uppercase text-emerald-400 mb-2">{offer.phase === 'initial_decision' ? (eligible ? 'RTM decision required' : 'RTM decision pending') : offer.phase === 'counter_bid' ? (counterBidder ? 'Submit counter-price' : 'Waiting for counter-price') : offer.phase === 'match_decision' ? (eligible ? 'Match counter-price' : 'Counter-price submitted') : 'RTM in progress'}</div>
                         <div className="flex items-center gap-4 mb-5">
                            <img src={player?.image} alt={player?.name || 'Player'} className="w-20 h-20 object-contain rounded-2xl bg-white/5 border border-white/10" />
                            <div>
                               <h2 className="text-xl font-black text-white">{player?.name || 'Player'}</h2>
-                              <p className="text-sm text-gray-400">Winning bid: <span className="text-yellow-400 font-black">₹{Number(offer.bid).toFixed(2)} Cr</span></p>
+                              <p className="text-sm text-gray-400">Winning bid: <span className="text-emerald-400 font-black">₹{Number(offer.bid).toFixed(2)} Cr</span></p>
                               <p className="text-xs text-gray-500 mt-1">Original franchise: {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId}</p>
                            </div>
                         </div>
                         {offer.phase === 'initial_decision' ? (
                            eligible ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-4">Do you want to use your RTM card? If you choose YES, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} gets one chance to raise the price. You then decide whether to match their new price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-4">Do you want to use your RTM card? If you choose YES, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} gets one chance to raise the price. You then decide whether to match their new price. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
@@ -1780,7 +1780,7 @@ const AuctionRoom = () => {
                                           setError(e?.message || 'RTM choice failed. Please try again before the timer expires.');
                                           setRetentionDecisionPendingFor(null);
                                        }
-                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Use RTM</button>
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Use RTM</button>
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
                                        try {
@@ -1801,7 +1801,7 @@ const AuctionRoom = () => {
                         ) : offer.phase === 'counter_bid' ? (
                            counterBidder ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-3">The original franchise chose YES to RTM. Enter a counter-price strictly greater than ₹{Number(offer.bid).toFixed(2)} Cr. You have up to 15 seconds; submitting early immediately sends the new price to the original franchise. If they do not match, you win at your counter-price. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-3">The original franchise chose YES to RTM. Enter a counter-price strictly greater than ₹{Number(offer.bid).toFixed(2)} Cr. You have up to 15 seconds; submitting early immediately sends the new price to the original franchise. If they do not match, you win at your counter-price. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
                                  <form className="space-y-3" onSubmit={async (e) => {
                                     e.preventDefault();
                                     const enteredCounterBid = Number(retentionCounterBid);
@@ -1832,14 +1832,14 @@ const AuctionRoom = () => {
                         ) : offer.phase === 'match_decision' ? (
                            eligible ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-yellow-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to use your RTM card to match this price? You have up to 10 seconds. Choosing YES or NO immediately advances the auction. Time left: <span className="font-black text-yellow-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-emerald-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to use your RTM card to match this price? You have up to 10 seconds. Choosing YES or NO immediately advances the auction. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
                                        try { await decideRetention(id, 'match'); }
                                        catch (e) { console.error('RTM match failed:', e); setError(e?.message || 'RTM match failed.'); }
                                        finally { setRetentionDecisionPendingFor(null); }
-                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Match ₹{Number(offer.counterBid).toFixed(2)} Cr</button>
+                                    }} disabled={Boolean(retentionDecisionPendingFor)} className="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">YES — Match ₹{Number(offer.counterBid).toFixed(2)} Cr</button>
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
                                        try { await decideRetention(id, 'decline_counter'); }
@@ -1902,7 +1902,7 @@ const AuctionRoom = () => {
                         <div className="flex items-center justify-between pb-3 border-b border-white/5">
                            <div className="flex items-center gap-2">
 
-                              <span className="text-[10px] font-black text-yellow-400 uppercase tracking-wider">Voice Auctioneer</span>
+                              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Voice Auctioneer</span>
                            </div>
 
                            {/* Toggle Switch */}
@@ -1916,7 +1916,7 @@ const AuctionRoom = () => {
                                     speak("Voice Auctioneer enabled.");
                                  }
                               }}
-                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer ${isTtsEnabled ? 'bg-yellow-500' : 'bg-white/10'}`}
+                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 cursor-pointer ${isTtsEnabled ? 'bg-emerald-500' : 'bg-white/10'}`}
                            >
                               <motion.div
                                  layout
@@ -1930,18 +1930,18 @@ const AuctionRoom = () => {
                         <div className={isTtsEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}>
                            <div className="flex justify-between items-center mb-1.5">
                               <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Speaking Speed</label>
-                              <span className="text-[10px] font-black text-yellow-400">{ttsSpeed.toFixed(2)}x</span>
+                              <span className="text-[10px] font-black text-emerald-400">{ttsSpeed.toFixed(2)}x</span>
                            </div>
-                           <input type="range" min="0.70" max="1.80" step="0.05" value={ttsSpeed} onChange={(e) => setTtsSpeed(parseFloat(e.target.value))} className="w-full accent-yellow-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
+                           <input type="range" min="0.70" max="1.80" step="0.05" value={ttsSpeed} onChange={(e) => setTtsSpeed(parseFloat(e.target.value))} className="w-full accent-emerald-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
                         </div>
 
                         {/* Pitch Slider */}
                         <div className={isTtsEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}>
                            <div className="flex justify-between items-center mb-1.5">
                               <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Voice Pitch</label>
-                              <span className="text-[10px] font-black text-yellow-400">{ttsPitch.toFixed(2)}</span>
+                              <span className="text-[10px] font-black text-emerald-400">{ttsPitch.toFixed(2)}</span>
                            </div>
-                           <input type="range" min="0.60" max="1.40" step="0.05" value={ttsPitch} onChange={(e) => setTtsPitch(parseFloat(e.target.value))} className="w-full accent-yellow-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
+                           <input type="range" min="0.60" max="1.40" step="0.05" value={ttsPitch} onChange={(e) => setTtsPitch(parseFloat(e.target.value))} className="w-full accent-emerald-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
                         </div>
 
                         {/* Voice Selector */}
@@ -1966,7 +1966,7 @@ const AuctionRoom = () => {
                                        }
                                     }, 100);
                                  }}
-                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-gray-200 font-bold focus:outline-none focus:border-yellow-500/50 transition-colors cursor-pointer"
+                                 className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-gray-200 font-bold focus:outline-none focus:border-emerald-500/50 transition-colors cursor-pointer"
                               >
                                  {availableVoices.map(v => (
                                     <option key={v.name} value={v.name} className="bg-[#0c0d12] text-white">
@@ -1999,7 +1999,7 @@ const AuctionRoom = () => {
                                  <div className={`w-12 h-12 rounded-2xl bg-white/5 border border-white/10 p-1.5 flex items-center justify-center`}>
                                     <img src={TEAMS.find(t => t.id === player.team)?.logo} alt="Player Team Logo" className="w-full h-full object-contain" />
                                  </div>
-                                 <div><h5 className="text-sm font-black uppercase flex items-center gap-2">{player.name}{player.isHost && <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[8px] rounded-md">HOST</span>}</h5><p className="text-[10px] font-bold text-gray-500 uppercase">{player.teamName}</p></div>
+                                 <div><h5 className="text-sm font-black uppercase flex items-center gap-2">{player.name}{player.isHost && <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-500 text-[8px] rounded-md">HOST</span>}</h5><p className="text-[10px] font-bold text-gray-500 uppercase">{player.teamName}</p></div>
                               </div>
                               {!player.isHost && (
                                  <button onClick={async () => { if (window.confirm(`Are you sure you want to kick ${player.name}?`)) { await kickPlayer(id, player); } }} className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all opacity-0 group-hover:opacity-100 cursor-pointer">Kick Player</button>
@@ -2169,7 +2169,7 @@ const SoldCard = ({ msg }) => {
 
                <div className="space-y-3 sm:space-y-4">
                   <div className="text-center">
-                     <p className="text-sm sm:text-[16px] font-black italic uppercase tracking-wider text-yellow-500 drop-shadow-lg">#{slogan.slogan}</p>
+                     <p className="text-sm sm:text-[16px] font-black italic uppercase tracking-wider text-emerald-500 drop-shadow-lg">#{slogan.slogan}</p>
 
                   </div>
 

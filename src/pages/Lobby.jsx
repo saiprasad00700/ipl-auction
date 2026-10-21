@@ -609,7 +609,7 @@ const Lobby = () => {
                 </div>
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/5">
                   <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest block mb-1">Initial Budget</span>
-                  <span className="text-[11px] font-black text-yellow-500 uppercase tracking-tight">
+                  <span className="text-[11px] font-black text-emerald-500 uppercase tracking-tight">
                     ₹{currentAuction?.settings?.budget || 120}.0 Cr
                   </span>
                 </div>
@@ -653,7 +653,7 @@ const Lobby = () => {
                       onClick={() => handleTeamSelect(team.id)}
                       disabled={!!isTaken && !isMine}
                       className={`relative group/team flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 border ${isMine
-                        ? 'bg-[#1b1b1b] border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                        ? 'bg-[#0b1727] border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
                         : isTaken
                           ? 'border-transparent opacity-20 grayscale cursor-not-allowed'
                           : 'border-transparent hover:bg-white/[0.04]'
@@ -787,7 +787,7 @@ const Lobby = () => {
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <p className="font-black text-xs sm:text-sm text-white uppercase tracking-tight truncate max-w-[160px] sm:max-w-none">{player.name}</p>
-                                {player.isHost && <Crown size={14} className="text-yellow-500 fill-yellow-500 shrink-0" />}
+                                {player.isHost && <Crown size={14} className="text-emerald-500 fill-emerald-500 shrink-0" />}
                                 {(player.isBot || player.id.startsWith('bot_')) && <span className="text-[8px] font-black bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-400/30 flex items-center gap-1 shrink-0"><Zap size={8} /> AI BOT</span>}
                                 {player.id === user?.uid && <span className="text-[8px] font-black bg-white/10 px-1.5 py-0.5 rounded text-gray-400 shrink-0">YOU</span>}
                               </div>
@@ -898,7 +898,7 @@ const Lobby = () => {
                     <div>
                       <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-white mb-0.5">Smart Bidding Engine</h4>
                       <p className="text-[10px] sm:text-[11px] text-gray-400 leading-relaxed">
-                        Bots evaluate players using base price, star tier, role demand, and team bias - e.g., <span className="text-emerald-300 font-semibold">MI</span> chases pace bowlers, <span className="text-yellow-400 font-semibold">CSK</span> prioritizes all-rounders, and <span className="text-red-400 font-semibold">RCB</span> bids aggressively on marquee batsmen.
+                        Bots evaluate players using base price, star tier, role demand, and team bias - e.g., <span className="text-emerald-300 font-semibold">MI</span> chases pace bowlers, <span className="text-emerald-400 font-semibold">CSK</span> prioritizes all-rounders, and <span className="text-red-400 font-semibold">RCB</span> bids aggressively on marquee batsmen.
                       </p>
                     </div>
                   </div>
