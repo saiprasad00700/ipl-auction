@@ -856,7 +856,7 @@ const AuctionRoom = () => {
 
    if (banError) {
       return (
-         <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 font-primary text-white">
+         <div className="min-h-screen bg-[#050914] flex items-center justify-center p-6 font-primary text-white">
             <motion.div
                initial={{ opacity: 0, scale: 0.9 }}
                animate={{ opacity: 1, scale: 1 }}
@@ -920,8 +920,8 @@ const AuctionRoom = () => {
       const availableTeams = TEAMS.filter(t => !takenTeamIds.has(t.id));
 
       return (
-         <div className="h-screen-safe bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-500/10 blur-[120px] rounded-full" />
+         <div className="h-screen-safe bg-[#050914] text-white flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-400/10 blur-[120px] rounded-full" />
             <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
                {availableTeams.length > 0 ? (
                   <>
@@ -1375,7 +1375,7 @@ const AuctionRoom = () => {
                                                     };
                                                     const colorMap = {
                                                        wickets: 'text-green-400', runs: 'text-yellow-500', 
-                                                       econ: 'text-cyan-400', avg: 'text-orange-400',
+                                                       econ: 'text-cyan-400', avg: 'text-emerald-300',
                                                        sr: 'text-purple-400', matches: 'text-gray-100',
                                                        hs: 'text-pink-400', bb: 'text-emerald-400'
                                                     };
@@ -1823,7 +1823,7 @@ const AuctionRoom = () => {
                                     }
                                  }}>
                                     <input type="number" min={(Number(offer.bid) + 0.01).toFixed(2)} step="0.01" value={retentionCounterBid} onChange={(e) => setRetentionCounterBid(e.target.value)} placeholder="Enter new price in Cr" className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-white" required />
-                                    <button type="submit" disabled={!retentionCounterBid || Boolean(retentionDecisionPendingFor)} className="w-full rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor ? 'Submitting…' : 'Submit higher price'}</button>
+                                    <button type="submit" disabled={!retentionCounterBid || Boolean(retentionDecisionPendingFor)} className="w-full rounded-xl bg-emerald-400 hover:bg-emerald-300 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor ? 'Submitting…' : 'Submit higher price'}</button>
                                  </form>
                               </>
                            ) : (
@@ -2015,7 +2015,7 @@ const AuctionRoom = () => {
          {currentAuction?.status === 'awaiting_xi' && (
             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
                <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#101010] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
-                  <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
+                  <p className="text-emerald-300 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
                   <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
                   <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
                   {team?.disqualified && (
@@ -2060,10 +2060,10 @@ const AuctionRoom = () => {
                      {mySquadPlayers.map((player) => {
                         const isStarter = selectedXIIds.includes(player.id);
                         const isImpact = selectedImpactId === player.id;
-                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-orange-400/40 bg-orange-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-emerald-300/40 bg-emerald-400/10' : 'border-white/10 bg-white/[0.02]'}`}>
                            <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
                            <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
-                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
+                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-emerald-400 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
                            <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
                         </div>;
                      })}
@@ -2072,13 +2072,13 @@ const AuctionRoom = () => {
                   {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
                      <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
-                     <button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
+                     <button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
                   </div>
                </div>
             </div>
          )}
-         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
-         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
+         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
+         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
 
          <ConfirmDialog
             isOpen={showEndConfirm}
