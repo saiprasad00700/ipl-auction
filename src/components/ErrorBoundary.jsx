@@ -13,9 +13,9 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // You can also log the error to an error reporting service
-    if (import.meta.env.DEV) {
-      console.error("Uncaught error:", error, errorInfo);
-    }
+    // Keep production diagnostics available for mobile-only crashes too.
+    // The fallback screen shows only the error message (not the component stack).
+    console.error("[Auction ErrorBoundary] Uncaught render error:", error, errorInfo);
     this.setState({
       error: error,
       errorInfo: errorInfo
@@ -60,6 +60,15 @@ class ErrorBoundary extends React.Component {
                 Return to Base
               </button>
             </div>
+
+            {this.state.error && (
+              <div className="mt-6 rounded-xl border border-amber-500/20 bg-black/40 p-4 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300 mb-2">Diagnostic message</p>
+                <p className="text-xs font-mono text-gray-300 break-words whitespace-pre-wrap">
+                  {this.state.error.toString()}
+                </p>
+              </div>
+            )}
 
             {import.meta.env.DEV && this.state.error && (
               <div className="mt-10 text-left">
