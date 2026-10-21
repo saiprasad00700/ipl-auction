@@ -56,7 +56,7 @@ const ConfirmDialog = ({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative w-full max-w-sm bg-[#0c0c0c] border border-white/10 rounded-2xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.8)]"
+        className="relative w-full max-w-sm bg-[#08111f] border border-white/10 rounded-2xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.8)]"
       >
         <button
           type="button"
