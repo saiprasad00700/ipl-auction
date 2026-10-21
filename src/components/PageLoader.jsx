@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { useState, useEffect } from 'react';
 // `motion` is used only inside JSX; core no-unused-vars can't detect that.
 // eslint-disable-next-line no-unused-vars
