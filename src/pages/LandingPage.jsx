@@ -37,7 +37,7 @@ const LandingPage = () => {
   const [selectedTeam, setSelectedTeam] = useState("MI");
   const [activeTab, setActiveTab] = useState("new");
   const [auctionType, setAuctionType] = useState("mega"); 
-  const [isPublicRoom, setIsPublicRoom] = useState(true);
+  const [isPublicRoom] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -794,32 +794,6 @@ const LandingPage = () => {
                   </div>
                 </div>
 
-                {/* Room Visibility Toggle */}
-                <div className="p-3 sm:p-4 bg-white/[0.02] border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="text-[10px] sm:text-[11px] font-black uppercase text-white tracking-wider flex items-center gap-1.5">
-                      Public Room Visibility
-                    </h2>
-                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-medium">
-                      {isPublicRoom
-                        ? "Listed in the Public Rooms Directory for anyone to join"
-                        : "Private room — accessible only via Room Code link"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsPublicRoom(!isPublicRoom)}
-                    aria-label="Toggle public room visibility"
-                    className={`w-10 h-5 sm:w-12 sm:h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer shrink-0 ${
-                      isPublicRoom
-                        ? "bg-emerald-600 justify-end"
-                        : "bg-white/10 justify-start"
-                    }`}
-                  >
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-white shadow-md" />
-                  </button>
-                </div>
-
                 <div className="pt-1 sm:pt-2">
                   <button
                     type="submit"
@@ -887,143 +861,7 @@ const LandingPage = () => {
                   </button>
                 </form>
 
-                <div className="relative py-1 sm:py-2 flex items-center justify-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/5" />
-                  </div>
-                  <span className="relative bg-[#0b1220] px-3 sm:px-4 text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                    Or join a public lobby
-                  </span>
-                </div>
 
-                {/* Public Lobbies Directory Section */}
-                <div className="space-y-2.5 sm:space-y-3 pt-0 sm:pt-1">
-                  {/* Responsive Search & Filter Bar */}
-                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-                    <div className="relative w-full sm:flex-1 flex gap-2">
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search room code or manager..."
-                        className="w-full bg-white/[0.03] border border-white/10 focus:border-emerald-400/50 rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white placeholder:text-gray-400 focus:outline-none transition-all font-medium"
-                      />
-                      <button
-                        onClick={fetchPublicLobbies}
-                        className="flex items-center justify-center gap-1.5 bg-emerald-400/20 hover:bg-emerald-400 text-emerald-400 hover:text-white border border-emerald-400/30 hover:border-emerald-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[9px] sm:text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shrink-0"
-                        title="Refresh Lobbies"
-                      >
-                        <RefreshCw
-                          size={14}
-                          className={lobbiesLoading ? "animate-spin" : ""}
-                        />
-                        <span className="hidden sm:inline">Refresh</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto custom-scrollbar no-scrollbar py-0.5">
-                      {[
-                        { id: "all", label: "All" },
-                        { id: "mega", label: "Mega" },
-                        { id: "sprint11", label: "11-Classic" },
-                        { id: "sprint5", label: "5-Sprint" },
-                      ].map((mode) => (
-                        <button
-                          key={mode.id}
-                          type="button"
-                          onClick={() => setFilterMode(mode.id)}
-                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[8px] sm:text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
-                            filterMode === mode.id
-                              ? "bg-white/10 text-white border border-white/20"
-                              : "bg-transparent text-gray-400 hover:text-gray-300 border border-transparent"
-                          }`}
-                        >
-                          {mode.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Responsive Lobbies Directory List */}
-                  {lobbiesLoading ? (
-                    <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-gray-400">
-                      <Loader2
-                        size={18}
-                        className="animate-spin mb-2 text-emerald-400"
-                      />
-                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                        Scanning active rooms...
-                      </p>
-                    </div>
-                  ) : filteredPublicRooms.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-5 sm:py-8 text-center bg-white/[0.01] border border-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                      <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
-                        No Active Public Lobbies
-                      </p>
-                      <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium">
-                        No open public rooms right now. Create one to get
-                        started!
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5 sm:space-y-2 max-h-[220px] sm:max-h-[310px] overflow-y-auto custom-scrollbar pr-0.5">
-                      {filteredPublicRooms.map((room) => (
-                        <div
-                          key={room.roomId}
-                          className="p-2 sm:p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 rounded-xl transition-all duration-200 flex flex-row items-center justify-between gap-2 sm:gap-3 group"
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                            {/* Clean Room Code Pill */}
-                            <div className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 font-mono font-black text-[9px] sm:text-xs tracking-wider shrink-0">
-                              {room.roomId}
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <h2 className="text-[10px] sm:text-xs font-bold text-white tracking-tight truncate max-w-[96px] xs:max-w-[160px] sm:max-w-none">
-                                  {room.hostName}'s Room
-                                </h2>
-                              </div>
-
-                              <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-gray-400 font-medium mt-0.5 truncate">
-                                <span
-                                  className={`px-1 sm:px-1.5 py-0.2 rounded font-black text-[7px] sm:text-[8px] uppercase tracking-wider ${room.status === "active" ? "bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse" : "bg-green-500/20 text-green-400 border border-green-500/30"}`}
-                                >
-                                  {room.status === "active"
-                                    ? "LIVE"
-                                    : "WAITING"}
-                                </span>
-
-                                <span className="shrink-0">•</span>
-                                <span className="text-gray-400 truncate">
-                                  {room.auctionType === "sprint5"
-                                    ? "5-Sprint"
-                                    : room.auctionType === "sprint11"
-                                      ? "11-Classic"
-                                      : "Mega"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigate(`/lobby/${room.roomId}`);
-                            }}
-                            className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-emerald-400 hover:bg-emerald-600 text-white font-black text-[8px] sm:text-[10px] uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer shadow-md"
-                          >
-                            <span>Join</span>
-                            <ChevronRight
-                              size={12}
-                              className="sm:w-3.5 sm:h-3.5"
-                            />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
