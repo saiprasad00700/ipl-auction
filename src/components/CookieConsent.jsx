@@ -34,11 +34,11 @@ export default function CookieConsent() {
           transition={{ duration: 0.3 }}
           className="fixed bottom-6 left-4 right-4 sm:right-auto sm:left-6 sm:max-w-sm z-[100] pointer-events-auto"
         >
-          <div className="bg-[#0a0a0b]/95 border border-white/10 backdrop-blur-2xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-white relative flex flex-col gap-3">
+          <div className="bg-[#08111d]/95 border border-white/10 backdrop-blur-2xl rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-white relative flex flex-col gap-3">
             {/* Top Row: Icon, Title & Close */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-[#ff5500]/10 border border-[#ff5500]/30 rounded-lg text-[#ff5500]">
+                <div className="p-1.5 bg-emerald-400/10 border border-[#ff5500]/30 rounded-lg text-emerald-300">
                   <Cookie className="w-4 h-4" />
                 </div>
                 <h4 className="font-black text-xs uppercase tracking-wider text-white">
@@ -57,7 +57,7 @@ export default function CookieConsent() {
             {/* Minimal Description */}
             <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
               We use essential storage & telemetry to keep auction bids synced in real-time.{' '}
-              <Link to="/privacy" className="text-gray-300 underline hover:text-[#ff5500] transition-colors">
+              <Link to="/privacy" className="text-gray-300 underline hover:text-emerald-300 transition-colors">
                 Privacy Policy
               </Link>
             </p>
@@ -72,7 +72,7 @@ export default function CookieConsent() {
               </button>
               <button
                 onClick={handleAccept}
-                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#ff5500] to-[#ff8c00] text-white text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1 shadow-[0_4px_15px_rgba(255,85,0,0.25)]"
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-300 text-white text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1 shadow-[0_4px_15px_rgba(16,185,129,0.24)]"
               >
                 <Check className="w-3.5 h-3.5" /> Accept
               </button>
