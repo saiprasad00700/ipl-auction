@@ -802,13 +802,20 @@ export const AuctionProvider = ({ children }) => {
 
           if (nextIndexInOrder !== undefined && IPL_PLAYERS[nextIndexInOrder]) {
             const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-            await set(liveRef, {
-              playerId: nextPlayer.id,
-              currentBid: 0,
-              highBidderId: '',
-              highBidderName: 'No Bids',
-              timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
-              status: 'bidding'
+            // Guard the local timeout with the same settled-lot identity as the
+            // recovery path. If another client already advanced it, do not reset
+            // the next player's timer or overwrite newer live state.
+            await runTransactionRtdb(liveRef, (current) => {
+              if (!current || current.playerId !== currentPlayerId
+                || !['sold', 'unsold'].includes(current.status)) return;
+              return {
+                playerId: nextPlayer.id,
+                currentBid: 0,
+                highBidderId: '',
+                highBidderName: 'No Bids',
+                timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
+                status: 'bidding'
+              };
             });
           } else {
             // Natural end of bidding must enter the same shared XI phase as host-triggered end.
