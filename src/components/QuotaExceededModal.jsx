@@ -29,12 +29,12 @@ export default function QuotaExceededModal() {
       {/* Outer Card Glass Frame matching Landing Page style */}
       <div className="relative max-w-md w-full bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10">
         {/* Subtle Orange Glow behind panel */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.05] via-[#ff5500]/[0.02] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#6ee7b7]/[0.05] via-[#6ee7b7]/[0.02] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
 
         {/* Inner Dark Container */}
         <div className="bg-[#08111d] rounded-[2.2rem] border border-white/5 p-6 sm:p-8 text-center relative overflow-hidden">
           {/* Top Divider Accent */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px bg-gradient-to-r from-transparent via-[#ff5500]/50 to-transparent" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px bg-gradient-to-r from-transparent via-[#6ee7b7]/50 to-transparent" />
 
           {/* Badge matching Landing Page */}
           <div className="inline-flex items-center gap-2 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-5 shadow-[0_0_20px_rgba(234,179,8,0.15)]">
