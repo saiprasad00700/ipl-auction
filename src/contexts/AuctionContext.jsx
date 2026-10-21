@@ -617,11 +617,16 @@ export const AuctionProvider = ({ children }) => {
           });
         }
       }
-      // RTM is only charged when the original franchise actually wins the player.
-      // Choosing YES merely opens the counter-bid stage; if the counter-price is
-      // declined, the player goes to the bidder and the retention card is preserved.
-      if (auctionState.retentionOffer?.rtmUsed && auctionState.retentionOffer?.status === 'accepted') {
-        const acceptedTeamId = `${roomId}_${auctionState.retentionOffer.eligibleUserId}`;
+      // Deduct a card only when the original franchise actually retained the player:
+      // either it matched the counter-price, or the counter-bidder timed out after RTM.
+      // Explicitly exclude a declined counter-price even if stale settlement state says accepted.
+      const settledOffer = auctionState.retentionOffer;
+      const successfullyRetainedPlayer = settledOffer?.status === 'accepted'
+        && auctionState.highBidderTeamId === settledOffer.originalFranchiseId
+        && (settledOffer.decision === 'match'
+          || (settledOffer.phase === 'counter_bid' && settledOffer.decision === 'accept'));
+      if (successfullyRetainedPlayer) {
+        const acceptedTeamId = `${roomId}_${settledOffer.eligibleUserId}`;
         const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
         const acceptedTeamSnap = await get(acceptedTeamRef);
         const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
