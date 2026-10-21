@@ -121,10 +121,10 @@ export default function ConnectionAlertModal() {
         <div className="relative flex min-h-0 flex-col rounded-t-[2rem] border border-white/10 bg-white/[0.04] p-2.5 shadow-[0_-20px_60px_rgba(0,0,0,0.85)] backdrop-blur-3xl sm:rounded-[2.5rem] sm:p-3">
           {/* Solid card: scrolling body + pinned actions */}
           <div className="relative flex min-h-0 flex-col overflow-hidden rounded-t-[1.7rem] border border-white/5 bg-[#08111d] sm:rounded-[2.2rem]">
-            <div className="absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-[#ff5500]/50 to-transparent" />
+            <div className="absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-[#6ee7b7]/50 to-transparent" />
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-6 text-center sm:px-8 sm:pt-8">
-              <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ff5500]/25 bg-emerald-400/10 shadow-[0_0_28px_rgba(255,85,0,0.18)] sm:mb-4 sm:h-14 sm:w-14">
+              <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#6ee7b7]/25 bg-emerald-400/10 shadow-[0_0_28px_rgba(16,185,129,0.18)] sm:mb-4 sm:h-14 sm:w-14">
                 {isCapacity ? (
                   <ServerOff className="h-6 w-6 text-emerald-300 sm:h-7 sm:w-7" aria-hidden="true" />
                 ) : (
@@ -132,10 +132,10 @@ export default function ConnectionAlertModal() {
                 )}
               </div>
 
-              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-orange-300 sm:mb-4 sm:px-4 sm:py-1.5 sm:text-[10px]">
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-200 sm:mb-4 sm:px-4 sm:py-1.5 sm:text-[10px]">
                 <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-70 motion-reduce:animate-none" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-70 motion-reduce:animate-none" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
                 </span>
                 {copy.badge}
               </div>
@@ -174,7 +174,7 @@ export default function ConnectionAlertModal() {
                   ref={retryButtonRef}
                   type="button"
                   onClick={retry}
-                  className="group/retry relative flex h-12 w-full touch-manipulation items-center justify-center overflow-hidden rounded-xl border border-emerald-300/30 shadow-[0_10px_30px_rgba(16,185,129,0.24)] transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0c0c] sm:flex-1"
+                  className="group/retry relative flex h-12 w-full touch-manipulation items-center justify-center overflow-hidden rounded-xl border border-emerald-300/30 shadow-[0_10px_30px_rgba(16,185,129,0.24)] transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08111d] sm:flex-1"
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-teal-300 transition-transform duration-500 group-hover/retry:scale-105" />
                   <span className="relative flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.15em] text-white">
