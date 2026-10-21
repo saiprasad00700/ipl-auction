@@ -191,19 +191,19 @@ const AuctionSummary = () => {
 
   if ((loading && !activeAuction) || (!activeAuction && summaryLoading)) {
     return (
-      <div className="h-screen-safe bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-20 h-20 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mb-8" />
+      <div className="h-screen-safe bg-[#050914] text-white flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-20 h-20 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mb-8" />
         <h2 className="text-2xl font-black italic tracking-widest uppercase animate-pulse text-gray-400">Loading Summary...</h2>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans overflow-x-hidden selection:bg-orange-500 selection:text-black">
+    <div className="min-h-screen bg-[#050914] text-white font-sans overflow-x-hidden selection:bg-emerald-400 selection:text-[#04110d]">
       
       {/* Premium Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-600/20 blur-[150px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/20 blur-[150px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[150px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:12px_12px] opacity-20" />
       </div>
@@ -222,7 +222,7 @@ const AuctionSummary = () => {
               
               <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full shrink-0">
                 <span className="text-gray-500 text-[9px] font-black uppercase tracking-widest leading-none">ID:</span>
-                <span className="text-orange-500 font-extrabold tracking-widest text-xs">{id}</span>
+                <span className="text-emerald-400 font-extrabold tracking-widest text-xs">{id}</span>
               </div>
             </div>
 
@@ -292,10 +292,10 @@ const AuctionSummary = () => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.08 }}
                     key={player.id}
-                    className="group relative bg-white/[0.03] border border-white/5 p-3.5 sm:p-6 rounded-2xl sm:rounded-[2rem] transition-all hover:bg-white/5 hover:border-orange-500/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-6"
+                    className="group relative bg-white/[0.03] border border-white/5 p-3.5 sm:p-6 rounded-2xl sm:rounded-[2rem] transition-all hover:bg-white/5 hover:border-emerald-400/30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-6"
                   >
                     <div className="flex items-center gap-3 sm:gap-8">
-                      <span className="text-2xl sm:text-5xl font-black text-white/10 group-hover:text-orange-500/20 transition-colors shrink-0">#{idx + 1}</span>
+                      <span className="text-2xl sm:text-5xl font-black text-white/10 group-hover:text-emerald-400/20 transition-colors shrink-0">#{idx + 1}</span>
                       <div className="w-12 h-12 sm:w-20 sm:h-20 bg-black/40 border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden group-hover:scale-105 transition-transform duration-500 p-1 sm:p-2 shrink-0">
                         <img 
                           src={player.image} 
@@ -345,11 +345,11 @@ const AuctionSummary = () => {
                   const teamInfo = TEAMS.find((t) => t.id === entry.franchiseId);
                   return <div key={entry.franchiseId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6">
                     <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center text-[10px] sm:text-xs font-black text-center ${entry.disqualified ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{entry.disqualified ? 'DQ' : `#${entry.rank}`}</div>
+                      <div className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center text-[10px] sm:text-xs font-black text-center ${entry.disqualified ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-emerald-400/10 border-emerald-400/20 text-emerald-300'}`}>{entry.disqualified ? 'DQ' : `#${entry.rank}`}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h3 className="font-black uppercase">{teamInfo?.name || entry.franchiseId}</h3>
-                          {entry.disqualified ? <span className="text-xs font-black text-red-300">DISQUALIFIED</span> : entry.score != null && Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-orange-300">{entry.score}/100</span>}
+                          {entry.disqualified ? <span className="text-xs font-black text-red-300">DISQUALIFIED</span> : entry.score != null && Number.isFinite(Number(entry.score)) && <span className="text-xs font-black text-emerald-200">{entry.score}/100</span>}
                         </div>
                         <p className="text-sm text-gray-300 mt-2">{entry.summary || 'AI squad assessment'}</p>
                         {entry.strengths?.length > 0 && <p className="text-xs text-emerald-300 mt-3"><strong>Strengths:</strong> {entry.strengths.join(' · ')}</p>}
@@ -395,7 +395,7 @@ const AuctionSummary = () => {
                     <button
                       onClick={() => setExpandedTeam(isExpanded ? null : t.id)}
                       className={`w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 sm:p-6 rounded-2xl sm:rounded-[2.5rem] bg-[#0c0c0c] border transition-all duration-300 relative overflow-hidden group active:scale-[0.99] touch-manipulation gap-4 ${
-                        isExpanded ? 'border-orange-500/50 bg-white/5 shadow-2xl' : 'border-white/5 hover:border-white/10'
+                        isExpanded ? 'border-emerald-400/50 bg-white/5 shadow-2xl' : 'border-white/5 hover:border-white/10'
                       }`}
                     >
                       {/* Massive Background Logo */}
@@ -408,7 +408,7 @@ const AuctionSummary = () => {
                            <img src={t.logo} alt={`${t.name} Logo`} decoding="async" loading="lazy" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left min-w-0">
-                          <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tighter group-hover:text-orange-500 transition-colors truncate">{t.name}</h3>
+                          <h3 className="text-lg sm:text-2xl font-black uppercase tracking-tighter group-hover:text-emerald-400 transition-colors truncate">{t.name}</h3>
                           <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] sm:tracking-[0.4em] leading-none mt-1 truncate">Managed by {manager?.name || 'N/A'}</p>
                         </div>
                       </div>
@@ -425,12 +425,12 @@ const AuctionSummary = () => {
                             <span className="text-xs sm:text-lg font-black">{osCount}</span>
                           </div>
                           <div className="shrink-0">
-                            <span className="block text-[7px] sm:text-[8px] font-black text-orange-500 uppercase tracking-widest mb-0.5">Spent</span>
+                            <span className="block text-[7px] sm:text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-0.5">Spent</span>
                             <span className="text-xs sm:text-lg font-black">₹{totalSpent.toFixed(1)}Cr</span>
                           </div>
                         </div>
 
-                        <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/5 flex items-center justify-center transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180 bg-orange-600 text-white' : 'text-gray-500'}`}>
+                        <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/5 flex items-center justify-center transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180 bg-emerald-500 text-white' : 'text-gray-500'}`}>
                           <ChevronDown size={20} />
                         </div>
                       </div>
@@ -459,13 +459,13 @@ const AuctionSummary = () => {
                                <div className="bg-white/5 border border-white/10 p-1 rounded-xl flex items-center gap-1">
                                  <button 
                                    onClick={() => setSquadViewMode('grid')} 
-                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'grid' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-gray-400 hover:text-white'}`}
+                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'grid' ? 'bg-emerald-400 text-white shadow-lg shadow-emerald-400/20' : 'text-gray-400 hover:text-white'}`}
                                  >
                                    List
                                  </button>
                                  <button 
                                    onClick={() => setSquadViewMode('card')} 
-                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'card' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-gray-400 hover:text-white'}`}
+                                   className={`px-3 sm:px-4 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all ${squadViewMode === 'card' ? 'bg-emerald-400 text-white shadow-lg shadow-emerald-400/20' : 'text-gray-400 hover:text-white'}`}
                                  >
                                    Cards
                                  </button>
@@ -479,8 +479,8 @@ const AuctionSummary = () => {
                               return (
                                 <div key={role} className="space-y-3 sm:space-y-6 relative z-10">
                                   <div className="flex items-center gap-3 sm:gap-4">
-                                    <h4 className="text-[9px] sm:text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] sm:tracking-[0.4em]">{role}s</h4>
-                                    <div className="flex-1 h-px bg-orange-500/20" />
+                                    <h4 className="text-[9px] sm:text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] sm:tracking-[0.4em]">{role}s</h4>
+                                    <div className="flex-1 h-px bg-emerald-400/20" />
                                     <span className="text-[9px] sm:text-[10px] font-black text-gray-600">{rolePlayers.length} Members</span>
                                   </div>
                                   
@@ -492,13 +492,13 @@ const AuctionSummary = () => {
                                         transition={{ delay: pidx * 0.04 }}
                                         key={p.id} 
                                         className={squadViewMode === 'card' 
-                                          ? "bg-gradient-to-br from-[#1a1b26] to-[#0c0c0c] border border-white/10 p-4 sm:p-6 rounded-[2rem] flex flex-col justify-between group/p relative overflow-hidden transition-all hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/10"
+                                          ? "bg-gradient-to-br from-[#1a1b26] to-[#0c0c0c] border border-white/10 p-4 sm:p-6 rounded-[2rem] flex flex-col justify-between group/p relative overflow-hidden transition-all hover:border-emerald-400/30 hover:shadow-2xl hover:shadow-emerald-400/10"
                                           : "bg-white/5 border border-white/10 p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl flex items-center justify-between group/p hover:bg-white/10 transition-all"
                                         }
                                       >
                                         {squadViewMode === 'card' ? (
                                            <>
-                                             <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full pointer-events-none opacity-0 group-hover/p:opacity-100 transition-opacity" />
+                                             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 blur-3xl rounded-full pointer-events-none opacity-0 group-hover/p:opacity-100 transition-opacity" />
                                              <div className="flex items-start justify-between relative z-10 mb-4">
                                                 <div className="flex items-center gap-4 min-w-0">
                                                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/40 border border-white/10 rounded-2xl p-1 shrink-0 overflow-hidden">
@@ -574,10 +574,10 @@ const AuctionSummary = () => {
                                   <button 
                                      onClick={() => handleShareSquadImage(t, squad, manager)}
                                      disabled={sharingTeamId === t.id}
-                                     className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400 hover:text-orange-500 transition-colors touch-manipulation cursor-pointer active:scale-95 disabled:opacity-50"
+                                     className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-400 hover:text-emerald-400 transition-colors touch-manipulation cursor-pointer active:scale-95 disabled:opacity-50"
                                   >
                                      {sharingTeamId === t.id ? (
-                                       <span className="text-orange-400 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Generating Poster...</span>
+                                       <span className="text-emerald-300 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Generating Poster...</span>
                                      ) : copiedTeamId === t.id ? (
                                        <span className="text-green-500 flex items-center gap-1.5"><CheckCircle2 size={12} /> Image Downloaded!</span>
                                      ) : (
