@@ -1342,7 +1342,7 @@ const AuctionRoom = () => {
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.16),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.01))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/15 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
+                                    <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.22),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
@@ -1392,11 +1392,11 @@ const AuctionRoom = () => {
                                               </div>
                                            );
                                         })()}
-                                       <div className="flex items-center justify-between mt-2 md:mt-4">
+                                       <div className="flex items-center justify-between gap-3 mt-2 md:mt-4">
                                           <div className="text-left">
-                                             <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Current Bid</span>
+                                             <span className="text-[9px] md:text-[10px] font-black text-emerald-200/70 uppercase tracking-[0.18em] block mb-1.5">Current Bid</span>
                                              <div className="flex items-center gap-2 sm:gap-3">
-                                                <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-none">₹{(displayAuctionState?.currentBid || 0).toFixed(2)} Cr</span>
+                                                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-none tracking-tight">₹{(displayAuctionState?.currentBid || 0).toFixed(2)} Cr</span>
                                                 {displayAuctionState?.highBidderTeamId && (
                                                    <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
                                                       <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-white/5 border border-white/10 p-0.5 flex items-center justify-center">
