@@ -22,7 +22,6 @@ import {
   RefreshCw,
   Clock,
 } from "lucide-react";
-import GithubStarButton from "../components/GithubStarButton";
 import BuyMeACoffee from "../components/BuyMeACoffee";
 import ConfirmDialog from "../components/ConfirmDialog";
 import AuctionActivityFeed from "../components/AuctionActivityFeed";
@@ -299,7 +298,6 @@ const LandingPage = () => {
   if (!user) {
     return (
       <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-start pt-6 sm:pt-10 px-4 sm:px-6 font-sans text-white overflow-x-hidden">
-        <GithubStarButton />
         <BuyMeACoffee />
 
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -471,7 +469,6 @@ const LandingPage = () => {
   // ─── Signed In: Show Create / Join / History ───
   return (
     <main className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-start pt-8 sm:pt-12 px-4 sm:px-6 font-sans text-white overflow-x-hidden">
-      <GithubStarButton />
       <BuyMeACoffee />
 
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
