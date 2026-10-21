@@ -236,9 +236,16 @@ const AuctionSummary = () => {
 
           {/* Title */}
           <div className="text-center md:text-left pt-1">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/[0.06] px-3 py-1.5 mb-4">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.8)]" />
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.24em] text-emerald-200">Final results · squad review</span>
+            </div>
             <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black tracking-tighter uppercase leading-none drop-shadow-2xl">
               Auction <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#10b981] to-[#34d399]">Complete</span>
             </h1>
+            <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400 leading-relaxed md:mx-0 mx-auto">
+              Every signing tells a story. Review the squads, biggest buys, and final team rankings from your auction.
+            </p>
           </div>
         </motion.header>
 
