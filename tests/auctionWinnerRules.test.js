@@ -21,7 +21,7 @@ const squad = catalog.map((p) => ({ id: p.id, bid: 1 }));
 
 test('post-auction deadlines and retention allowance match product rules', () => {
   assert.equal(PLAYING_XI_DEADLINE_MS, 120000);
-  assert.equal(RETENTION_DECISION_MS, 5000);
+  assert.equal(RETENTION_DECISION_MS, 10000);
   assert.equal(RETENTION_CARDS_PER_FRANCHISE, 2);
 });
 
