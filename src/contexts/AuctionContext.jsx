@@ -738,7 +738,13 @@ export const AuctionProvider = ({ children }) => {
         } : null,
         timestamp: serverTimestampRtdb()
       }));
-      await Promise.all(syncPromises);
+      // Do not let a slow auxiliary RTDB write (team/room snapshot or activity log)
+      // block the auction's player-transition timer indefinitely. These writes are
+      // already in flight; wait briefly for them, then let the auction continue.
+      await Promise.race([
+        Promise.allSettled(syncPromises),
+        new Promise((resolve) => setTimeout(resolve, 1500))
+      ]);
 
       const waitTime = isSold ? 5000 : 2000;
 
