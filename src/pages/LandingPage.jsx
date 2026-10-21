@@ -398,7 +398,7 @@ const LandingPage = () => {
         </div>
 
         <div className="w-full max-w-7xl bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-emerald-400/[0.035] border border-white/[0.11] rounded-[1.75rem] sm:rounded-[2.5rem] p-2 sm:p-3 shadow-[0_30px_100px_rgba(0,0,0,0.5)] z-10 relative mt-1 backdrop-blur-xl">
-          {/* Subtle Orange Glow behind panel */}
+          {/* Emerald ambient glow behind the auction dashboard */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#10b981]/[0.02] via-[#10b981]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
           <div className="absolute -inset-2 bg-gradient-to-r from-[#10b981]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
           <div className="bg-[#080f1d]/95 rounded-[1.35rem] sm:rounded-[2rem] border border-white/[0.07] grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/[0.07] overflow-hidden">
@@ -579,7 +579,7 @@ const LandingPage = () => {
         </div>
       </div>
       <div className="w-full max-w-7xl bg-gradient-to-br from-white/[0.07] via-white/[0.025] to-emerald-400/[0.035] border border-white/[0.11] rounded-[1.75rem] sm:rounded-[2.5rem] p-2 sm:p-3 shadow-[0_30px_100px_rgba(0,0,0,0.45)] z-10 relative mt-1 backdrop-blur-xl">
-        {/* Subtle Orange Glow behind panel */}
+        {/* Emerald ambient glow behind the auction dashboard */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#10b981]/[0.02] via-[#10b981]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
         <div className="absolute -inset-2 bg-gradient-to-r from-[#10b981]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
         <div className="bg-[#080f1d]/95 rounded-[1.35rem] sm:rounded-[2rem] border border-white/[0.07] grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/[0.07] overflow-hidden">
@@ -680,8 +680,8 @@ const LandingPage = () => {
                         aria-label={`Select ${t.name}`}
                         className={`relative group/team flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-xl sm:rounded-2xl transition-all duration-200 hover:-translate-y-0.5 ${
                           selectedTeam === t.id
-                            ? "bg-[#1b1b1b] border border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
-                            : "bg-[#151515] border border-transparent hover:bg-white/[0.04]"
+                            ? "bg-emerald-400/[0.09] border border-emerald-300/35 scale-[1.02] shadow-[0_4px_24px_rgba(16,185,129,0.12)]"
+                            : "bg-[#0d1a2b] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.04]"
                         }`}
                       >
                         {selectedTeam === t.id && (
@@ -725,8 +725,8 @@ const LandingPage = () => {
                       onClick={() => setAuctionType("mega")}
                       className={`flex-1 p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-200 text-left relative overflow-hidden group/mode ${
                         auctionType === "mega"
-                          ? "bg-[#1b1b1b] border border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
-                          : "bg-[#151515] border border-transparent hover:bg-white/[0.04]"
+                          ? "bg-emerald-400/[0.09] border border-emerald-300/35 scale-[1.02] shadow-[0_4px_24px_rgba(16,185,129,0.12)]"
+                          : "bg-[#0d1a2b] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.04]"
                       }`}
                     >
                       {auctionType === "mega" && (
@@ -764,8 +764,8 @@ const LandingPage = () => {
                       onClick={() => setAuctionType("sprint11")}
                       className={`flex-1 p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-200 text-left relative overflow-hidden group/mode ${
                         auctionType === "sprint11"
-                          ? "bg-[#1b1b1b] border border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
-                          : "bg-[#151515] border border-transparent hover:bg-white/[0.04]"
+                          ? "bg-emerald-400/[0.09] border border-emerald-300/35 scale-[1.02] shadow-[0_4px_24px_rgba(16,185,129,0.12)]"
+                          : "bg-[#0d1a2b] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.04]"
                       }`}
                     >
                       {auctionType === "sprint11" && (
@@ -803,8 +803,8 @@ const LandingPage = () => {
                       onClick={() => setAuctionType("sprint5")}
                       className={`flex-1 p-2 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-200 text-left relative overflow-hidden group/mode ${
                         auctionType === "sprint5"
-                          ? "bg-[#1b1b1b] border border-white/[0.12] scale-[1.02] shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
-                          : "bg-[#151515] border border-transparent hover:bg-white/[0.04]"
+                          ? "bg-emerald-400/[0.09] border border-emerald-300/35 scale-[1.02] shadow-[0_4px_24px_rgba(16,185,129,0.12)]"
+                          : "bg-[#0d1a2b] border border-white/[0.06] hover:border-white/15 hover:bg-white/[0.04]"
                       }`}
                     >
                       {auctionType === "sprint5" && (
@@ -1208,7 +1208,7 @@ const LandingPage = () => {
                             {/* Expanded Squad */}
                             {isExpanded && (
                               <div className="overflow-hidden">
-                                <div className="bg-[#111] border border-white/5 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 space-y-2 sm:space-y-3 mt-1">
+                                <div className="bg-[#0b1727] border border-white/10 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 space-y-2 sm:space-y-3 mt-1">
                                   {isCompleted ? (
                                     <>
                                       {/* Quick Stats */}
