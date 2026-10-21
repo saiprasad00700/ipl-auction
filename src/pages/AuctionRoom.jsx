@@ -856,7 +856,7 @@ const AuctionRoom = () => {
 
    if (banError) {
       return (
-         <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 font-primary text-white">
+         <div className="min-h-screen bg-[#050914] flex items-center justify-center p-6 font-primary text-white">
             <motion.div
                initial={{ opacity: 0, scale: 0.9 }}
                animate={{ opacity: 1, scale: 1 }}
@@ -920,8 +920,8 @@ const AuctionRoom = () => {
       const availableTeams = TEAMS.filter(t => !takenTeamIds.has(t.id));
 
       return (
-         <div className="h-screen-safe bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-500/10 blur-[120px] rounded-full" />
+         <div className="h-screen-safe bg-[#050914] text-white flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-400/10 blur-[120px] rounded-full" />
             <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
                {availableTeams.length > 0 ? (
                   <>
@@ -1005,9 +1005,9 @@ const AuctionRoom = () => {
    }
 
    return (
-      <div className="h-screen-safe bg-[#0d0d0d] text-white font-sans flex flex-col items-center overflow-hidden">
+      <div className="h-screen-safe relative bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.12),_transparent_45%),linear-gradient(145deg,#071521_0%,#050914_48%,#02040a_100%)] text-white font-sans flex flex-col items-center overflow-hidden">
 
-         <header className="w-full h-14 bg-black/40 backdrop-blur-md border-b border-white/5 flex flex-row items-center justify-between px-2.5 sm:px-4 md:px-6 z-50 gap-2 shrink-0">
+         <header className="w-full h-14 bg-[#050914]/85 backdrop-blur-xl border-b border-emerald-300/15 shadow-[0_8px_32px_rgba(0,0,0,0.25)] flex flex-row items-center justify-between px-2.5 sm:px-4 md:px-6 z-50 gap-2 shrink-0">
             <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
                <div className="flex items-center gap-1">
                   <span className="text-gray-500 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hidden xs:inline">ID:</span>
@@ -1082,8 +1082,8 @@ const AuctionRoom = () => {
          </header>
 
          <div className="w-full flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden relative">
-            <aside className={`${mobileTab === 'squad' ? 'flex' : 'hidden'} md:flex w-full md:w-80 bg-black/40 border-r border-white/5 flex-col h-full max-h-[calc(100dvh-7.5rem)] md:max-h-[calc(100dvh-3.5rem)] overflow-hidden`}>
-               <div className="h-14 border-b border-white/5 bg-white/[0.01] flex items-center px-6 shrink-0">
+            <aside className={`${mobileTab === 'squad' ? 'flex' : 'hidden'} md:flex w-full md:w-80 bg-[#07111d]/80 backdrop-blur-xl border-r border-emerald-300/10 flex-col h-full max-h-[calc(100dvh-7.5rem)] md:max-h-[calc(100dvh-3.5rem)] overflow-hidden`}>
+               <div className="h-14 border-b border-emerald-300/10 bg-white/[0.025] flex items-center px-6 shrink-0">
                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">Auction Teams</span>
                </div>
 
@@ -1099,7 +1099,7 @@ const AuctionRoom = () => {
                         <div key={idx} className="border-b border-white/5 last:border-b-0 py-1">
                            <button
                               onClick={() => setSelectedTeamId(isSelected ? null : (manager?.id || t.id))}
-                              className={`w-full text-left py-3 px-2 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'bg-white/[0.03]' : 'hover:bg-white/[0.02]'}`}
+                              className={`w-full text-left py-3 px-2 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'bg-emerald-300/[0.07] border border-emerald-300/10' : 'hover:bg-white/[0.02]'}`}
                            >
                               <div className="flex items-center gap-2.5">
                                  <span className="w-4 text-[10px] font-black text-gray-500 text-center shrink-0">{idx + 1}</span>
@@ -1129,8 +1129,8 @@ const AuctionRoom = () => {
                                     <span className="text-[10px] font-bold block leading-none text-gray-200">
                                        ₹{(teamDoc?.budgetRemaining || (currentAuction?.settings?.budget || 120.0)).toFixed(1)} Cr
                                     </span>
-                                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mt-0.5 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
-                                    <span className="text-[8px] font-bold text-yellow-500 uppercase tracking-widest mt-0.5 block">Retention cards: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1 block">{teamDoc?.squad?.length || 0}/{currentAuction?.squadLimit || 25} players</span>
+                                    <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wider mt-1 block">RTM: {teamDoc?.retentionCardsRemaining ?? 2}/2</span>
                                  </div>
                                  <ChevronDown size={12} className={`text-gray-500 transition-transform duration-300 ${isSelected ? 'rotate-180' : ''}`} />
                               </div>
@@ -1337,12 +1337,12 @@ const AuctionRoom = () => {
                             );
                          })() : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className="bg-gradient-to-b from-[#161616] to-[#0f0f0f] border border-white/[0.08] rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.6)] relative min-h-[400px]">
+                              <div className="bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]">
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-60 md:h-80 bg-gradient-to-b from-white/10 to-transparent rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/10 relative z-10 shadow-[0_12px_40px_rgba(0,0,0,0.4)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
+                                    <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.22),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
                                        <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
@@ -1375,7 +1375,7 @@ const AuctionRoom = () => {
                                                     };
                                                     const colorMap = {
                                                        wickets: 'text-green-400', runs: 'text-yellow-500', 
-                                                       econ: 'text-cyan-400', avg: 'text-orange-400',
+                                                       econ: 'text-cyan-400', avg: 'text-emerald-300',
                                                        sr: 'text-purple-400', matches: 'text-gray-100',
                                                        hs: 'text-pink-400', bb: 'text-emerald-400'
                                                     };
@@ -1392,11 +1392,11 @@ const AuctionRoom = () => {
                                               </div>
                                            );
                                         })()}
-                                       <div className="flex items-center justify-between mt-2 md:mt-4">
+                                       <div className="flex items-center justify-between gap-3 mt-2 md:mt-4">
                                           <div className="text-left">
-                                             <span className="text-[9px] md:text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Current Bid</span>
+                                             <span className="text-[9px] md:text-[10px] font-black text-emerald-200/70 uppercase tracking-[0.18em] block mb-1.5">Current Bid</span>
                                              <div className="flex items-center gap-2 sm:gap-3">
-                                                <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white leading-none">₹{(displayAuctionState?.currentBid || 0).toFixed(2)} Cr</span>
+                                                <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-none tracking-tight">₹{(displayAuctionState?.currentBid || 0).toFixed(2)} Cr</span>
                                                 {displayAuctionState?.highBidderTeamId && (
                                                    <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
                                                       <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-white/5 border border-white/10 p-0.5 flex items-center justify-center">
@@ -1409,7 +1409,7 @@ const AuctionRoom = () => {
                                           </div>
                                           <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex flex-col items-center justify-center transition-all duration-300 border-2 ${timeLeft < 5
                                              ? 'border-red-500 bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                                             : 'border-green-500/30 bg-green-500/5 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                                             : 'border-green-500/30 bg-green-500/5 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                                              }`}>
                                              <span className="text-base sm:text-lg md:text-xl font-black leading-none">{timeLeft}</span>
                                              <span className="text-[6px] md:text-[7px] font-bold tracking-widest uppercase mt-0.5">Sec</span>
@@ -1417,7 +1417,7 @@ const AuctionRoom = () => {
                                        </div>
                                     </div>
                                  </div>
-                                 <div className="bg-black/20 border-t border-white/5 p-3 sm:p-4 md:p-6 flex flex-col gap-3">
+                                 <div className="bg-[#040a12]/75 backdrop-blur-xl border-t border-emerald-300/10 p-3 sm:p-4 md:p-6 flex flex-col gap-3">
                                     {/* Franchise Quick Stats Bar right above Bid button (Mobile view only) */}
                                     {team && (() => {
                                        const osCount = (team.squad || []).filter(s => {
@@ -1427,20 +1427,20 @@ const AuctionRoom = () => {
                                        const totalBudget = currentAuction?.settings?.budget || 120;
 
                                        return (
-                                          <div className="flex md:hidden items-center justify-between bg-white/[0.03] border border-white/10 px-2.5 sm:px-4 py-2 rounded-xl text-[9px] sm:text-xs font-bold text-gray-300">
+                                          <div className="flex md:hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-[#07111d]/90 border border-emerald-300/15 px-3 sm:px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold text-gray-300 shadow-inner shadow-emerald-300/[0.03]">
                                              <div className="flex items-center gap-1" title="Squad Count">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Squad:</span>
-                                                <span className="text-blue-400 font-extrabold">{team.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
+                                                <span className="text-emerald-300 font-extrabold">{team.squad?.length || 0}/{currentAuction?.squadLimit || 25}</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Overseas Players">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">OS:</span>
-                                                <span className="text-purple-400 font-extrabold">{osCount}/{currentAuction?.overseasLimit || 8}</span>
+                                                <span className="text-sky-300 font-extrabold">{osCount}/{currentAuction?.overseasLimit || 8}</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Purse Left out of Total Budget">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">Purse:</span>
-                                                <span className="text-green-400 font-extrabold">₹{(team.budgetRemaining || 0).toFixed(1)}/{totalBudget}Cr</span>
+                                                <span className="text-emerald-300 font-extrabold">₹{(team.budgetRemaining || 0).toFixed(1)}/{totalBudget}Cr</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10 hidden xs:block" />
                                              <div className="items-center gap-1 hidden xs:flex" title="Total Spent">
@@ -1455,7 +1455,7 @@ const AuctionRoom = () => {
                                        <button
                                           onClick={handleBid}
                                           disabled={spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
-                                          className={`flex-1 h-12 sm:h-14 md:h-18 font-black text-sm sm:text-base md:text-xl rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${spectateMode
+                                          className={`flex-1 min-h-14 sm:min-h-16 md:min-h-[4.5rem] px-3 font-black text-sm sm:text-base md:text-xl rounded-2xl border border-white/10 flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${spectateMode
                                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                              : displayAuctionState?.highBidderId === user?.uid
                                                 ? 'bg-white/5 text-green-500 border border-green-500/20 shadow-inner'
@@ -1468,7 +1468,7 @@ const AuctionRoom = () => {
                                              </span>
                                           ) : displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
                                        </button>
-                                       <button onClick={() => setShowPlayersOverlay(true)} className="w-12 h-12 sm:w-14 sm:h-14 md:w-18 md:h-18 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><List size={20} /></button>
+                                       <button onClick={() => setShowPlayersOverlay(true)} className="w-12 h-12 sm:w-14 sm:h-14 md:w-18 md:h-18 bg-slate-900/65 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><List size={20} /></button>
                                     </div>
                                  </div>
                               </div>
@@ -1479,13 +1479,13 @@ const AuctionRoom = () => {
                </main>
             </div>
 
-            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-black/40 border-l border-white/5 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
+            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-[#07111d]/80 backdrop-blur-xl border-l border-emerald-300/10 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
                {/* Premium Tabs Header */}
-               <div className="h-14 bg-white/[0.01] border-b border-white/5 flex items-center shrink-0 w-full">
+               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full">
                   <button
                      onClick={() => setSidebarTab('activity')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'activity'
-                        ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                        ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                         }`}
                   >
@@ -1495,7 +1495,7 @@ const AuctionRoom = () => {
                   <button
                      onClick={() => setSidebarTab('chat')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
-                        ? 'bg-white/[0.04] text-white border-b-2 border-white/60 font-black'
+                        ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
                         : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                         }`}
                   >
@@ -1665,7 +1665,7 @@ const AuctionRoom = () => {
                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-12">
                         {filteredPlayers.length === 0 ? (
                            <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
-                              <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 mb-4 shadow-xl">
+                              <div className="w-16 h-16 bg-slate-900/65 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 mb-4 shadow-xl">
                                  <Users size={32} className="opacity-50" />
                               </div>
                               <h4 className="text-base font-black uppercase tracking-wider text-gray-300 mb-1">
@@ -1823,7 +1823,7 @@ const AuctionRoom = () => {
                                     }
                                  }}>
                                     <input type="number" min={(Number(offer.bid) + 0.01).toFixed(2)} step="0.01" value={retentionCounterBid} onChange={(e) => setRetentionCounterBid(e.target.value)} placeholder="Enter new price in Cr" className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-white" required />
-                                    <button type="submit" disabled={!retentionCounterBid || Boolean(retentionDecisionPendingFor)} className="w-full rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor ? 'Submitting…' : 'Submit higher price'}</button>
+                                    <button type="submit" disabled={!retentionCounterBid || Boolean(retentionDecisionPendingFor)} className="w-full rounded-xl bg-emerald-400 hover:bg-emerald-300 text-white font-black text-xs uppercase tracking-wider py-3 disabled:opacity-60">{retentionDecisionPendingFor ? 'Submitting…' : 'Submit higher price'}</button>
                                  </form>
                               </>
                            ) : (
@@ -2014,8 +2014,8 @@ const AuctionRoom = () => {
 
          {currentAuction?.status === 'awaiting_xi' && (
             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
-               <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#101010] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
-                  <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
+               <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#0b1422] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+                  <p className="text-emerald-300 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
                   <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
                   <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
                   {team?.disqualified && (
@@ -2060,10 +2060,10 @@ const AuctionRoom = () => {
                      {mySquadPlayers.map((player) => {
                         const isStarter = selectedXIIds.includes(player.id);
                         const isImpact = selectedImpactId === player.id;
-                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-orange-400/40 bg-orange-500/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-emerald-300/40 bg-emerald-400/10' : 'border-white/10 bg-white/[0.02]'}`}>
                            <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
                            <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
-                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-orange-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
+                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-emerald-400 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
                            <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
                         </div>;
                      })}
@@ -2072,13 +2072,13 @@ const AuctionRoom = () => {
                   {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
                      <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
-                     <button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
+                     <button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
                   </div>
                </div>
             </div>
          )}
-         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
-         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#101010] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-orange-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
+         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
+         {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
 
          <ConfirmDialog
             isOpen={showEndConfirm}

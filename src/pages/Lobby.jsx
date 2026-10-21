@@ -286,9 +286,9 @@ const Lobby = () => {
   // ─── Unauthenticated State: Show Login Gateway ───
   if (banError) {
     return (
-      <div className="relative min-h-screen bg-[#050505] flex items-center justify-center p-6 font-primary text-white overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050914] flex items-center justify-center p-6 font-primary text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-orange-700/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -328,9 +328,9 @@ const Lobby = () => {
 
   if (!user) {
     return (
-      <div className="relative min-h-screen bg-[#050505] flex flex-col items-center justify-center py-12 px-4 font-sans text-white overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-center py-12 px-4 font-sans text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-orange-700/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -339,10 +339,10 @@ const Lobby = () => {
           {...enterProps({ opacity: 0, y: 20 })}
           className="relative z-10 w-full md:w-xl max-md bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-2xl"
         >
-          <div className="bg-[#0c0c0c] rounded-[2.2rem] p-8 border border-white/5 flex flex-col items-center text-center">
+          <div className="bg-[#08111d]/90 backdrop-blur-2xl rounded-[2.2rem] p-6 sm:p-8 border border-emerald-300/10 shadow-[0_24px_80px_rgba(0,0,0,0.35)] flex flex-col items-center text-center">
 
             <h2 className="text-2xl font-black tracking-tighter uppercase mb-2">Joining Arena</h2>
-            <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">Room ID: <span className="text-orange-500">{id}</span></p>
+            <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">Room ID: <span className="text-emerald-400">{id}</span></p>
 
             {!isGuestMode ? (
               <div className="w-full space-y-4">
@@ -366,7 +366,7 @@ const Lobby = () => {
 
                 <div className="relative py-2 flex items-center justify-center">
                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5" /></div>
-                  <span className="relative bg-[#0c0c0c] px-4 text-[9px] font-black text-gray-700 uppercase tracking-widest italic">Or enter as temporary guest</span>
+                  <span className="relative bg-[#08111d] px-4 text-[9px] font-black text-gray-700 uppercase tracking-widest italic">Or enter as temporary guest</span>
                 </div>
 
                 <button
@@ -385,7 +385,7 @@ const Lobby = () => {
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     placeholder="e.g. THALA"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-black uppercase text-sm tracking-[0.2em] placeholder:text-gray-800 focus:outline-none focus:border-orange-500/50 transition-all"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-black uppercase text-sm tracking-[0.2em] placeholder:text-gray-800 focus:outline-none focus:border-emerald-400/50 transition-all"
                     autoFocus
                   />
                 </div>
@@ -393,7 +393,7 @@ const Lobby = () => {
                 <button
                   type="submit"
                   disabled={isUpdatingSettings || !guestName.trim()}
-                  className="w-full h-14 bg-gradient-to-r from-orange-600 to-orange-500 rounded-xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-widest text-xs shadow-[0_10px_30px_rgba(255,85,0,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                  className="w-full h-14 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-widest text-xs shadow-[0_10px_30px_rgba(255,85,0,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
                 >
                   {isUpdatingSettings ? <Loader2 size={18} className="animate-spin" /> : <span>Step into Hub</span>}
                 </button>
@@ -425,9 +425,9 @@ const Lobby = () => {
 
   if (!currentAuction) {
     return (
-      <div className="relative min-h-screen bg-[#050505] flex items-center justify-center p-6 text-white font-sans overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050914] flex items-center justify-center p-6 text-white font-sans overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-orange-700/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -435,17 +435,17 @@ const Lobby = () => {
           {...enterProps({ opacity: 0, scale: 0.9 })}
           className="max-w-md w-full bg-white/[0.03] border border-white/10 p-8 rounded-[2.5rem] text-center relative z-10 shadow-2xl overflow-hidden"
         >
-          <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-orange-500/10 rounded-full -mr-16 -mt-16 blur-3xl" />
-          <div className="w-20 h-20 bg-orange-500/10 border border-orange-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-orange-500 shadow-2xl">
+          <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-emerald-400/10 rounded-full -mr-16 -mt-16 blur-3xl" />
+          <div className="w-20 h-20 bg-emerald-400/10 border border-emerald-400/20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-emerald-400 shadow-2xl">
             <ShieldAlert size={40} />
           </div>
           <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Room Not Found</h2>
           <p className="text-gray-400 text-xs font-medium mb-8 leading-relaxed">
-            This auction room code (<span className="text-orange-500 font-mono font-bold">{id}</span>) does not exist, has expired, or was closed by the host.
+            This auction room code (<span className="text-emerald-400 font-mono font-bold">{id}</span>) does not exist, has expired, or was closed by the host.
           </p>
           <button
             onClick={() => navigate('/')}
-            className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-[0_10px_30px_rgba(255,85,0,0.3)]"
+            className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-widest text-xs rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-[0_10px_30px_rgba(16,185,129,0.24)]"
           >
             <Home size={16} /> Back to Base
           </button>
@@ -457,9 +457,9 @@ const Lobby = () => {
   if (!spectateMode && (!isJoined || !currentUserPlayer?.team)) {
     // ═══ TEAM SELECTION OVERLAY ═══
     return (
-      <div className="relative min-h-screen bg-[#050505] flex flex-col items-center py-12 px-4 font-sans text-white overflow-x-hidden">
+      <div className="relative min-h-screen bg-[#050914] flex flex-col items-center py-12 px-4 font-sans text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-orange-700/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -487,7 +487,7 @@ const Lobby = () => {
                     }`}
                 >
                   <div className="w-20 h-20 bg-white/5 border border-white/5 rounded-2xl p-2 flex items-center justify-center">
-                    {isSelectingTeam === team.id ? <Loader2 className="animate-spin text-orange-500" /> : <img src={team.logo} alt={`${team.name || team.id} Logo`} className="w-full h-full object-contain" />}
+                    {isSelectingTeam === team.id ? <Loader2 className="animate-spin text-emerald-400" /> : <img src={team.logo} alt={`${team.name || team.id} Logo`} className="w-full h-full object-contain" />}
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] font-black uppercase tracking-widest text-white">{team.id}</p>
@@ -519,11 +519,11 @@ const Lobby = () => {
 
   // ─── Authenticated State ───
   return (
-    <div className="relative min-h-screen bg-[#050505] flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden">
+    <div className="relative min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.13),_transparent_45%),linear-gradient(145deg,#071521_0%,#050914_55%,#02040a_100%)] flex flex-col items-center pt-8 px-4 font-sans text-white overflow-x-hidden">
 
       {/* Premium Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-800/20 md:bg-orange-700/20 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
       </div>
@@ -556,16 +556,16 @@ const Lobby = () => {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => fillEmptyTeamsWithBots(id)}
-              className="shrink-0 px-2.5 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider text-orange-400 hover:text-orange-300 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
+              className="shrink-0 px-2.5 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider text-emerald-300 hover:text-emerald-200 transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
               title="Add AI Bots to unassigned franchises"
             >
-              <Zap size={12} className="text-orange-400 shrink-0 sm:w-[14px] sm:h-[14px]" />
+              <Zap size={12} className="text-emerald-300 shrink-0 sm:w-[14px] sm:h-[14px]" />
               <span>Fill Bots</span>
             </button>
             <button
               onClick={handleStartAuction}
               disabled={isStarting}
-              className="relative overflow-hidden group shrink-0 px-3 sm:px-4 md:px-8 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-[#ff5500] to-[#ff8c00] rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider md:tracking-widest shadow-[0_10px_30px_rgba(255,85,0,0.3)] disabled:opacity-50 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              className="relative overflow-hidden group shrink-0 px-3 sm:px-4 md:px-8 py-2 sm:py-2.5 md:py-3 bg-gradient-to-r from-emerald-400 to-teal-300 rounded-xl sm:rounded-2xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider md:tracking-widest shadow-[0_10px_30px_rgba(16,185,129,0.24)] disabled:opacity-50 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               <div className="relative flex items-center gap-1 sm:gap-1.5 md:gap-2">
@@ -585,7 +585,7 @@ const Lobby = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-[#ff5500]/[0.02] via-[#ff5500]/[0.01] to-transparent rounded-[2.5rem] blur-xl pointer-events-none -z-10" />
         <div className="absolute -inset-2 bg-gradient-to-r from-[#ff5500]/5 to-[#0088ff]/2 rounded-[2.5rem] blur-3xl opacity-40 pointer-events-none -z-10" />
 
-        <div className="bg-[#0c0c0c] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
+        <div className="bg-[#08111d] rounded-[2.2rem] border border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/5 overflow-hidden">
 
           {/* Left Column: Management Hub */}
           <div className="lg:col-span-5 w-full flex flex-col p-6 md:p-8 relative gap-6">
@@ -710,7 +710,7 @@ const Lobby = () => {
             <div>
               <button
                 onClick={() => setShowBotInfo(true)}
-                className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-white/[0.03] to-transparent hover:from-[#ff5500]/10 hover:to-transparent border border-white/5 hover:border-[#ff5500]/30 rounded-2xl transition-all duration-300 group cursor-pointer text-left"
+                className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-white/[0.03] to-transparent hover:from-emerald-300/[0.08] hover:to-transparent border border-white/5 hover:border-emerald-300/25 rounded-2xl transition-all duration-300 group cursor-pointer text-left"
               >
                 <div className="flex items-center gap-2.5">
                   <div>
@@ -788,7 +788,7 @@ const Lobby = () => {
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <p className="font-black text-xs sm:text-sm text-white uppercase tracking-tight truncate max-w-[160px] sm:max-w-none">{player.name}</p>
                                 {player.isHost && <Crown size={14} className="text-yellow-500 fill-yellow-500 shrink-0" />}
-                                {(player.isBot || player.id.startsWith('bot_')) && <span className="text-[8px] font-black bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded border border-orange-500/30 flex items-center gap-1 shrink-0"><Zap size={8} /> AI BOT</span>}
+                                {(player.isBot || player.id.startsWith('bot_')) && <span className="text-[8px] font-black bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-400/30 flex items-center gap-1 shrink-0"><Zap size={8} /> AI BOT</span>}
                                 {player.id === user?.uid && <span className="text-[8px] font-black bg-white/10 px-1.5 py-0.5 rounded text-gray-400 shrink-0">YOU</span>}
                               </div>
                               <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] mt-0.5 truncate">
@@ -861,10 +861,10 @@ const Lobby = () => {
             <motion.div
               {...enterProps({ opacity: 0, scale: 0.95, y: 20 }, { transition: { type: 'spring', damping: 25, stiffness: 300 } })}
               {...exitProps({ opacity: 0, scale: 0.95, y: 20 })}
-              className="relative w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] bg-[#0c0c0c] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-10 flex flex-col my-auto overflow-hidden"
+              className="relative w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] bg-[#08111d] border border-white/10 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-6 md:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-10 flex flex-col my-auto overflow-hidden"
             >
               {/* Background Glows */}
-              <div className="absolute -top-20 -right-20 w-40 h-40 sm:w-56 sm:h-56 bg-[#ff5500]/20 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
+              <div className="absolute -top-20 -right-20 w-40 h-40 sm:w-56 sm:h-56 bg-emerald-400/15 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
               <div className="absolute -bottom-20 -left-20 w-40 h-40 sm:w-56 sm:h-56 bg-blue-500/10 rounded-full blur-[60px] sm:blur-[80px] pointer-events-none" />
 
               {/* Close Button */}
@@ -898,7 +898,7 @@ const Lobby = () => {
                     <div>
                       <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-white mb-0.5">Smart Bidding Engine</h4>
                       <p className="text-[10px] sm:text-[11px] text-gray-400 leading-relaxed">
-                        Bots evaluate players using base price, star tier, role demand, and team bias - e.g., <span className="text-orange-400 font-semibold">MI</span> chases pace bowlers, <span className="text-yellow-400 font-semibold">CSK</span> prioritizes all-rounders, and <span className="text-red-400 font-semibold">RCB</span> bids aggressively on marquee batsmen.
+                        Bots evaluate players using base price, star tier, role demand, and team bias - e.g., <span className="text-emerald-300 font-semibold">MI</span> chases pace bowlers, <span className="text-yellow-400 font-semibold">CSK</span> prioritizes all-rounders, and <span className="text-red-400 font-semibold">RCB</span> bids aggressively on marquee batsmen.
                       </p>
                     </div>
                   </div>
@@ -925,18 +925,18 @@ const Lobby = () => {
                 </div>
 
                 {/* How to add box */}
-                <div className="p-3 sm:p-4 bg-gradient-to-r from-[#ff5500]/10 to-transparent border border-[#ff5500]/30 rounded-xl sm:rounded-2xl">
+                <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-300/10 to-transparent border border-emerald-300/20 rounded-xl sm:rounded-2xl">
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-1.5">
                     <Zap size={13} className="text-[#ff5500] sm:w-[14px] sm:h-[14px]" />
                     <h5 className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-[#ff5500]">How to Add Bots</h5>
                   </div>
                   {isAdmin ? (
                     <p className="text-[10px] sm:text-xs text-gray-300 font-medium leading-relaxed">
-                      As host, click <span className="text-white font-bold bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-500/30">Fill Bots</span> in the top header. This fills all unassigned franchise teams with AI managers so your auction runs at full capacity!
+                      As host, click <span className="text-white font-bold bg-emerald-400/20 px-1.5 py-0.5 rounded border border-emerald-400/30">Fill Bots</span> in the top header. This fills all unassigned franchise teams with AI managers so your auction runs at full capacity!
                     </p>
                   ) : (
                     <p className="text-[10px] sm:text-xs text-gray-300 font-medium leading-relaxed">
-                      The room host can click <span className="text-white font-bold bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-500/30">Fill Bots</span> to assign AI managers to empty teams, allowing the auction to run smoothly even without 10 human players.
+                      The room host can click <span className="text-white font-bold bg-emerald-400/20 px-1.5 py-0.5 rounded border border-emerald-400/30">Fill Bots</span> to assign AI managers to empty teams, allowing the auction to run smoothly even without 10 human players.
                     </p>
                   )}
                 </div>
