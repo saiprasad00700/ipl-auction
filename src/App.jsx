@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
