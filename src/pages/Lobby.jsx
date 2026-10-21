@@ -288,7 +288,7 @@ const Lobby = () => {
     return (
       <div className="relative min-h-screen bg-[#050914] flex items-center justify-center p-6 font-primary text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-emerald-600/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -330,7 +330,7 @@ const Lobby = () => {
     return (
       <div className="relative min-h-screen bg-[#050914] flex flex-col items-center justify-center py-12 px-4 font-sans text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-emerald-600/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -339,7 +339,7 @@ const Lobby = () => {
           {...enterProps({ opacity: 0, y: 20 })}
           className="relative z-10 w-full md:w-xl max-md bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-3 shadow-2xl"
         >
-          <div className="bg-[#0c0c0c] rounded-[2.2rem] p-8 border border-white/5 flex flex-col items-center text-center">
+          <div className="bg-[#08111d]/90 backdrop-blur-2xl rounded-[2.2rem] p-6 sm:p-8 border border-emerald-300/10 shadow-[0_24px_80px_rgba(0,0,0,0.35)] flex flex-col items-center text-center">
 
             <h2 className="text-2xl font-black tracking-tighter uppercase mb-2">Joining Arena</h2>
             <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">Room ID: <span className="text-emerald-400">{id}</span></p>
@@ -427,7 +427,7 @@ const Lobby = () => {
     return (
       <div className="relative min-h-screen bg-[#050914] flex items-center justify-center p-6 text-white font-sans overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-emerald-600/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -459,7 +459,7 @@ const Lobby = () => {
     return (
       <div className="relative min-h-screen bg-[#050914] flex flex-col items-center py-12 px-4 font-sans text-white overflow-x-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-800/20 md:bg-emerald-600/20 blur-[120px] rounded-full" />
+          <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
         </div>
@@ -523,7 +523,7 @@ const Lobby = () => {
 
       {/* Premium Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-orange-800/20 md:bg-emerald-600/20 blur-[120px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-500/10 md:bg-emerald-600/20 blur-[120px] rounded-full" />
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://res.cloudinary.com/drl6ky9as/image/upload/v1792012081/texture_os1ukf.jpg')] opacity-[0.25]" />
       </div>
