@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
