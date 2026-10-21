@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
