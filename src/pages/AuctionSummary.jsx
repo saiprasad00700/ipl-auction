@@ -237,7 +237,7 @@ const AuctionSummary = () => {
           {/* Title */}
           <div className="text-center md:text-left pt-1">
             <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black tracking-tighter uppercase leading-none drop-shadow-2xl">
-              Auction <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff5500] to-[#ff8c00]">Complete</span>
+              Auction <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#10b981] to-[#34d399]">Complete</span>
             </h1>
           </div>
         </motion.header>
@@ -255,7 +255,7 @@ const AuctionSummary = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-2 sm:px-6 md:px-10 py-2.5 sm:py-3.5 md:py-4 rounded-xl sm:rounded-[1.5rem] font-black uppercase text-[9px] sm:text-[10px] tracking-tight sm:tracking-[0.2em] transition-all flex items-center justify-center gap-1.5 sm:gap-3 touch-manipulation w-full sm:w-auto ${
                   activeTab === tab.id 
-                    ? 'bg-[#ff5500] text-white shadow-2xl' 
+                    ? 'bg-[#10b981] text-white shadow-2xl' 
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
@@ -326,7 +326,7 @@ const AuctionSummary = () => {
                     </div>
                     <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-white/5 flex sm:block items-center justify-between">
                       <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest sm:hidden">Winning Bid</p>
-                      <div className="text-2xl sm:text-4xl font-black text-[#ff5500] tracking-tighter">
+                      <div className="text-2xl sm:text-4xl font-black text-[#10b981] tracking-tighter">
                         ₹{player.bidVal.toFixed(2)}<span className="text-xs ml-1 font-bold not-italic text-gray-500">Cr</span>
                       </div>
                     </div>
