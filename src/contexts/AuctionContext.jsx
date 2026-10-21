@@ -410,7 +410,7 @@ export const AuctionProvider = ({ children }) => {
         // any connected client can settle it after its deadline.
         if (currentData.status === 'processing_sale') {
           const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending' || now < Number(offer.expiresAt)) return;
+          if (!offer || offer.status !== 'pending' || now < Number(offer.expiresAt) + 1500) return;
           if (offer.phase === 'counter_bid' && offer.rtmUsed) {
             // Original franchise exercised RTM but the winning bidder did not raise in time.
             currentData.highBidderId = offer.eligibleUserId;
@@ -527,7 +527,7 @@ export const AuctionProvider = ({ children }) => {
               finish();
               return;
             }
-            if (getSyncedTime() >= Number(offer.expiresAt)) finish();
+            if (getSyncedTime() >= Number(offer.expiresAt) + 1500) finish();
           };
           pollId = setInterval(async () => {
             try {
@@ -554,7 +554,7 @@ export const AuctionProvider = ({ children }) => {
           const matchDecisionMade = offer.phase === 'match_decision'
             && ['match', 'decline_counter'].includes(offer.decision)
             && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt)) return;
+          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
           if (offer.phase === 'counter_bid' && offer.rtmUsed) {
             currentData.highBidderId = offer.eligibleUserId;
             currentData.highBidderName = offer.eligibleTeamName;
@@ -1363,11 +1363,14 @@ export const AuctionProvider = ({ children }) => {
     // transaction is the authority; use the cached server-adjusted clock and
     // record the phase transition atomically.
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+    // Capture when the manager actually clicked. A slow network must not turn an on-time
+    // choice into a rejection merely because the transaction reaches Firebase near expiry.
+    const decisionStartedAt = getSyncedTime();
     const result = await runTransactionRtdb(liveRef, (currentData) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
       if (!offer || offer.status !== 'pending') return;
-      const now = getSyncedTime();
+      const now = decisionStartedAt;
       if (now > Number(offer.expiresAt)) return;
       const isInitialDecision = offer.phase === 'initial_decision';
       const isMatchDecision = offer.phase === 'match_decision';
