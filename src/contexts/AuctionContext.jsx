@@ -1417,8 +1417,11 @@ export const AuctionProvider = ({ children }) => {
       if (!currentData || currentData.status !== 'processing_sale') return;
       const offer = currentData.retentionOffer;
       if (!offer || offer.status !== 'pending') return;
-      const now = decisionStartedAt;
-      if (now > Number(offer.expiresAt)) return;
+      const expiresAt = Number(offer.expiresAt);
+      // Allow a small network/UI scheduling grace for a click made at the countdown
+      // boundary. Store the decision at the deadline so settlement treats it as on-time.
+      if (decisionStartedAt > expiresAt + 1500) return;
+      const now = Math.min(decisionStartedAt, expiresAt);
       const isInitialDecision = offer.phase === 'initial_decision';
       const isMatchDecision = offer.phase === 'match_decision';
       if (isInitialDecision) {
