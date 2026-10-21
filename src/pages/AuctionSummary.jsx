@@ -499,7 +499,7 @@ const AuctionSummary = () => {
                                         transition={{ delay: pidx * 0.04 }}
                                         key={p.id} 
                                         className={squadViewMode === 'card' 
-                                          ? "bg-gradient-to-br from-[#1a1b26] to-[#0c0c0c] border border-white/10 p-4 sm:p-6 rounded-[2rem] flex flex-col justify-between group/p relative overflow-hidden transition-all hover:border-emerald-400/30 hover:shadow-2xl hover:shadow-emerald-400/10"
+                                          ? "bg-gradient-to-br from-[#1a1b26] to-[#08111f] border border-white/10 p-4 sm:p-6 rounded-[2rem] flex flex-col justify-between group/p relative overflow-hidden transition-all hover:border-emerald-400/30 hover:shadow-2xl hover:shadow-emerald-400/10"
                                           : "bg-white/5 border border-white/10 p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl flex items-center justify-between group/p hover:bg-white/10 transition-all"
                                         }
                                       >
