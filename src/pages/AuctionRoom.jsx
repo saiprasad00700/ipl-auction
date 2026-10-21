@@ -149,7 +149,7 @@ const AuctionRoom = () => {
    useEffect(() => {
       if (displayAuctionState?.status !== 'processing_sale' || retentionOffer?.status !== 'pending') return;
       const timer = setInterval(() => {
-         if (getSyncedTime() >= Number(retentionOffer.expiresAt)) {
+         if (getSyncedTime() >= Number(retentionOffer.expiresAt) + 1500) {
             clearInterval(timer);
             endPlayerAuction(id).catch(() => {});
          }
