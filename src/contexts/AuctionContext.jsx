@@ -934,6 +934,7 @@ export const AuctionProvider = ({ children }) => {
               hostName: sData.host_name,
               status: sData.status,
               auctionType: sData.auction_type || 'mega',
+              isPublic: sData.is_public !== false,
               squadLimit: sData.squad_limit || 25,
               overseasLimit: sData.overseas_limit || 8,
               players: sData.players || [],
