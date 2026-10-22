@@ -99,7 +99,9 @@ const VoiceChat = ({ roomId }) => {
     }
   };
 
-  // Automated auction bot identities must never join voice rooms or request microphone access.\n  const isBotUser = Boolean(user?.uid && /^(bot[_-]|auctionbot[_-])/i.test(user.uid));\n  if (!user || !roomId || isBotUser) return null;
+  // Automated auction bot identities must never join voice rooms or request microphone access.
+  const isBotUser = Boolean(user?.uid && /^(bot[_-]|auctionbot[_-])/i.test(user.uid));
+  if (!user || !roomId || isBotUser) return null;
   const canUseVoice = connected && participants.length > 0;
 
   return (
