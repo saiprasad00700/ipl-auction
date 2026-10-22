@@ -47,6 +47,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { TEAMS } from '../data/teams';
 import TextChat from '../components/TextChat';
+import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -1617,6 +1618,7 @@ const AuctionRoom = () => {
                            exit={{ opacity: 0, y: -10 }}
                            className="flex-1 flex flex-col min-h-0 h-full p-2"
                         >
+                           <VoiceChat roomId={id} />
                            <TextChat roomId={id} />
                         </motion.div>
                      )}
