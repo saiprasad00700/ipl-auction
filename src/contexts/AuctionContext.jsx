@@ -1035,13 +1035,10 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Update each permitted child path separately. Writing both fields at the
-    // parent /room path is denied by RTDB rules because non-hosts cannot write
-    // the whole room object, even though they may update these two child nodes.
-    await Promise.all([
-      updateRtdb(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers),
-      updateRtdb(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now())
-    ]);
+    // Non-host members are allowed to update the room's players child, but
+    // the deployed RTDB rules do not grant them write access to lastActivityAt.
+    // Update only players here so joining cannot fail on the activity timestamp.
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers);
 
     // Sync updated player count/list to Supabase so Public Lobbies show live player counts
     /*
