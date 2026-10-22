@@ -159,15 +159,29 @@ async function cleanupAbandonedRooms() {
         return;
       }
 
+      const supabaseHeaders = {
+        apikey: supabaseServiceKey,
+        Authorization: 'Bearer ' + supabaseServiceKey,
+        Prefer: 'return=minimal'
+      };
+
+      // Remove child team rows first in case the database enforces a foreign key.
+      const teamsQuery = new URL('/rest/v1/teams', supabaseUrl);
+      teamsQuery.searchParams.set('auction_id', 'eq.' + roomId);
+      const teamsResponse = await fetch(teamsQuery, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+      if (!teamsResponse.ok) {
+        console.warn('[Room cleanup] Supabase team cleanup failed for room', roomId, teamsResponse.status);
+        continue;
+      }
+
       const query = new URL('/rest/v1/auctions', supabaseUrl);
       query.searchParams.set('id', 'eq.' + roomId);
       const response = await fetch(query, {
         method: 'DELETE',
-        headers: {
-          apikey: supabaseServiceKey,
-          Authorization: 'Bearer ' + supabaseServiceKey,
-          Prefer: 'return=minimal'
-        }
+        headers: supabaseHeaders
       });
       if (!response.ok) {
         console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status);
