@@ -754,7 +754,7 @@ export const AuctionProvider = ({ children }) => {
                 }
               : p);
           });
-          if (!playersTx.committed && !playersTx.snapshot?.exists()) {
+          if (!playersTx.committed) {
             throw new Error('Could not synchronize team totals to the room roster.');
           }
         }
