@@ -46,12 +46,38 @@ const LandingPage = () => {
   const [publicRooms, setPublicRooms] = useState([]);
   const [lobbiesLoading, setLobbiesLoading] = useState(false);
 
-  // Public-room discovery remains disabled until the database has an explicit,
-  // tested read policy for public room metadata. Room-code joining still works.
-  const fetchPublicLobbies = () => {
-    setPublicRooms([]);
-    setLobbiesLoading(false);
+  // Read only the minimal public directory; private auction state stays under /auctions.
+  const fetchPublicLobbies = async () => {
+    setLobbiesLoading(true);
+    try {
+      const snapshot = await get(ref(rtdb, "publicRooms"));
+      const directory = snapshot.exists() ? snapshot.val() : {};
+      const rooms = Object.values(directory).filter((room) =>
+        room && typeof room.roomId === "string" &&
+        typeof room.hostName === "string" &&
+        (room.status === "waiting" || room.status === "active") &&
+        ["mega", "sprint11", "sprint5"].includes(room.auctionType)
+      ).map((room) => ({
+        roomId: room.roomId,
+        hostName: room.hostName,
+        status: room.status,
+        auctionType: room.auctionType,
+        players: 0
+      }));
+      setPublicRooms(rooms);
+    } catch (err) {
+      console.error("Could not load public auction rooms:", err);
+      setPublicRooms([]);
+    } finally {
+      setLobbiesLoading(false);
+    }
   };
+  useEffect(() => {
+    fetchPublicLobbies();
+    const refreshId = setInterval(fetchPublicLobbies, 15000);
+    return () => clearInterval(refreshId);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
 
