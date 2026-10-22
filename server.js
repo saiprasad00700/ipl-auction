@@ -191,7 +191,8 @@ async function cleanupAbandonedRooms() {
         headers: supabaseHeaders
       });
       if (!response.ok) {
-        console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status);
+        const detail = (await response.text()).slice(0, 500);
+        console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status, detail);
         continue;
       }
 
