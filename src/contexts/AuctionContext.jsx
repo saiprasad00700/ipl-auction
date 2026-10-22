@@ -690,16 +690,8 @@ export const AuctionProvider = ({ children }) => {
         && auctionState.highBidderTeamId === settledOffer.originalFranchiseId
         && (settledOffer.decision === 'match'
           || (settledOffer.phase === 'counter_bid' && settledOffer.decision === 'accept'));
-      if (successfullyRetainedPlayer) {
-        const acceptedTeamId = `${roomId}_${settledOffer.eligibleUserId}`;
-        const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
-        const acceptedTeamSnap = await get(acceptedTeamRef);
-        const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
-        await updateRtdb(acceptedTeamRef, {
-          retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-        });
-        // Final sale log below records the settled price and winning franchise.
-      }
+      // Retention-card deduction is applied inside the same team transaction as
+      // the squad entry below, so duplicate settlement cannot consume a second card.
 
       const isSold = auctionState.status === 'sold';
       const player = IPL_PLAYERS.find(p => p.id === auctionState.playerId);
@@ -736,7 +728,9 @@ export const AuctionProvider = ({ children }) => {
             teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
             budgetRemaining: Math.max(0, Number(tData.budgetRemaining ?? defaultBudget) - Number(auctionState.currentBid)),
             spent: Number(tData.spent || 0) + Number(auctionState.currentBid),
-            retentionCardsRemaining: Number(tData.retentionCardsRemaining ?? 2),
+            retentionCardsRemaining: successfullyRetainedPlayer
+              ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
+              : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
             squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid }]
           };
         });
