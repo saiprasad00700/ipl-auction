@@ -248,6 +248,14 @@ const LandingPage = () => {
       return;
     }
 
+    // Remove the public listing before deleting its source room.
+    // Private rooms have no listing; permission errors here are harmless.
+    try {
+      await remove(ref(rtdb, `publicRooms/${roomId}`));
+    } catch {
+      // Ignore missing or non-public directory entries.
+    }
+
     // 3. Remove room from Realtime Database if still sitting in waiting state
     try {
       await remove(ref(rtdb, `auctions/${roomId}`));
