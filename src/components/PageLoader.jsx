@@ -10,7 +10,7 @@ const GAME_TIPS = [
   "TIP: Playing solo? Hit Fill Bots in the lobby to let smart AI managers fill every empty franchise instantly.",
   "TIP: Public rooms are listed in the Join tab - jump into an open auction without needing a room code.",
   "TIP: Watch your purse. Reserve budget for your mandatory squad slots so you are never priced out late.",
-  "DID YOU KNOW: CrickAuction enforces the overseas quota automatically - max 8 in Mega, 4 in Classic, 2 in Sprint.",
+  "DID YOU KNOW: SSAUCTION enforces the overseas quota automatically - max 8 in Mega, 4 in Classic, 2 in Sprint.",
   "TIP: Toggle your room Public or Private before starting so only the right players can join.",
   "DID YOU KNOW: Every completed auction is saved to your History tab with full squads, spends, and ratings.",
   "TIP: No account needed - continue as a guest manager and start bidding in seconds."
@@ -162,7 +162,7 @@ const PageLoader = ({ isGame = false }) => {
               className="text-[20px] bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent"
               style={{ fontFamily: '"Geist Pixel", Silkscreen, VT323, "Geist Mono", monospace', fontWeight: 600 }}
             >
-              CrickAuction
+              SSAUCTION
             </span>
           </div>
         </div>
