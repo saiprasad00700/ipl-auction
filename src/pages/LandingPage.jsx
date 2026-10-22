@@ -37,7 +37,7 @@ const LandingPage = () => {
   const [selectedTeam, setSelectedTeam] = useState("MI");
   const [activeTab, setActiveTab] = useState("new");
   const [auctionType, setAuctionType] = useState("mega"); 
-  const [isPublicRoom] = useState(false);
+  const [isPublicRoom, setIsPublicRoom] = useState(true);
   const [roomCode, setRoomCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -659,6 +659,41 @@ const LandingPage = () => {
                         </span>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:p-4">
+                  <div className="mb-3 ml-1">
+                    <h2 className="text-[11px] sm:text-[13px] font-black uppercase text-gray-300 tracking-wider">
+                      Room visibility
+                    </h2>
+                    <p className="text-[9px] sm:text-[11px] text-gray-500 font-bold mt-1">
+                      Choose who can discover your auction.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPublicRoom(true)}
+                      aria-pressed={isPublicRoom}
+                      className={`rounded-xl border p-3 text-left transition-all ${isPublicRoom
+                        ? "border-emerald-300/40 bg-emerald-400/10"
+                        : "border-white/10 bg-[#0d1a2b] hover:border-white/20"}`}
+                    >
+                      <span className={`block text-[10px] sm:text-xs font-black uppercase ${isPublicRoom ? "text-emerald-300" : "text-gray-300"}`}>🌐 Public</span>
+                      <span className="block mt-1 text-[9px] sm:text-[10px] text-gray-500">Listed for everyone to discover.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPublicRoom(false)}
+                      aria-pressed={!isPublicRoom}
+                      className={`rounded-xl border p-3 text-left transition-all ${!isPublicRoom
+                        ? "border-amber-300/40 bg-amber-400/10"
+                        : "border-white/10 bg-[#0d1a2b] hover:border-white/20"}`}
+                    >
+                      <span className={`block text-[10px] sm:text-xs font-black uppercase ${!isPublicRoom ? "text-amber-300" : "text-gray-300"}`}>🔒 Private</span>
+                      <span className="block mt-1 text-[9px] sm:text-[10px] text-gray-500">Hidden from discovery; join by room code.</span>
+                    </button>
                   </div>
                 </div>
 
