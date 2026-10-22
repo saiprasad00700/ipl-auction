@@ -874,7 +874,6 @@ export const AuctionProvider = ({ children }) => {
       ]);
       const { RETENTION_CARDS_PER_FRANCHISE } = retentionRules;
       const { getPlayerOriginalFranchise } = playerFranchises;
-      const player = IPL_PLAYERS.find((p) => p.id === live.playerId);
       const teamDetails = TEAMS.find((t) => t.id === live.highBidderTeamId);
       const teamRef = ref(rtdb, `auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
       const defaultBudget = Number(roomData.settings?.budget ?? 120);
