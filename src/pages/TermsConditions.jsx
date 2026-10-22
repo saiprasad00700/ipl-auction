@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const TermsConditions = () => {
-  useDocumentTitle('Terms of Service | SSAUCTION', 'Terms of Service for SSAUCTION.');
+  useDocumentTitle('Terms of Service', 'Terms of Service for SSAUCTION.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
