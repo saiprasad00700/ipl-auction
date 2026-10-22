@@ -192,8 +192,18 @@ async function cleanupAbandonedRooms() {
       });
       if (!response.ok) {
         const detail = (await response.text()).slice(0, 500);
-        console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status, detail);
-        continue;
+        let errorBody = {};
+        try { errorBody = JSON.parse(detail); } catch {}
+        const tableMissing = response.status === 404 && errorBody.code === 'PGRST205';
+        if (tableMissing) {
+          // This project does not have the optional Supabase auctions table.
+          // Firebase Realtime Database is the actual room store, so continue
+          // with RTDB cleanup instead of blocking deletion on a missing index.
+          console.warn('[Room cleanup] Supabase auctions table is missing; removing room from Firebase only:', roomId);
+        } else {
+          console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status, detail);
+          continue;
+        }
       }
 
       await database.ref('auctions/' + roomId).remove();
