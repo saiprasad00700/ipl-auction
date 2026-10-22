@@ -15,8 +15,8 @@ const BuyMeACoffee = () => {
   const [selectedTier, setSelectedTier] = useState('coffee');
   const [customAmount, setCustomAmount] = useState('100');
 
-  const developerName = "Shaurya";
-  const upiId = "shaurya69889@oksbi";
+  const developerName = "NUKALA SAIPRASAD";
+  const upiId = "paymentkaroo1@ybl";
 
   const tiers = {
     coffee: {
