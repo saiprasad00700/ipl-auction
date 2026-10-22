@@ -161,6 +161,22 @@ export const AuctionProvider = ({ children }) => {
       }
     });
 
+
+    // Publish only minimal metadata for public rooms; never expose auction state.
+    const publicRoomRef = ref(rtdb, `publicRooms/${roomId}`);
+    if (isPublic) {
+      await set(publicRoomRef, {
+        roomId,
+        hostId: userId,
+        hostName: playerDetails.name || 'Auction host',
+        status: 'waiting',
+        auctionType,
+        createdAt: Date.now()
+      });
+    } else {
+      await remove(publicRoomRef);
+    }
+
     if (playerDetails.team) {
       const rtdbTeamRef = ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`);
       await set(rtdbTeamRef, {
@@ -334,6 +350,10 @@ export const AuctionProvider = ({ children }) => {
       status: 'active',
       playerOrder: randomizedIndices
     });
+    try {
+      const publicRoomSnap = await get(ref(rtdb, `publicRooms/${roomId}`));
+      if (publicRoomSnap.exists()) await updateRtdb(ref(rtdb, `publicRooms/${roomId}`), { status: 'active' });
+    } catch (directoryError) { console.warn('Public room status sync failed:', directoryError); }
 
     if (supabase) {
       try {
