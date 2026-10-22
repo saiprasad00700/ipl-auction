@@ -2098,6 +2098,134 @@ export const AuctionProvider = ({ children }) => {
   // multiple times during the same countdown cycle.
   const lastBotBidCycleRef = React.useRef(null);
 
+  // One host client coordinates bot RTM decisions, just like bot bidding.
+  // Bots only exercise retention cards for Marquee Set 1 players.
+  const lastBotRtmActionRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!currentAuction || !user || currentAuction.hostId !== user.uid) return;
+    const live = currentAuction.currentAuction;
+    const offer = live?.retentionOffer;
+    if (live?.status !== 'processing_sale' || offer?.status !== 'pending') return;
+
+    const phase = offer.phase;
+    const botId = phase === 'counter_bid' ? offer.buyerId : offer.eligibleUserId;
+    if (!String(botId || '').startsWith('bot_')) return;
+
+    const actionKey = `${currentAuction.id}:${phase}:${offer.expiresAt}:${botId}:${offer.counterBid ?? ''}`;
+    if (lastBotRtmActionRef.current === actionKey) return;
+    lastBotRtmActionRef.current = actionKey;
+
+    // Small reaction delay makes bot decisions feel natural. The transaction
+    // rechecks the live offer, so a stale timer cannot override a human decision.
+    setTimeout(async () => {
+      const roomId = currentAuction.id;
+      const liveRef = ref(rtdb, `auctions/${roomId}/live`);
+      const roomData = currentAuction;
+      const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
+      const botTeam = roomTeams.find((t) => t.userId === botId || t.id === `${roomId}_${botId}`);
+      if (!player || !botTeam) {
+        lastBotRtmActionRef.current = null;
+        return;
+      }
+
+      const squad = Array.isArray(botTeam.squad) ? botTeam.squad : [];
+      const budget = Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120);
+      const squadLimit = Number(roomData.squadLimit || 25);
+      const overseasLimit = Number(roomData.overseasLimit || 8);
+      const slotsLeft = squadLimit - squad.length;
+      const isOverseas = player.country && player.country !== 'IND';
+      const overseasCount = squad.reduce((count, item) => {
+        const id = typeof item === 'string' ? item : item?.id;
+        const info = IPL_PLAYERS.find((p) => p.id === id);
+        return count + (info && info.country !== 'IND' ? 1 : 0);
+      }, 0);
+      const roleCount = squad.reduce((count, item) => {
+        const id = typeof item === 'string' ? item : item?.id;
+        const info = IPL_PLAYERS.find((p) => p.id === id);
+        return count + (info?.role === player.role ? 1 : 0);
+      }, 0);
+      const maxPerRole = squadLimit <= 5 ? 3 : squadLimit <= 11 ? 5 : 9;
+      const canAddPlayer = slotsLeft > 0 && (!isOverseas || overseasCount < overseasLimit)
+        && (roleCount < maxPerRole || slotsLeft <= 1);
+      const isMarquee = player.set === 'Marquee Set 1';
+      const cardsRemaining = Number.isFinite(Number(botTeam.retentionCardsRemaining))
+        ? Number(botTeam.retentionCardsRemaining)
+        : 2;
+
+      try {
+        if (phase === 'initial_decision' && offer.eligibleUserId === botId) {
+          const shouldUseRtm = isMarquee && cardsRemaining > 0 && canAddPlayer
+            && budget >= Number(offer.bid || 0);
+          await runTransactionRtdb(liveRef, (current) => {
+            const currentOffer = current?.retentionOffer;
+            if (!current || current.status !== 'processing_sale' || !currentOffer
+              || currentOffer.status !== 'pending' || currentOffer.phase !== 'initial_decision'
+              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
+              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
+            currentOffer.decision = shouldUseRtm ? 'accept' : 'decline';
+            currentOffer.decidedBy = user.uid;
+            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
+            if (shouldUseRtm) {
+              currentOffer.rtmUsed = true;
+              currentOffer.phase = 'counter_bid';
+              currentOffer.expiresAt = getSyncedTime() + 15000;
+            }
+            return current;
+          });
+        } else if (phase === 'counter_bid' && offer.buyerId === botId) {
+          // Counter-prices are between ₹5 Cr and ₹20 Cr and must exceed the
+          // original bid. If the bid is already ₹20 Cr or the bot cannot afford
+          // the player / fit the squad, it lets the RTM timer expire.
+          const minCounter = Math.max(5, Math.ceil((Number(offer.bid || 0) + 0.25) * 4) / 4);
+          const maxCounter = Math.min(20, budget);
+          if (canAddPlayer && maxCounter >= minCounter) {
+            const steps = Math.floor((maxCounter - minCounter) * 4 + 0.0001);
+            const counterBid = Number((minCounter + Math.floor(Math.random() * (steps + 1)) / 4).toFixed(2));
+            await runTransactionRtdb(liveRef, (current) => {
+              const currentOffer = current?.retentionOffer;
+              if (!current || current.status !== 'processing_sale' || !currentOffer
+                || currentOffer.status !== 'pending' || currentOffer.phase !== 'counter_bid'
+                || currentOffer.buyerId !== botId || currentOffer.decision !== 'accept'
+                || getSyncedTime() > Number(currentOffer.expiresAt)
+                || counterBid <= Number(currentOffer.bid)
+                || counterBid > 20
+                || counterBid > Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
+              currentOffer.counterBid = counterBid;
+              currentOffer.phase = 'match_decision';
+              currentOffer.decision = null;
+              currentOffer.expiresAt = getSyncedTime() + 10000;
+              current.currentBid = counterBid;
+              return current;
+            });
+          }
+        } else if (phase === 'match_decision' && offer.eligibleUserId === botId
+          && offer.counterBid != null) {
+          const counterBid = Number(offer.counterBid);
+          const slotsAfter = Math.max(0, slotsLeft - 1);
+          const leavesEnoughPurse = slotsLeft <= 1 || (budget - counterBid) / slotsAfter >= 0.30;
+          const shouldMatch = isMarquee && cardsRemaining > 0 && canAddPlayer
+            && budget >= counterBid && leavesEnoughPurse;
+          await runTransactionRtdb(liveRef, (current) => {
+            const currentOffer = current?.retentionOffer;
+            if (!current || current.status !== 'processing_sale' || !currentOffer
+              || currentOffer.status !== 'pending' || currentOffer.phase !== 'match_decision'
+              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
+              || Number(currentOffer.counterBid) !== counterBid
+              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
+            currentOffer.decision = shouldMatch ? 'match' : 'decline_counter';
+            currentOffer.decidedBy = user.uid;
+            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
+            return current;
+          });
+        }
+      } catch (error) {
+        console.warn('[Bot RTM] Automated decision failed:', error);
+        lastBotRtmActionRef.current = null;
+      }
+    }, 350 + Math.random() * 650);
+  }, [currentAuction, user, roomTeams, getSyncedTime]);
+
   // Host Bidding Bot Loop Effect
   useEffect(() => {
     if (!currentAuction || !user || currentAuction.hostId !== user.uid) return;
