@@ -700,7 +700,6 @@ export const AuctionProvider = ({ children }) => {
       const playerNameStr = player?.name || 'Player';
       const logText = `${playerNameStr} ${isSold ? `SOLD to ${teamDetails?.name || auctionState.highBidderName} for \u20b9${auctionState.currentBid} Cr` : 'UNSOLD'}`;
 
-      let updatedPlayers = null;
       let teamDocId = null;
       let newTeamData = null;
       let teamSaleApplied = false;
@@ -739,30 +738,34 @@ export const AuctionProvider = ({ children }) => {
         teamSaleApplied = Boolean(teamTx.committed);
         newTeamData = finalTeamData;
 
-        // Only update the room's aggregate counters when this browser actually
-        // committed the new squad entry. Retried/concurrent settlement won't double count.
-        if (teamSaleApplied && rtdbRoomSnap.exists()) {
-          updatedPlayers = (roomData.players || []).map((p) => p.id === auctionState.highBidderId
-            ? {
-                ...p,
-                spent: Number(p.spent || 0) + Number(auctionState.currentBid),
-                squadCount: Number(p.squadCount || 0) + 1
-              }
-            : p);
+        // Reconcile room-level counters from the committed team record, not by
+        // incrementing a stale room snapshot. This also repairs the counters if a
+        // previous client committed the squad transaction but disconnected before
+        // updating room.players.
+        if (finalTeamData) {
+          const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
+          const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
+            if (!Array.isArray(currentPlayers)) return;
+            return currentPlayers.map((p) => p.id === auctionState.highBidderId
+              ? {
+                  ...p,
+                  spent: Number(finalTeamData.spent || 0),
+                  squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0
+                }
+              : p);
+          });
+          if (!playersTx.committed && !playersTx.snapshot?.exists()) {
+            throw new Error('Could not synchronize team totals to the room roster.');
+          }
         }
       }
 
       // Do not advance the lot until required state writes have completed. A failed
       // write throws into the recovery path instead of being silently swallowed.
       const syncPromises = [];
-      if (updatedPlayers) {
-        syncPromises.push(updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers }));
-      }
-      if (isSold && !teamSaleApplied) {
-        // Another connected browser already recorded this player in the squad.
-        // Treat that as an idempotent retry, not a second sale.
-      }
-      syncPromises.push(push(ref(rtdb, `auctions/${roomId}/messages`), {
+      // A concurrent/recovery client that finds the player already in the squad
+      // must not emit a second sale message.
+      if (!isSold || teamSaleApplied) syncPromises.push(push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system',
         userName: 'System',
         text: logText,
