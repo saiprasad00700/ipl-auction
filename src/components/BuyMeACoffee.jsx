@@ -12,18 +12,18 @@ import {
 const BuyMeACoffee = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [selectedTier, setSelectedTier] = useState('coffee');
-  const [customAmount, setCustomAmount] = useState('100');
+  const [selectedTier, setSelectedTier] = useState('biriyani');
+  const [customAmount, setCustomAmount] = useState('50');
 
   const developerName = "NUKALA SAIPRASAD";
   const upiId = "paymentkaroo1@ybl";
 
   const tiers = {
-    coffee: {
-      name: "Coffee",
-      amountINR: 150,
-      icon: <Coffee className="w-3.5 h-3.5 text-[#ff5500]" />,
-      tagline: "Late-night coding fuel ☕"
+    biriyani: {
+      name: "Biriyani",
+      amountINR: 100,
+      icon: <Pizza className="w-3.5 h-3.5 text-[#ff5500]" />,
+      tagline: "Treat the developer to biriyani 🍛"
     },
   };
 
