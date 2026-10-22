@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const PrivacyPolicy = () => {
-  useDocumentTitle('Privacy Policy | SSAUCTION', 'Privacy Policy for SSAUCTION.');
+  useDocumentTitle('Privacy Policy', 'Privacy Policy for SSAUCTION.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
