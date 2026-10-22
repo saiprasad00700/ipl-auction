@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 const VoiceChat = ({ roomId }) => {
   const { user } = useAuth();
   const roomRef = useRef(null);
+  const lastVoiceActivityPingRef = useRef(0);
   const audioElementsRef = useRef(new Map());
   const [connected, setConnected] = useState(false);
   const [participants, setParticipants] = useState([]);
@@ -42,6 +43,18 @@ const VoiceChat = ({ roomId }) => {
         room = new Room({ adaptiveStream: true, dynacast: true });
         roomRef.current = room;
         const refresh = () => syncParticipants(room);
+        room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+          // Record real speaking activity, not merely an open voice connection.
+          if (!speakers.some((speaker) => speaker.identity === room.localParticipant.identity)) return;
+          const now = Date.now();
+          if (now - lastVoiceActivityPingRef.current < 10000) return;
+          lastVoiceActivityPingRef.current = now;
+          void user.getIdToken().then((token) => fetch('/api/room-activity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({ roomId })
+          })).catch(() => {});
+        });
         room.on(RoomEvent.ParticipantConnected, refresh);
         room.on(RoomEvent.ParticipantDisconnected, refresh);
         room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
