@@ -690,16 +690,8 @@ export const AuctionProvider = ({ children }) => {
         && auctionState.highBidderTeamId === settledOffer.originalFranchiseId
         && (settledOffer.decision === 'match'
           || (settledOffer.phase === 'counter_bid' && settledOffer.decision === 'accept'));
-      if (successfullyRetainedPlayer) {
-        const acceptedTeamId = `${roomId}_${settledOffer.eligibleUserId}`;
-        const acceptedTeamRef = ref(rtdb, `auctions/${roomId}/teams/${acceptedTeamId}`);
-        const acceptedTeamSnap = await get(acceptedTeamRef);
-        const acceptedTeam = acceptedTeamSnap.exists() ? acceptedTeamSnap.val() : {};
-        await updateRtdb(acceptedTeamRef, {
-          retentionCardsRemaining: Math.max(0, Number(acceptedTeam.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-        });
-        // Final sale log below records the settled price and winning franchise.
-      }
+      // Retention-card deduction is applied inside the same team transaction as
+      // the squad entry below, so duplicate settlement cannot consume a second card.
 
       const isSold = auctionState.status === 'sold';
       const player = IPL_PLAYERS.find(p => p.id === auctionState.playerId);
@@ -708,75 +700,72 @@ export const AuctionProvider = ({ children }) => {
       const playerNameStr = player?.name || 'Player';
       const logText = `${playerNameStr} ${isSold ? `SOLD to ${teamDetails?.name || auctionState.highBidderName} for \u20b9${auctionState.currentBid} Cr` : 'UNSOLD'}`;
 
-      let updatedPlayers = null;
       let teamDocId = null;
       let newTeamData = null;
+      let teamSaleApplied = false;
 
-      // ── Bug Fix 5: Single get(room) call — eliminates TOCTOU window and halves RTDB reads ──
-      // Fetch room data once up front; reuse for both player-update and player-order logic.
+      // Fetch room data once for budget defaults and player ordering.
       const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
       const roomData = rtdbRoomSnap.exists() ? rtdbRoomSnap.val() : {};
 
       if (isSold) {
         teamDocId = `${roomId}_${auctionState.highBidderId}`;
-
-        // Update room.players spent/squadCount from the single snapshot already fetched
-        if (rtdbRoomSnap.exists()) {
-          updatedPlayers = (roomData.players || []).map(p => {
-            if (p.id === auctionState.highBidderId) {
-              return {
-                ...p,
-                spent: (p.spent || 0) + auctionState.currentBid,
-                squadCount: (p.squadCount || 0) + 1
-              };
-            }
-            return p;
-          });
-        }
-
-        // Get current team data from RTDB to update RTDB team node
-        const rtdbTeamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${teamDocId}`));
-        const tData = rtdbTeamSnap.exists() ? rtdbTeamSnap.val() : {};
+        const teamRef = ref(rtdb, `auctions/${roomId}/teams/${teamDocId}`);
         const defaultBudget = roomData.settings?.budget || 120.0;
-        newTeamData = {
-          auctionId: roomId,
-          userId: auctionState.highBidderId,
-          teamId: auctionState.highBidderTeamId || tData.teamId || '',
-          teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
-          budgetRemaining: Math.max(0, (tData.budgetRemaining ?? defaultBudget) - auctionState.currentBid),
-          spent: (tData.spent || 0) + auctionState.currentBid,
-          retentionCardsRemaining: Number(tData.retentionCardsRemaining ?? 2),
-          squad: [...(tData.squad || []), { id: auctionState.playerId, bid: auctionState.currentBid }]
-        };
 
-        // Real-time incremental sync to Supabase teams table on every player sale
-        /*
-        if (supabase) {
-          try {
-            await supabase.from('teams').upsert({
-              id: teamDocId,
-              auction_id: roomId,
-              user_id: auctionState.highBidderId,
-              team_id: auctionState.highBidderTeamId || tData.teamId || '',
-              team_name: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
-              budget_remaining: newTeamData.budgetRemaining,
-              spent: newTeamData.spent,
-              squad: newTeamData.squad
-            });
-          } catch (sErr) {}
+        // A transaction makes the squad append and budget deduction atomic. If
+        // multiple browsers settle the same lot, only the first can apply it.
+        const teamTx = await runTransactionRtdb(teamRef, (current) => {
+          const tData = current || {};
+          const squad = Array.isArray(tData.squad) ? tData.squad : [];
+          if (squad.some((p) => p?.id === auctionState.playerId)) return;
+          return {
+            ...tData,
+            auctionId: roomId,
+            userId: auctionState.highBidderId,
+            teamId: auctionState.highBidderTeamId || tData.teamId || '',
+            teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
+            budgetRemaining: Math.max(0, Number(tData.budgetRemaining ?? defaultBudget) - Number(auctionState.currentBid)),
+            spent: Number(tData.spent || 0) + Number(auctionState.currentBid),
+            retentionCardsRemaining: successfullyRetainedPlayer
+              ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
+              : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
+            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid }]
+          };
+        });
+
+        const finalTeamData = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
+        teamSaleApplied = Boolean(teamTx.committed);
+        newTeamData = finalTeamData;
+
+        // Reconcile room-level counters from the committed team record, not by
+        // incrementing a stale room snapshot. This also repairs the counters if a
+        // previous client committed the squad transaction but disconnected before
+        // updating room.players.
+        if (finalTeamData) {
+          const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
+          const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
+            if (!Array.isArray(currentPlayers)) return;
+            return currentPlayers.map((p) => p.id === auctionState.highBidderId
+              ? {
+                  ...p,
+                  spent: Number(finalTeamData.spent || 0),
+                  squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0
+                }
+              : p);
+          });
+          if (!playersTx.committed) {
+            throw new Error('Could not synchronize team totals to the room roster.');
+          }
         }
-        */
       }
 
-      // Sync live state to RTDB in parallel (0 Firestore cost!)
+      // Do not advance the lot until required state writes have completed. A failed
+      // write throws into the recovery path instead of being silently swallowed.
       const syncPromises = [];
-      if (updatedPlayers) {
-        syncPromises.push(updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers }));
-      }
-      if (newTeamData && teamDocId) {
-        syncPromises.push(updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${teamDocId}`), newTeamData));
-      }
-      syncPromises.push(push(ref(rtdb, `auctions/${roomId}/messages`), {
+      // A concurrent/recovery client that finds the player already in the squad
+      // must not emit a second sale message.
+      if (!isSold || teamSaleApplied) syncPromises.push(push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system',
         userName: 'System',
         text: logText,
@@ -790,13 +779,7 @@ export const AuctionProvider = ({ children }) => {
         } : null,
         timestamp: serverTimestampRtdb()
       }));
-      // Do not let a slow auxiliary RTDB write (team/room snapshot or activity log)
-      // block the auction's player-transition timer indefinitely. These writes are
-      // already in flight; wait briefly for them, then let the auction continue.
-      await Promise.race([
-        Promise.allSettled(syncPromises),
-        new Promise((resolve) => setTimeout(resolve, 1500))
-      ]);
+      await Promise.all(syncPromises);
 
       const waitTime = isSold ? 5000 : 2000;
 
@@ -880,6 +863,63 @@ export const AuctionProvider = ({ children }) => {
     if (!roomSnap.exists()) return;
     const roomData = roomSnap.val();
     if (roomData.status !== 'active') return;
+
+    // Repair the sale's durable side effects before advancing the live lot.
+    // This covers a coordinator disconnect after live.status became "sold" but
+    // before the team squad/budget or room roster counters finished syncing.
+    if (live.status === 'sold' && live.highBidderId && live.playerId) {
+      const [retentionRules, playerFranchises] = await Promise.all([
+        import('../lib/auctionWinnerRules'),
+        import('../data/playerOriginalFranchises')
+      ]);
+      const { RETENTION_CARDS_PER_FRANCHISE } = retentionRules;
+      const { getPlayerOriginalFranchise } = playerFranchises;
+      const teamDetails = TEAMS.find((t) => t.id === live.highBidderTeamId);
+      const teamRef = ref(rtdb, `auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
+      const defaultBudget = Number(roomData.settings?.budget ?? 120);
+      const offer = live.retentionOffer;
+      const successfullyRetainedPlayer = offer?.status === 'accepted'
+        && live.highBidderTeamId === offer.originalFranchiseId
+        && (offer.decision === 'match'
+          || (offer.phase === 'counter_bid' && offer.decision === 'accept'));
+
+      const teamTx = await runTransactionRtdb(teamRef, (current) => {
+        const team = current || {};
+        const squad = Array.isArray(team.squad) ? team.squad : [];
+        // A player in the squad means another client already applied the charge.
+        if (squad.some((p) => p?.id === live.playerId)) return;
+        return {
+          ...team,
+          auctionId: roomId,
+          userId: live.highBidderId,
+          teamId: live.highBidderTeamId || team.teamId || getPlayerOriginalFranchise(live.playerId) || '',
+          teamName: teamDetails?.name || live.highBidderName || team.teamName || 'Unknown',
+          budgetRemaining: Math.max(0, Number(team.budgetRemaining ?? defaultBudget) - Number(live.currentBid || 0)),
+          spent: Number(team.spent || 0) + Number(live.currentBid || 0),
+          retentionCardsRemaining: successfullyRetainedPlayer
+            ? Math.max(0, Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
+            : Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
+          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0) }]
+        };
+      });
+      const finalTeam = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
+      if (!finalTeam) throw new Error('Sale recovery could not find or create the winning team record.');
+
+      const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
+      const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
+        if (!Array.isArray(currentPlayers)) return;
+        return currentPlayers.map((p) => p.id === live.highBidderId
+          ? {
+              ...p,
+              spent: Number(finalTeam.spent || 0),
+              squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0
+            }
+          : p);
+      });
+      if (!playersTx.committed) {
+        throw new Error('Sale recovery could not synchronize the room roster totals.');
+      }
+    }
 
     let playerOrder = roomData.playerOrder;
     if (!playerOrder) {
