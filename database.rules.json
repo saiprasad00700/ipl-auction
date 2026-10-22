@@ -69,6 +69,12 @@
           // authenticated users. (RTDB rules cannot assert "is an array".)
           "players": { ".write": "auth != null" },
 
+          // Activity heartbeat used by the scheduled 30-minute inactivity cleanup.
+          "lastActivityAt": {
+            ".write": "auth != null",
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          },
+
           // Lot lifecycle. The host-fallback that closes an expired lot can run
           // on any client, so this cannot be host-only.
           "status": {
