@@ -1514,7 +1514,7 @@ const AuctionRoom = () => {
                         }`}
                   >
                      <MessageSquare size={14} />
-                     <span className="text-[10px] uppercase tracking-widest">Chat</span>
+                     <span className="text-[10px] uppercase tracking-widest">Voice Chat</span>
                   </button>
                </div>
 
