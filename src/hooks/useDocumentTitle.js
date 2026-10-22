@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 export function useDocumentTitle(title, description) {
   useEffect(() => {
     if (title) {
-      document.title = title
+      document.title = title.toUpperCase().startsWith('SSAUCTION') ? title : `SSAUCTION | ${title}`
     }
     if (description) {
       let metaDescription = document.querySelector('meta[name="description"]')

@@ -31,7 +31,7 @@ import useDocumentTitle from "../hooks/useDocumentTitle";
 
 const LandingPage = () => {
   useDocumentTitle(
-    "IPL Auction Simulator & Game | Live IPL Mega Auction 2026",
+    "SSAUCTION | IPL Auction Simulator & Game",
     "Play the ultimate multiplayer IPL Auction Simulator online. Host live IPL Mega Auctions with friends, manage purse budgets, bid on top T20 players, and build championship squads!",
   );
   const [selectedTeam, setSelectedTeam] = useState("MI");
@@ -339,6 +339,7 @@ const LandingPage = () => {
         </div>
 
         <div className="text-center mb-6 sm:mb-8 z-10 relative w-full max-w-5xl px-2 sm:px-4 mt-8 sm:mt-10">
+          <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 mb-4 text-sm sm:text-base font-black tracking-[0.22em] text-white shadow-lg shadow-emerald-500/10">SSAUCTION</div>
           <h1 className="sr-only">
             IPL Auction Simulator & Game - Live IPL Mega Auction 2026
           </h1>
