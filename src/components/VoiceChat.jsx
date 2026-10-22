@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,10 +51,10 @@ const VoiceChat = ({ roomId }) => {
           document.body.appendChild(audio);
           audioElementsRef.current.set(participant.identity + ':' + track.sid, audio);
         });
-        room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
           track.detach().forEach((element) => element.remove());
           for (const [key, element] of audioElementsRef.current) {
-            if (element === track.attach()) audioElementsRef.current.delete(key);
+            if (key === participant.identity + ':' + track.sid) audioElementsRef.current.delete(key);
           }
         });
         room.on(RoomEvent.Disconnected, () => { setConnected(false); setMicOn(false); });
@@ -95,7 +95,7 @@ const VoiceChat = ({ roomId }) => {
     }
   };
 
-  if (!user || user.isAnonymous || !roomId) return null;
+  if (!user || !roomId) return null;
   const canUseVoice = connected && participants.length > 0;
 
   return (
