@@ -7,7 +7,7 @@ import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const GameGuide = () => {
-  useDocumentTitle('Rulebook | SSAUCTION', 'Comprehensive guide on how to play SSAUCTION.');
+  useDocumentTitle('Rulebook', 'Comprehensive guide on how to play SSAUCTION.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
