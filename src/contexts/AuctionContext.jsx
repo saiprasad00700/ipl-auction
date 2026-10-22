@@ -1869,6 +1869,9 @@ export const AuctionProvider = ({ children }) => {
         winnerAnalysisModel: analysisModel,
         winnerAnalysisCompletedAt: getSyncedTime()
       });
+      // Completed auctions should no longer appear in the public lobby.
+      try { await remove(ref(rtdb, `publicRooms/${roomId}`)); }
+      catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: disqualifiedFranchises.length
