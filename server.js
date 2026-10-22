@@ -237,6 +237,32 @@ function startRoomCleanup() {
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (pathname === '/health') return sendJson(res, 200, { ok: true });
+  if (pathname === '/api/room-activity') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const roomSnapshot = await roomRef.get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
+      const isHost = roomData.hostId === decoded.uid;
+      const isPlayer = roster.some((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
+      if (!isHost && !isPlayer) return sendJson(res, 403, { error: 'You are not a member of this room' });
+      await roomRef.update({ lastActivityAt: Date.now() });
+      return sendJson(res, 200, { ok: true });
+    } catch (error) {
+      console.warn('[Room activity] Failed to record activity:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not record room activity' });
+    }
+  }
   if (pathname === '/api/voice-token') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
