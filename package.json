@@ -23,7 +23,8 @@
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2",
     "firebase-admin": "^13.4.0",
-    "livekit-server-sdk": "^2.13.3"
+    "livekit-server-sdk": "^2.13.3",
+    "livekit-client": "^2.13.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
