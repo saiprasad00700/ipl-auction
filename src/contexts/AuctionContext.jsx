@@ -347,7 +347,8 @@ export const AuctionProvider = ({ children }) => {
     // Store playerOrder in room node (matching RTDB rules) and attempt subnode update
     await updateRtdb(rtdbRoomRef, {
       status: 'active',
-      playerOrder: randomizedIndices
+      playerOrder: randomizedIndices,
+      lastActivityAt: Date.now()
     });
     try {
       const publicRoomSnap = await get(ref(rtdb, `publicRooms/${roomId}`));
