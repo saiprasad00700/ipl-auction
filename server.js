@@ -93,9 +93,51 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
+// LiveKit voice-room token endpoint. Requires server-only Firebase Admin credentials.
+let firebaseAdminAuthPromise;
+async function getFirebaseAdminAuth() {
+  if (!firebaseAdminAuthPromise) firebaseAdminAuthPromise = (async () => {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!raw) throw new Error('Voice chat authentication is not configured');
+    const { initializeApp, cert, getApps } = await import('firebase-admin/app');
+    const { getAuth } = await import('firebase-admin/auth');
+    const serviceAccount = JSON.parse(raw);
+    const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
+    return getAuth(app);
+  })();
+  return firebaseAdminAuthPromise;
+}
+
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (pathname === '/health') return sendJson(res, 200, { ok: true });
+  if (pathname === '/api/voice-token') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in to use voice chat' });
+      const auth = await getFirebaseAdminAuth();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const participantName = String(body.participantName || 'Player').trim().slice(0, 60);
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+      if (!process.env.LIVEKIT_URL || !process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET) {
+        return sendJson(res, 503, { error: 'Voice chat is not configured on the server' });
+      }
+      const { AccessToken } = await import('livekit-server-sdk');
+      const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
+        identity: decoded.uid,
+        name: participantName,
+        ttl: '1h'
+      });
+      token.addGrant({ roomJoin: true, room: 'auction-' + roomId, canPublish: true, canSubscribe: true });
+      return sendJson(res, 200, { token: await token.toJwt(), url: process.env.LIVEKIT_URL, identity: decoded.uid });
+    } catch (error) {
+      console.error('[Voice] Token request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not start voice chat. Check server configuration.' });
+    }
+  }
   if (pathname === '/api/analyze-winner') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
