@@ -106,11 +106,6 @@ const LandingPage = () => {
     }
   }, []);
 
-  // Do not query public room data until Supabase access policies are verified.
-  useEffect(() => {
-    setPublicRooms([]);
-    setLobbiesLoading(false);
-  }, []);
 
   // Fetch auction history directly from Supabase
   // Fetch auction history directly from Supabase
