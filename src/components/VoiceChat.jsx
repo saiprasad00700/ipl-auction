@@ -12,6 +12,8 @@ const VoiceChat = ({ roomId }) => {
   const [micOn, setMicOn] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
   const [volumes, setVolumes] = useState({});
+  const speakerOnRef = useRef(true);
+  const volumesRef = useRef({});
   const [error, setError] = useState('');
 
   const syncParticipants = (room) => {
@@ -47,7 +49,7 @@ const VoiceChat = ({ roomId }) => {
           const audio = track.attach();
           audio.autoplay = true;
           audio.dataset.voiceParticipant = participant.identity;
-          audio.volume = speakerOn ? (volumes[participant.identity] ?? 1) : 0;
+          audio.volume = speakerOnRef.current ? (volumesRef.current[participant.identity] ?? 1) : 0;
           document.body.appendChild(audio);
           audioElementsRef.current.set(participant.identity + ':' + track.sid, audio);
         });
@@ -77,6 +79,8 @@ const VoiceChat = ({ roomId }) => {
   }, [roomId, user]);
 
   useEffect(() => {
+    speakerOnRef.current = speakerOn;
+    volumesRef.current = volumes;
     for (const [key, audio] of audioElementsRef.current) {
       const participantId = key.split(':')[0];
       audio.volume = speakerOn ? (volumes[participantId] ?? 1) : 0;
