@@ -21,6 +21,22 @@
     ".read": false,
     ".write": false,
 
+    "publicRooms": {
+      // This node contains only minimal directory metadata, never live auction data.
+      ".read": true,
+      ".write": false,
+      "$roomId": {
+        ".write": "auth != null && root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid && root.child('auctions').child($roomId).child('room/isPublic').val() == true",
+        ".validate": "!newData.exists() || (newData.hasChildren(['roomId', 'hostId', 'hostName', 'status', 'auctionType']) && newData.child('roomId').val() == $roomId && newData.child('hostId').val() == root.child('auctions').child($roomId).child('room/hostId').val() && newData.child('hostName').isString() && (newData.child('status').val() == 'waiting' || newData.child('status').val() == 'active'))",
+        "roomId": { ".validate": "newData.isString()" },
+        "hostId": { ".validate": "newData.isString()" },
+        "hostName": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "status": { ".validate": "newData.val() == 'waiting' || newData.val() == 'active'" },
+        "auctionType": { ".validate": "newData.val() == 'mega' || newData.val() == 'sprint11' || newData.val() == 'sprint5'" },
+        "createdAt": { ".validate": "newData.isNumber()" }
+      }
+    },
+
     "auctions": {
       // Do not allow listing/enumerating rooms. A room is read by its id only.
       ".read": false,

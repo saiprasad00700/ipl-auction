@@ -37,7 +37,7 @@ const LandingPage = () => {
   const [selectedTeam, setSelectedTeam] = useState("MI");
   const [activeTab, setActiveTab] = useState("new");
   const [auctionType, setAuctionType] = useState("mega"); 
-  const [isPublicRoom] = useState(false);
+  const [isPublicRoom, setIsPublicRoom] = useState(true);
   const [roomCode, setRoomCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -46,11 +46,38 @@ const LandingPage = () => {
   const [publicRooms, setPublicRooms] = useState([]);
   const [lobbiesLoading, setLobbiesLoading] = useState(false);
 
-  // Public-room discovery is disabled; keep the legacy refresh button safe.
-  const fetchPublicLobbies = () => {
-    setPublicRooms([]);
-    setLobbiesLoading(false);
+  // Read only the minimal public directory; private auction state stays under /auctions.
+  const fetchPublicLobbies = async () => {
+    setLobbiesLoading(true);
+    try {
+      const snapshot = await get(ref(rtdb, "publicRooms"));
+      const directory = snapshot.exists() ? snapshot.val() : {};
+      const rooms = Object.values(directory).filter((room) =>
+        room && typeof room.roomId === "string" &&
+        typeof room.hostName === "string" &&
+        (room.status === "waiting" || room.status === "active") &&
+        ["mega", "sprint11", "sprint5"].includes(room.auctionType)
+      ).map((room) => ({
+        roomId: room.roomId,
+        hostName: room.hostName,
+        status: room.status,
+        auctionType: room.auctionType,
+        players: 0
+      }));
+      setPublicRooms(rooms);
+    } catch (err) {
+      console.error("Could not load public auction rooms:", err);
+      setPublicRooms([]);
+    } finally {
+      setLobbiesLoading(false);
+    }
   };
+  useEffect(() => {
+    fetchPublicLobbies();
+    const refreshId = setInterval(fetchPublicLobbies, 15000);
+    return () => clearInterval(refreshId);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
 
@@ -79,8 +106,7 @@ const LandingPage = () => {
     }
   }, []);
 
-  // Public-room discovery is intentionally disabled. Rooms are joined by invite link/code,
-  // so do not read the entire Firebase auctions tree (which is not publicly readable).
+  // Do not query public room data until Supabase access policies are verified.
   useEffect(() => {
     setPublicRooms([]);
     setLobbiesLoading(false);
@@ -662,6 +688,41 @@ const LandingPage = () => {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:p-4">
+                  <div className="mb-3 ml-1">
+                    <h2 className="text-[11px] sm:text-[13px] font-black uppercase text-gray-300 tracking-wider">
+                      Room visibility
+                    </h2>
+                    <p className="text-[9px] sm:text-[11px] text-gray-500 font-bold mt-1">
+                      Choose who can discover your auction.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPublicRoom(true)}
+                      aria-pressed={isPublicRoom}
+                      className={`rounded-xl border p-3 text-left transition-all ${isPublicRoom
+                        ? "border-emerald-300/40 bg-emerald-400/10"
+                        : "border-white/10 bg-[#0d1a2b] hover:border-white/20"}`}
+                    >
+                      <span className={`block text-[10px] sm:text-xs font-black uppercase ${isPublicRoom ? "text-emerald-300" : "text-gray-300"}`}>🌐 Public</span>
+                      <span className="block mt-1 text-[9px] sm:text-[10px] text-gray-500">Listed for everyone to discover.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPublicRoom(false)}
+                      aria-pressed={!isPublicRoom}
+                      className={`rounded-xl border p-3 text-left transition-all ${!isPublicRoom
+                        ? "border-amber-300/40 bg-amber-400/10"
+                        : "border-white/10 bg-[#0d1a2b] hover:border-white/20"}`}
+                    >
+                      <span className={`block text-[10px] sm:text-xs font-black uppercase ${!isPublicRoom ? "text-amber-300" : "text-gray-300"}`}>🔒 Private</span>
+                      <span className="block mt-1 text-[9px] sm:text-[10px] text-gray-500">Hidden from discovery; join by room code.</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <div className="mb-2.5 sm:mb-4 ml-1">
                     <h2 className="text-[11px] sm:text-[13px] font-black uppercase text-gray-400 tracking-wider">
@@ -859,6 +920,34 @@ const LandingPage = () => {
                   </button>
                 </form>
 
+                <section className="mt-5 border-t border-white/10 pt-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-200">Public auction rooms</h3>
+                      <p className="mt-1 text-[9px] text-gray-500">Private rooms are not listed here.</p>
+                    </div>
+                    <button type="button" onClick={fetchPublicLobbies} disabled={lobbiesLoading} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[9px] font-black uppercase text-emerald-300 disabled:opacity-50">
+                      <RefreshCw size={12} className={lobbiesLoading ? "animate-spin" : ""}/> Refresh
+                    </button>
+                  </div>
+                  <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search room code or host" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-emerald-400/40"/>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {lobbiesLoading && publicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">Loading public rooms…</p>
+                    ) : filteredPublicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">No public rooms available. Create one or join using a room code.</p>
+                    ) : filteredPublicRooms.map((room) => (
+                      <div key={room.roomId} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[10px] font-black text-white">{room.hostName}'s Room</p>
+                          <p className="mt-1 text-[9px] text-gray-400"><span className={room.status === "active" ? "text-emerald-300" : "text-blue-300"}>{room.status === "active" ? "LIVE" : "WAITING"}</span>{" · "}{room.auctionType === "sprint11" ? "Classic" : room.auctionType === "sprint5" ? "Sprint" : "Mega"}</p>
+                          <p className="mt-1 font-mono text-[9px] tracking-widest text-emerald-300">{room.roomId}</p>
+                        </div>
+                        <button type="button" onClick={() => setRoomCode(room.roomId)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[9px] font-black uppercase text-black">Use code</button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
               </div>
             )}

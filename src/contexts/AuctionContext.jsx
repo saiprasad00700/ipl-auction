@@ -161,6 +161,22 @@ export const AuctionProvider = ({ children }) => {
       }
     });
 
+
+    // Publish only minimal metadata for public rooms; never expose auction state.
+    const publicRoomRef = ref(rtdb, `publicRooms/${roomId}`);
+    if (isPublic) {
+      await set(publicRoomRef, {
+        roomId,
+        hostId: userId,
+        hostName: playerDetails.name || 'Auction host',
+        status: 'waiting',
+        auctionType,
+        createdAt: Date.now()
+      });
+    } else {
+      await remove(publicRoomRef);
+    }
+
     if (playerDetails.team) {
       const rtdbTeamRef = ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`);
       await set(rtdbTeamRef, {
@@ -334,6 +350,10 @@ export const AuctionProvider = ({ children }) => {
       status: 'active',
       playerOrder: randomizedIndices
     });
+    try {
+      const publicRoomSnap = await get(ref(rtdb, `publicRooms/${roomId}`));
+      if (publicRoomSnap.exists()) await updateRtdb(ref(rtdb, `publicRooms/${roomId}`), { status: 'active' });
+    } catch (directoryError) { console.warn('Public room status sync failed:', directoryError); }
 
     if (supabase) {
       try {
@@ -934,6 +954,7 @@ export const AuctionProvider = ({ children }) => {
               hostName: sData.host_name,
               status: sData.status,
               auctionType: sData.auction_type || 'mega',
+              isPublic: sData.is_public !== false,
               squadLimit: sData.squad_limit || 25,
               overseasLimit: sData.overseas_limit || 8,
               players: sData.players || [],
@@ -1848,6 +1869,9 @@ export const AuctionProvider = ({ children }) => {
         winnerAnalysisModel: analysisModel,
         winnerAnalysisCompletedAt: getSyncedTime()
       });
+      // Completed auctions should no longer appear in the public lobby.
+      try { await remove(ref(rtdb, `publicRooms/${roomId}`)); }
+      catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: disqualifiedFranchises.length
