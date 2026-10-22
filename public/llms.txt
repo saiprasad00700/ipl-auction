@@ -1,15 +1,15 @@
-# CrickAuction
+# SSAUCTION
 
 > The ultimate multiplayer IPL auction simulator. Host live IPL mega auctions with friends in real-time, choose your franchise, bid strategically, and build a championship squad.
 
-CrickAuction is a free, real-time web application for Indian Premier League (IPL) fantasy auction gameplay. Players join rooms, manage a purse budget, bid on real IPL players, and compete to assemble the best T20 squad.
+SSAUCTION is a free, real-time web application for Indian Premier League (IPL) fantasy auction gameplay. Players join rooms, manage a purse budget, bid on real IPL players, and compete to assemble the best T20 squad.
 
 ## Key Pages
 
-- [Home / Create Auction Room](https://www.crickauction.in/): Sign in and create or join a live IPL auction room.
-- [Game Guide & Rules](https://www.crickauction.in/guide): How to play, auction modes (Mega & Sprint), bidding rules, and squad constraints.
-- [Privacy Policy](https://www.crickauction.in/privacy): How user data is collected, stored, and used.
-- [Terms & Conditions](https://www.crickauction.in/terms): Terms of service governing the use of CrickAuction.
+- [Home / Create Auction Room](https://ssauction.in/): Sign in and create or join a live IPL auction room.
+- [Game Guide & Rules](https://ssauction.in/guide): How to play, auction modes (Mega & Sprint), bidding rules, and squad constraints.
+- [Privacy Policy](https://ssauction.in/privacy): How user data is collected, stored, and used.
+- [Terms & Conditions](https://ssauction.in/terms): Terms of service governing the use of SSAUCTION.
 
 ## Features
 
