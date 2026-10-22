@@ -920,6 +920,35 @@ const LandingPage = () => {
                   </button>
                 </form>
 
+                <section className="mt-5 border-t border-white/10 pt-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-200">Public auction rooms</h3>
+                      <p className="mt-1 text-[9px] text-gray-500">Private rooms are not listed here.</p>
+                    </div>
+                    <button type="button" onClick={fetchPublicLobbies} disabled={lobbiesLoading} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[9px] font-black uppercase text-emerald-300 disabled:opacity-50">
+                      <RefreshCw size={12} className={lobbiesLoading ? "animate-spin" : ""}/> Refresh
+                    </button>
+                  </div>
+                  <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search room code or host" className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-emerald-400/40"/>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {lobbiesLoading && publicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">Loading public rooms…</p>
+                    ) : filteredPublicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">No public rooms available. Create one or join using a room code.</p>
+                    ) : filteredPublicRooms.map((room) => (
+                      <div key={room.roomId} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[10px] font-black text-white">{room.hostName}'s Room</p>
+                          <p className="mt-1 text-[9px] text-gray-400"><span className={room.status === "active" ? "text-emerald-300" : "text-blue-300"}>{room.status === "active" ? "LIVE" : "WAITING"}</span>{" · "}{room.auctionType === "sprint11" ? "Classic" : room.auctionType === "sprint5" ? "Sprint" : "Mega"}</p>
+                          <p className="mt-1 font-mono text-[9px] tracking-widest text-emerald-300">{room.roomId}</p>
+                        </div>
+                        <button type="button" onClick={() => setRoomCode(room.roomId)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[9px] font-black uppercase text-black">Use code</button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
               </div>
             )}
 
