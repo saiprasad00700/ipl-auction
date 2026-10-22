@@ -172,9 +172,16 @@ async function cleanupAbandonedRooms() {
         method: 'DELETE',
         headers: supabaseHeaders
       });
-      if (!teamsResponse.ok) {
-        console.warn('[Room cleanup] Supabase team cleanup failed for room', roomId, teamsResponse.status);
+      if (!teamsResponse.ok && teamsResponse.status !== 404) {
+        const detail = (await teamsResponse.text()).slice(0, 300);
+        console.warn('[Room cleanup] Supabase team cleanup failed for room', roomId, teamsResponse.status, detail);
         continue;
+      }
+      if (teamsResponse.status === 404) {
+        // Some Supabase projects do not expose a REST table named "teams".
+        // Continue to the auction delete; if a foreign key blocks it, that
+        // request will fail and the Firebase room will be left untouched.
+        console.warn('[Room cleanup] Supabase teams endpoint returned 404; trying auction cleanup for room', roomId);
       }
 
       const query = new URL('/rest/v1/auctions', supabaseUrl);
