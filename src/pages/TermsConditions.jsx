@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const TermsConditions = () => {
-  useDocumentTitle('Terms of Service | CrickAuction', 'Terms of Service for CrickAuction.');
+  useDocumentTitle('Terms of Service', 'Terms of Service for SSAUCTION.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -15,7 +15,7 @@ const TermsConditions = () => {
   const [activeSection, setActiveSection] = useState('about');
 
   const sections = [
-    { id: 'about', label: '1. About CrickAuction' },
+    { id: 'about', label: '1. About SSAUCTION' },
     { id: 'acceptance', label: '2. Acceptance of these terms' },
     { id: 'virtual', label: '3. Virtual currency and mechanics' },
     { id: 'conduct', label: '4. User conduct' },
@@ -121,16 +121,16 @@ const TermsConditions = () => {
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Terms of Service</h1>
             <p className="text-sm text-gray-500 mb-6">Last updated: October 2, 2026</p>
             <p className="text-base text-[#E5E5E5] leading-relaxed">
-              These Terms of Service govern your use of CrickAuction. By accessing or using the platform, you agree to be bound by these terms.
+              These Terms of Service govern your use of SSAUCTION. By accessing or using the platform, you agree to be bound by these terms.
             </p>
           </div>
 
           <div className="space-y-8 sm:space-y-12">
             <section id="about" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">1. About CrickAuction</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">1. About SSAUCTION</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  CrickAuction is a real-time multiplayer web application that simulates the Indian Premier League (IPL) mega auction experience. It provides users with a virtual environment to manage a purse, bid on players, and construct simulated cricket squads.
+                  SSAUCTION is a real-time multiplayer web application that simulates the Indian Premier League (IPL) mega auction experience. It provides users with a virtual environment to manage a purse, bid on players, and construct simulated cricket squads.
                 </p>
               </div>
             </section>
@@ -148,12 +148,12 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">3. Virtual currency and game mechanics</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  All monetary values, player prices, and team budgets (such as ₹120 Crore) represented within CrickAuction are <strong>strictly virtual points</strong> used solely for the purpose of the simulation game.
+                  All monetary values, player prices, and team budgets (such as ₹120 Crore) represented within SSAUCTION are <strong>strictly virtual points</strong> used solely for the purpose of the simulation game.
                 </p>
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
                   <li>No real money is deposited, wagered, earned, or paid out under any circumstances.</li>
                   <li>Virtual budgets have no real-world value and cannot be exchanged, transferred, or redeemed.</li>
-                  <li>CrickAuction is not a gambling, betting, or fantasy sports money platform.</li>
+                  <li>SSAUCTION is not a gambling, betting, or fantasy sports money platform.</li>
                 </ul>
               </div>
             </section>
@@ -176,7 +176,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">5. Fan-made / non-affiliation notice</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  CrickAuction is an unofficial, non-commercial fan project created for entertainment and strategy practice. 
+                  SSAUCTION is an unofficial, non-commercial fan project created for entertainment and strategy practice. 
                 </p>
                 <p>
                   We are <strong>not affiliated with, endorsed by, sponsored by, or associated with</strong> the Board of Control for Cricket in India (BCCI), the Indian Premier League (IPL), or any official franchise team.
@@ -191,7 +191,7 @@ const TermsConditions = () => {
                   All team names, player names, logos, and trademarks mentioned or displayed in the simulation belong to their respective owners. Their use within this platform falls under fair use for transformative, non-commercial entertainment purposes.
                 </p>
                 <p>
-                  The underlying codebase, UI design, and specific auction algorithms of CrickAuction are the intellectual property of the developers, unless otherwise open-sourced.
+                  The underlying codebase, UI design, and specific auction algorithms of SSAUCTION are the intellectual property of the developers, unless otherwise open-sourced.
                 </p>
               </div>
             </section>
@@ -200,7 +200,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">7. Third-party services</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  CrickAuction relies on third-party infrastructure (such as Google Firebase) for hosting, database management, and authentication. Your use of the service is also subject to the terms and acceptable use policies of these providers.
+                  SSAUCTION relies on third-party infrastructure (such as Google Firebase) for hosting, database management, and authentication. Your use of the service is also subject to the terms and acceptable use policies of these providers.
                 </p>
               </div>
             </section>
@@ -209,7 +209,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">8. Availability of the service</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  We strive to maintain high uptime, especially during active sessions. However, CrickAuction is provided "as is" and "as available." We do not guarantee that the service will be uninterrupted, error-free, or completely secure. Scheduled maintenance or unexpected outages may occur.
+                  We strive to maintain high uptime, especially during active sessions. However, SSAUCTION is provided "as is" and "as available." We do not guarantee that the service will be uninterrupted, error-free, or completely secure. Scheduled maintenance or unexpected outages may occur.
                 </p>
               </div>
             </section>
@@ -227,7 +227,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">10. Limitation of liability</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  To the maximum extent permitted by law, CrickAuction and its developers shall not be liable for any indirect, incidental, special, or consequential damages arising out of your use of or inability to use the platform. This includes, but is not limited to, loss of data due to interrupted auction rooms or server failures.
+                  To the maximum extent permitted by law, SSAUCTION and its developers shall not be liable for any indirect, incidental, special, or consequential damages arising out of your use of or inability to use the platform. This includes, but is not limited to, loss of data due to interrupted auction rooms or server failures.
                 </p>
               </div>
             </section>
