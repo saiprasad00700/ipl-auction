@@ -1,0 +1,36 @@
+name: Refresh voice-chat lockfile
+
+on:
+  push:
+    branches:
+      - feature/livekit-voice-chat
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out voice-chat branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/livekit-voice-chat
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate package lock
+        run: npm install --package-lock-only
+      - name: Commit updated lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Update lockfile for voice chat dependencies"
+          git push origin HEAD:feature/livekit-voice-chat
