@@ -7,7 +7,7 @@ import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const GameGuide = () => {
-  useDocumentTitle('Rulebook | CrickAuction', 'Comprehensive guide on how to play CrickAuction.');
+  useDocumentTitle('Rulebook | SSAUCTION', 'Comprehensive guide on how to play SSAUCTION.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -200,7 +200,7 @@ const GameGuide = () => {
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Rulebook</h1>
             <p className="text-sm text-gray-500 mb-6">Last updated: October 2, 2026</p>
             <p className="text-base text-[#E5E5E5] leading-relaxed">
-              This guide outlines how to host live bidding sessions, build balanced championship rosters, manage purse budgets, and utilize AI bots in CrickAuction.
+              This guide outlines how to host live bidding sessions, build balanced championship rosters, manage purse budgets, and utilize AI bots in SSAUCTION.
             </p>
           </div>
 
