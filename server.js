@@ -94,18 +94,22 @@ async function serveStatic(req, res, pathname) {
 }
 
 // LiveKit voice-room token endpoint. Requires server-only Firebase Admin credentials.
-let firebaseAdminAuthPromise;
-async function getFirebaseAdminAuth() {
-  if (!firebaseAdminAuthPromise) firebaseAdminAuthPromise = (async () => {
+let firebaseAdminServicesPromise;
+async function getFirebaseAdminServices() {
+  if (!firebaseAdminServicesPromise) firebaseAdminServicesPromise = (async () => {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('Voice chat authentication is not configured');
+    const databaseURL = process.env.FIREBASE_DATABASE_URL || process.env.VITE_FIREBASE_DATABASE_URL;
+    if (!databaseURL) throw new Error('Firebase Realtime Database URL is not configured');
     const { initializeApp, cert, getApps } = await import('firebase-admin/app');
     const { getAuth } = await import('firebase-admin/auth');
+    const { getDatabase } = await import('firebase-admin/database');
     const serviceAccount = JSON.parse(raw);
-    const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
-    return getAuth(app);
+    const app = getApps().find((item) => item.name === '[DEFAULT]') ||
+      initializeApp({ credential: cert(serviceAccount), databaseURL });
+    return { auth: getAuth(app), database: getDatabase(app) };
   })();
-  return firebaseAdminAuthPromise;
+  return firebaseAdminServicesPromise;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -116,15 +120,27 @@ const server = http.createServer(async (req, res) => {
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in to use voice chat' });
-      const auth = await getFirebaseAdminAuth();
+      const { auth, database } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const participantName = String(body.participantName || 'Player').trim().slice(0, 60);
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
+        return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
+      }
+      const roomSnapshot = await database.ref(`auctions/${roomId}/room`).get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      const roster = Array.isArray(roomData.players)
+        ? roomData.players
+        : Object.values(roomData.players || {});
+      const rosterEntry = roster.find((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
+      const isHost = roomData.hostId === decoded.uid;
+      if (!isHost && !rosterEntry) return sendJson(res, 403, { error: 'You must join this auction before using voice chat' });
       if (!process.env.LIVEKIT_URL || !process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET) {
         return sendJson(res, 503, { error: 'Voice chat is not configured on the server' });
       }
+      const participantName = String(rosterEntry?.name || decoded.name || 'Player').trim().slice(0, 60);
       const { AccessToken } = await import('livekit-server-sdk');
       const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
         identity: decoded.uid,
