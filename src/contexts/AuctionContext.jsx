@@ -1035,8 +1035,13 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Update RTDB (0 Firestore cost in lobby!)
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
+    // Update each permitted child path separately. Writing both fields at the
+    // parent /room path is denied by RTDB rules because non-hosts cannot write
+    // the whole room object, even though they may update these two child nodes.
+    await Promise.all([
+      updateRtdb(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers),
+      updateRtdb(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now())
+    ]);
 
     // Sync updated player count/list to Supabase so Public Lobbies show live player counts
     /*
