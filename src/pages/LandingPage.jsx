@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
 import { rtdb } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
-import { ref, remove, get } from "firebase/database";
+import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
 import { TEAMS } from "../data/teams";
 import {
@@ -50,6 +50,8 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
+      // The app starts RTDB offline by default; connect before reading the public lobby.
+      goOnline(rtdb);
       const snapshot = await get(ref(rtdb, "publicRooms"));
       const directory = snapshot.exists() ? snapshot.val() : {};
       const rooms = Object.values(directory).filter((room) =>
