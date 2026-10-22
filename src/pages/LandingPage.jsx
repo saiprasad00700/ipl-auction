@@ -46,10 +46,37 @@ const LandingPage = () => {
   const [publicRooms, setPublicRooms] = useState([]);
   const [lobbiesLoading, setLobbiesLoading] = useState(false);
 
-  // Public-room discovery is disabled; keep the legacy refresh button safe.
-  const fetchPublicLobbies = () => {
-    setPublicRooms([]);
-    setLobbiesLoading(false);
+  // Only list rooms explicitly marked public. Private rooms remain invite-code only.
+  const fetchPublicLobbies = async () => {
+    if (!supabase) {
+      setPublicRooms([]);
+      setLobbiesLoading(false);
+      return;
+    }
+    setLobbiesLoading(true);
+    try {
+      const { data, error: lobbyError } = await supabase
+        .from("auctions")
+        .select("id, host_name, status, auction_type, players, is_public")
+        .eq("is_public", true)
+        .in("status", ["waiting", "active"])
+        .limit(50);
+      if (lobbyError) throw lobbyError;
+      setPublicRooms((data || [])
+        .filter((room) => room.is_public === true)
+        .map((room) => ({
+          roomId: room.id,
+          hostName: room.host_name || "Auction host",
+          status: room.status || "waiting",
+          auctionType: room.auction_type || "mega",
+          players: Array.isArray(room.players) ? room.players.length : 0,
+        })));
+    } catch (err) {
+      console.error("Could not load public auction rooms:", err);
+      setPublicRooms([]);
+    } finally {
+      setLobbiesLoading(false);
+    }
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
@@ -79,11 +106,11 @@ const LandingPage = () => {
     }
   }, []);
 
-  // Public-room discovery is intentionally disabled. Rooms are joined by invite link/code,
-  // so do not read the entire Firebase auctions tree (which is not publicly readable).
+  // Load only explicitly public rooms from the public database index.
   useEffect(() => {
-    setPublicRooms([]);
-    setLobbiesLoading(false);
+    fetchPublicLobbies();
+    const refresh = setInterval(fetchPublicLobbies, 15000);
+    return () => clearInterval(refresh);
   }, []);
 
   // Fetch auction history directly from Supabase
@@ -894,6 +921,44 @@ const LandingPage = () => {
                   </button>
                 </form>
 
+                <div className="pt-4 border-t border-white/10 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-200">Public auction rooms</h3>
+                      <p className="text-[9px] text-gray-500 mt-1">Private rooms are never listed here.</p>
+                    </div>
+                    <button type="button" onClick={fetchPublicLobbies} disabled={lobbiesLoading} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-[9px] font-black uppercase text-emerald-300 disabled:opacity-50">
+                      <RefreshCw size={12} className={lobbiesLoading ? "animate-spin" : ""}/> Refresh
+                    </button>
+                  </div>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search room code or host"
+                    className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-emerald-400/40"
+                  />
+                  <div className="space-y-2">
+                    {lobbiesLoading && publicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">Loading public rooms…</p>
+                    ) : filteredPublicRooms.length === 0 ? (
+                      <p className="py-4 text-center text-[10px] text-gray-500">No public rooms available. Create one or join using a room code.</p>
+                    ) : filteredPublicRooms.map((room) => (
+                      <div key={room.roomId} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black uppercase text-white truncate">{room.hostName}'s Room</p>
+                          <p className="mt-1 text-[9px] text-gray-400">
+                            <span className={room.status === "active" ? "text-emerald-300" : "text-blue-300"}>{room.status === "active" ? "LIVE" : "WAITING"}</span>
+                            {" · "}{room.auctionType === "sprint11" ? "Classic" : room.auctionType === "sprint5" ? "Sprint" : "Mega"}
+                            {" · "}{room.players} player{room.players === 1 ? "" : "s"}
+                          </p>
+                          <p className="mt-1 font-mono text-[9px] tracking-widest text-emerald-300">{room.roomId}</p>
+                        </div>
+                        <button type="button" onClick={() => setRoomCode(room.roomId)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[9px] font-black uppercase text-black">Use code</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
               </div>
             )}
