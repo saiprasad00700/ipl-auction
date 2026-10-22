@@ -173,8 +173,6 @@ export const AuctionProvider = ({ children }) => {
         auctionType,
         createdAt: Date.now()
       });
-    } else {
-      await remove(publicRoomRef);
     }
 
     if (playerDetails.team) {
