@@ -61,7 +61,15 @@ function allowAnalysis(ip) {
 }
 
 async function serveStatic(req, res, pathname) {
-  let relative = decodeURIComponent(pathname).replace(/^\/+/, '');
+  let decodedPathname;
+  try {
+    decodedPathname = decodeURIComponent(pathname);
+  } catch {
+    // Malformed percent-encoding in a request path must not crash the server.
+    sendJson(res, 400, { error: 'Malformed URL path' });
+    return;
+  }
+  let relative = decodedPathname.replace(/^\/+/, '');
   if (!relative || relative.endsWith('/')) relative += 'index.html';
   let filePath = path.resolve(DIST, relative);
   if (!filePath.startsWith(DIST + path.sep) && filePath !== path.join(DIST, 'index.html')) {
