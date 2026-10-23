@@ -130,7 +130,9 @@ async function cleanupAbandonedRooms() {
     for (const [roomId, roomNode] of Object.entries(rooms)) {
       const room = roomNode?.room;
       if (!room) continue;
-      const status = String(room.status || roomNode?.live?.status || 'waiting').toLowerCase();
+      // The live node is updated when an auction starts; prefer it over the
+      // room metadata, which may still say "waiting" for compatibility.
+      const status = String(roomNode?.live?.status || room.status || 'waiting').toLowerCase();
       const isWaiting = status === 'waiting';
       const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
       if (!isWaiting && !isStarted) continue;
