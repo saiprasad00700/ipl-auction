@@ -339,7 +339,7 @@ const LandingPage = () => {
         </div>
 
         <div className="text-center mb-6 sm:mb-8 z-10 relative w-full max-w-5xl px-2 sm:px-4 mt-8 sm:mt-10">
-          <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 mb-4 text-sm sm:text-base font-black tracking-[0.22em] text-white shadow-lg shadow-emerald-500/10">SSAUCTION</div>
+          <div className="ssauction-brand-motion inline-flex items-center rounded-2xl border border-emerald-300/30 bg-slate-950/55 px-5 py-2.5 mb-4 text-base sm:text-xl font-black tracking-[0.28em] text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-cyan-300 shadow-[0_0_28px_rgba(16,185,129,0.18)]"><span className="ssauction-brand-shine">SS AUCTION</span></div>
           <h1 className="sr-only">
             IPL Auction Simulator & Game - Live IPL Mega Auction 2026
           </h1>
@@ -512,6 +512,7 @@ const LandingPage = () => {
 
       {/* Hero */}
       <div className="text-center mb-5 sm:mb-7 z-10 relative w-full max-w-5xl px-2 sm:px-4 mt-6 sm:mt-8">
+        <div className="ssauction-brand-motion inline-flex items-center rounded-2xl border border-emerald-300/30 bg-slate-950/55 px-5 py-2.5 mb-4 text-base sm:text-xl font-black tracking-[0.28em] text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-cyan-300 shadow-[0_0_28px_rgba(16,185,129,0.18)]"><span className="ssauction-brand-shine">SS AUCTION</span></div>
         <h1 className="sr-only">
           IPL Auction Simulator & Game - Live IPL Mega Auction 2026
         </h1>
