@@ -1049,11 +1049,10 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Non-host members are allowed to update the room's players child, but
-    // the deployed RTDB rules do not grant them write access to lastActivityAt.
-    // Update only players here so joining cannot fail on the activity timestamp.
-    // Replacing the players array requires set(); RTDB update() only accepts an object map.
+    // Joining/rejoining is meaningful room activity. Update the roster and heartbeat
+    // separately so the roster's array shape is preserved and activity refreshes.
     await set(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers);
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
 
     // Record history without blocking room entry if rules are not deployed yet.
     try {
