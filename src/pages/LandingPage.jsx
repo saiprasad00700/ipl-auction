@@ -86,6 +86,7 @@ const LandingPage = () => {
   // History state
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [expandedSession, setExpandedSession] = useState(null);
   const [sessionToDelete, setSessionToDelete] = useState(null);
 
@@ -182,7 +183,7 @@ const LandingPage = () => {
 
     fetchHistory();
     return () => { cancelled = true; };
-  }, [activeTab, user?.uid]);
+  }, [activeTab, user?.uid, historyRefreshKey]);
 
   // Filtered public rooms
   const filteredPublicRooms = useMemo(() => {
@@ -206,7 +207,7 @@ const LandingPage = () => {
 
     // Optimistically update the UI immediately so no refresh is needed
     setHistoryData((prev) => prev.filter((item) => item.id !== teamDocId));
-    setPublicRooms((prev) => prev.filter((room) => room.roomId !== roomId));
+    // History is private to this user; deleting it must not hide a public room for everyone.
     if (expandedSession === teamDocId) setExpandedSession(null);
     setSessionToDelete(null);
 
@@ -924,6 +925,15 @@ const LandingPage = () => {
             {/* ─── HISTORY TAB ─── */}
             {activeTab === "history" && (
               <div key="history-tab" className="space-y-3 sm:space-y-4">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-3 sm:px-4">
+                  <div className="min-w-0">
+                    <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white">Your auction history</h2>
+                    <p className="mt-1 text-[8px] sm:text-[9px] text-gray-500">Rooms you created or joined · {historyData.length} saved</p>
+                  </div>
+                  <button type="button" onClick={() => setHistoryRefreshKey((value) => value + 1)} disabled={historyLoading} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-emerald-300 transition-colors hover:bg-emerald-400/10 disabled:opacity-50" aria-label="Refresh auction history">
+                    <RefreshCw size={12} className={historyLoading ? "animate-spin" : ""} /> Refresh
+                  </button>
+                </div>
                 {historyLoading ? (
                   <div className="flex flex-col items-center justify-center py-10 sm:py-16">
                     <Loader2
@@ -1003,6 +1013,7 @@ const LandingPage = () => {
                                     <span className="text-[7px] sm:text-[8px] font-bold text-gray-400 uppercase tracking-wider shrink-0">
                                       Room: {session.roomId}
                                     </span>
+                                    <span className="text-[7px] sm:text-[8px] text-gray-500 shrink-0">{session.date}</span>
                                     <span className="text-[7px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 bg-gray-500/10 text-gray-400">
                                       {session.mode}
                                     </span>
@@ -1231,8 +1242,8 @@ const LandingPage = () => {
 
       <ConfirmDialog
         isOpen={!!sessionToDelete}
-        title="Delete This Room?"
-        description="This permanently removes the room and its squad history for everyone. This action cannot be undone."
+        title="Delete History Entry?"
+        description="This removes this room from your personal history only. It will not delete the auction room or affect other players."
         detail={sessionToDelete ? `Room ${sessionToDelete.roomId}` : ""}
         confirmLabel="Delete"
         cancelLabel="Cancel"
