@@ -1,5 +1,5 @@
 // Modified from the upstream project by saiprasad00700.
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, deleteApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { createClient } from '@supabase/supabase-js';
 
@@ -72,4 +72,12 @@ async function main() {
   }
   console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}`);
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+main()
+  .catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    // Close Firebase Admin's persistent connections so GitHub Actions can exit.
+    await Promise.all(getApps().map(app => deleteApp(app)));
+  });
