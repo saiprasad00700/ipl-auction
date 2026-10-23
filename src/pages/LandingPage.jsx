@@ -109,88 +109,79 @@ const LandingPage = () => {
   }, []);
 
 
-  // Fetch auction history directly from Supabase
-  // Fetch auction history directly from Supabase
+  // Load this user's room history from Firebase; Supabase history tables are optional.
   useEffect(() => {
-    if (activeTab !== "history" || !user?.uid || historyData.length > 0) return;
+    if (activeTab !== "history" || !user?.uid) return;
+    let cancelled = false;
 
     const fetchHistory = async () => {
       setHistoryLoading(true);
       try {
-        if (supabase) {
-          const { data: supabaseTeams, error: tErr } = await supabase
-            .from("teams")
-            .select("*")
-            .eq("user_id", user.uid)
-            .order("created_at", { ascending: false });
-
-          if (!tErr && supabaseTeams && supabaseTeams.length > 0) {
-            const auctionIds = [
-              ...new Set(supabaseTeams.map((t) => t.auction_id)),
-            ].filter(Boolean);
-
-            const { data: supabaseAuctions } = await supabase
-              .from("auctions")
-              .select("*")
-              .in("id", auctionIds);
-
-            const auctionMap = {};
-            (supabaseAuctions || []).forEach((a) => {
-              auctionMap[a.id] = a;
-            });
-
-            const sessions = supabaseTeams.map((teamData) => {
-              const auctionData = auctionMap[teamData.auction_id];
-              const totalBudget = auctionData?.settings?.budget || 120;
-              const spent =
-                teamData.spent ||
-                totalBudget - (teamData.budget_remaining || totalBudget);
-
-              return {
-                id: teamData.id,
-                roomId: teamData.auction_id,
-                teamId: teamData.team_id,
-                teamName: teamData.team_name,
-                mode: auctionData?.auction_type || "mega",
-                status: auctionData?.status || "waiting",
-                budgetRemaining: teamData.budget_remaining,
-                spent,
-                squad: (teamData.squad || []).map((s) => {
-                  const pid = typeof s === "string" ? s : s.id;
-                  const bid = typeof s === "string" ? 0 : s.bid;
-                  const playerInfo = IPL_PLAYERS.find((p) => p.id === pid);
-                  return {
-                    id: pid,
-                    name: playerInfo?.name || pid,
-                    role: playerInfo?.role || "Player",
-                    image: playerInfo?.image || "",
-                    bid: bid || playerInfo?.basePrice || 0,
-                  };
-                }),
-                date: teamData.created_at
-                  ? new Date(teamData.created_at).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "Recent Session",
-              };
-            });
-
-            setHistoryData(sessions);
-            setHistoryLoading(false);
-            return;
+        goOnline(rtdb);
+        const snapshot = await get(ref(rtdb, `userAuctionHistory/${user.uid}`));
+        const entries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
+        const sessions = await Promise.all(entries.map(async (entry) => {
+          if (!entry?.roomId) return null;
+          let teamData = null;
+          let roomData = null;
+          try {
+            const [teamSnap, roomSnap] = await Promise.all([
+              get(ref(rtdb, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
+              get(ref(rtdb, `auctions/${entry.roomId}/room`))
+            ]);
+            teamData = teamSnap.exists() ? teamSnap.val() : null;
+            roomData = roomSnap.exists() ? roomSnap.val() : null;
+          } catch {
+            // Retain the saved entry even if its room has already been removed.
           }
+
+          const squadSource = Array.isArray(teamData?.squad) ? teamData.squad : (Array.isArray(entry.squad) ? entry.squad : []);
+          const squad = squadSource.map((s) => {
+            const pid = typeof s === "string" ? s : s?.id;
+            const playerInfo = IPL_PLAYERS.find((p) => p.id === pid);
+            return {
+              id: pid,
+              name: playerInfo?.name || (typeof s === "object" ? s?.name : null) || pid || "Player",
+              role: playerInfo?.role || "Player",
+              image: playerInfo?.image || "",
+              country: playerInfo?.country || "IND",
+              bid: (typeof s === "object" ? s?.bid : 0) || playerInfo?.basePrice || 0,
+            };
+          });
+          const budgetRemaining = teamData?.budgetRemaining ?? entry.budgetRemaining ?? 120;
+          const spent = Number(teamData?.spent ?? entry.spent ?? 0);
+          const createdAt = Number(entry.createdAt || entry.joinedAt || 0);
+
+          return {
+            id: entry.roomId,
+            roomId: entry.roomId,
+            teamId: teamData?.teamId || entry.teamId || "",
+            teamName: teamData?.teamName || entry.teamName || "Manager",
+            mode: roomData?.auctionType || entry.mode || "mega",
+            status: roomData?.status || entry.status || "waiting",
+            budgetRemaining,
+            spent,
+            squad,
+            date: createdAt ? new Date(createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Saved session",
+          };
+        }));
+        if (!cancelled) {
+          setHistoryData(sessions.filter(Boolean).sort((a, b) => {
+            const aa = entries.find((e) => e.roomId === a.roomId);
+            const bb = entries.find((e) => e.roomId === b.roomId);
+            return Number(bb?.createdAt || bb?.joinedAt || 0) - Number(aa?.createdAt || aa?.joinedAt || 0);
+          }));
         }
-        setHistoryData([]);
-      } catch {
-        setHistoryData([]);
+      } catch (error) {
+        console.error("Could not load user auction history:", error);
+        if (!cancelled) setHistoryData([]);
       } finally {
-        setHistoryLoading(false);
+        if (!cancelled) setHistoryLoading(false);
       }
     };
 
     fetchHistory();
+    return () => { cancelled = true; };
   }, [activeTab, user?.uid]);
 
   // Filtered public rooms
@@ -220,44 +211,15 @@ const LandingPage = () => {
     setSessionToDelete(null);
 
     try {
-      if (supabase) {
-        // 1. Delete user's team row from Supabase
-        const { error: teamError } = await supabase
-          .from("teams")
-          .delete()
-          .eq("id", teamDocId);
-        if (teamError) throw teamError;
-
-        // 2. Delete the auction room itself from Supabase
-        const { error: roomError } = await supabase
-          .from("auctions")
-          .delete()
-          .eq("id", roomId);
-        if (roomError) throw roomError;
-      }
+      if (!user?.uid) throw new Error("Please sign in to manage your history.");
+      // Delete only the current user's history entry, never the shared room itself.
+      await remove(ref(rtdb, `userAuctionHistory/${user.uid}/${roomId}`));
     } catch {
-      // Roll back the optimistic removal if the server delete failed
       setHistoryData((prev) =>
         prev.some((item) => item.id === teamDocId) ? prev : [session, ...prev],
       );
-      setError("Could not delete this room. Please try again.");
+      setError("Could not delete this history entry. Please try again.");
       setTimeout(() => setError(""), 3000);
-      return;
-    }
-
-    // Remove the public listing before deleting its source room.
-    // Private rooms have no listing; permission errors here are harmless.
-    try {
-      await remove(ref(rtdb, `publicRooms/${roomId}`));
-    } catch {
-      // Ignore missing or non-public directory entries.
-    }
-
-    // 3. Remove room from Realtime Database if still sitting in waiting state
-    try {
-      await remove(ref(rtdb, `auctions/${roomId}`));
-    } catch {
-      // Ignore RTDB cleanup errors
     }
   };
 
