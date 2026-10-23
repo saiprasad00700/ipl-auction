@@ -190,15 +190,19 @@ export const AuctionProvider = ({ children }) => {
       });
     }
 
-    // Record the room in the host's private history index.
-    await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
-      roomId, userId, hostId: userId,
-      hostName: playerDetails.name || 'Manager',
-      teamId: playerDetails.team || '',
-      teamName: teamDetails?.name || 'Unknown',
-      mode: auctionType, status: 'waiting', createdAt: Date.now(),
-      spent: 0, budgetRemaining: budget, squad: []
-    });
+    // Record history without blocking room creation if rules are not deployed yet.
+    try {
+      await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
+        roomId, userId, hostId: userId,
+        hostName: playerDetails.name || 'Manager',
+        teamId: playerDetails.team || '',
+        teamName: teamDetails?.name || 'Unknown',
+        mode: auctionType, status: 'waiting', createdAt: Date.now(),
+        spent: 0, budgetRemaining: budget, squad: []
+      });
+    } catch (historyError) {
+      console.warn('Could not save room history entry:', historyError?.message || historyError);
+    }
 
     // Write to Supabase (primary database index, 0 Firestore cost)
     try {
@@ -1051,16 +1055,20 @@ export const AuctionProvider = ({ children }) => {
     // Replacing the players array requires set(); RTDB update() only accepts an object map.
     await set(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers);
 
-    // Record this room in the joining user's private history index.
-    await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
-      roomId, userId, hostId: data.hostId || '',
-      hostName: data.hostName || 'Auction host',
-      teamId: playerDetails.team || playerExists?.team || '',
-      teamName: teamDetails?.name || playerExists?.teamName || 'Unknown',
-      mode: data.auctionType || 'mega', status: data.status || 'waiting',
-      createdAt: Date.now(), spent: 0,
-      budgetRemaining: data.settings?.budget || 120, squad: []
-    });
+    // Record history without blocking room entry if rules are not deployed yet.
+    try {
+      await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
+        roomId, userId, hostId: data.hostId || '',
+        hostName: data.hostName || 'Auction host',
+        teamId: playerDetails.team || playerExists?.team || '',
+        teamName: teamDetails?.name || playerExists?.teamName || 'Unknown',
+        mode: data.auctionType || 'mega', status: data.status || 'waiting',
+        createdAt: Date.now(), spent: 0,
+        budgetRemaining: data.settings?.budget || 120, squad: []
+      });
+    } catch (historyError) {
+      console.warn('Could not save room history entry:', historyError?.message || historyError);
+    }
 
     // Sync updated player count/list to Supabase so Public Lobbies show live player counts
     /*
