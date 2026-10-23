@@ -50,6 +50,8 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { ref, update } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 const AuctionRoom = () => {
    const { id } = useParams();
@@ -113,6 +115,24 @@ const AuctionRoom = () => {
       const params = new URLSearchParams(window.location.search);
       return params.get('spectate') === 'true';
    });
+
+   // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
+   // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
+   const lastInteractionHeartbeatRef = useRef(0);
+   useEffect(() => {
+      if (!id || !user?.uid) return undefined;
+      const markRoomActivity = () => {
+         const now = Date.now();
+         if (now - lastInteractionHeartbeatRef.current < 10000) return;
+         lastInteractionHeartbeatRef.current = now;
+         void update(ref(rtdb, `auctions/${id}/room`), { lastActivityAt: now }).catch((err) => {
+            console.warn('[AuctionRoom] Could not update room activity:', err?.message || err);
+         });
+      };
+      const events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'input'];
+      events.forEach((eventName) => window.addEventListener(eventName, markRoomActivity, { passive: true }));
+      return () => events.forEach((eventName) => window.removeEventListener(eventName, markRoomActivity));
+   }, [id, user?.uid]);
 
    // Clear optimistic state when DB catches up
    useEffect(() => {
