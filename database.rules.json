@@ -37,6 +37,16 @@
       }
     },
 
+    "userAuctionHistory": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "$roomId": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "!newData.exists() || (newData.hasChildren(['roomId', 'userId', 'mode', 'status']) && newData.child('roomId').val() == $roomId && newData.child('userId').val() == $uid && (newData.child('mode').val() == 'mega' || newData.child('mode').val() == 'sprint11' || newData.child('mode').val() == 'sprint5'))"
+        }
+      }
+    },
+
     "auctions": {
       // Do not allow listing/enumerating rooms. A room is read by its id only.
       ".read": false,
