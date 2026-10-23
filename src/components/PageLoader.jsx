@@ -150,6 +150,53 @@ const PageLoader = ({ isGame = false }) => {
           <div className="absolute inset-0 bg-radial-[circle_at_center,transparent_20%,#050505_95%]" />
         </div>
 
+        {/* Large animated brand — only shown on this landing intro overlay */}
+        <div className="absolute inset-0 z-[1] flex items-center justify-center px-4 pb-24 pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.88, filter: "blur(14px)" }}
+            animate={{ opacity: 1, y: [0, -8, 0], scale: [1, 1.025, 1], filter: "blur(0px)" }}
+            transition={{
+              opacity: { duration: 0.9, ease: "easeOut" },
+              y: { duration: 4.2, repeat: Infinity, ease: "easeInOut" },
+              scale: { duration: 4.2, repeat: Infinity, ease: "easeInOut" },
+              filter: { duration: 0.9 }
+            }}
+            className="relative text-center"
+          >
+            <motion.div
+              aria-hidden="true"
+              animate={{ opacity: [0.22, 0.65, 0.22], scale: [0.92, 1.08, 0.92] }}
+              transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -inset-x-12 -inset-y-8 sm:-inset-x-24 sm:-inset-y-14 rounded-full bg-emerald-400/20 blur-3xl"
+            />
+            <motion.div
+              aria-hidden="true"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-[-22px] sm:inset-[-38px] rounded-full border border-emerald-300/15 border-t-cyan-300/60 border-b-emerald-300/50"
+            />
+            <div
+              className="relative font-black uppercase text-6xl sm:text-8xl md:text-[9rem] lg:text-[11rem] leading-none tracking-[0.08em] sm:tracking-[0.14em] text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-cyan-300 drop-shadow-[0_0_35px_rgba(16,185,129,0.28)]"
+              style={{ fontFamily: '"Geist Pixel", Silkscreen, VT323, "Geist Mono", monospace' }}
+            >
+              <motion.span
+                animate={{ backgroundPosition: ["100% 50%", "0% 50%", "100% 50%"] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                className="inline-block bg-gradient-to-r from-white via-emerald-200 to-cyan-300 bg-[length:220%_100%] bg-clip-text text-transparent"
+              >
+                SS AUCTION
+              </motion.span>
+            </div>
+            <motion.div
+              animate={{ opacity: [0.45, 1, 0.45], letterSpacing: ["0.28em", "0.42em", "0.28em"] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+              className="relative mt-5 text-[9px] sm:text-xs font-black uppercase text-emerald-200/80"
+            >
+              BUILD YOUR DREAM SQUAD
+            </motion.div>
+          </motion.div>
+        </div>
+
         {/* Top-Right: Brand Lockup */}
         <div
           className="absolute top-6 right-6 z-10 flex items-center gap-2.5 bg-white/[0.04] border border-white/10 pl-2 pr-4 py-2 rounded-full backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
