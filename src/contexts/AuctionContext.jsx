@@ -1049,24 +1049,35 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Joining/rejoining is meaningful room activity. Update the roster and heartbeat
-    // separately so the roster's array shape is preserved and activity refreshes.
+    // Update the roster first, preserving its array shape.
     await set(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers);
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
 
-    // Record history without blocking room entry if rules are not deployed yet.
+    // Save history independently of the activity heartbeat. A heartbeat/rules
+    // failure must never prevent a successfully joined room from being recorded.
     try {
-      await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
+      const historyRef = ref(rtdb, `userAuctionHistory/${userId}/${roomId}`);
+      const previousHistory = await get(historyRef);
+      const previousEntry = previousHistory.exists() ? previousHistory.val() : {};
+      await set(historyRef, {
         roomId, userId, hostId: data.hostId || '',
         hostName: data.hostName || 'Auction host',
         teamId: playerDetails.team || playerExists?.team || '',
         teamName: teamDetails?.name || playerExists?.teamName || 'Unknown',
         mode: data.auctionType || 'mega', status: data.status || 'waiting',
-        createdAt: Date.now(), spent: 0,
-        budgetRemaining: data.settings?.budget || 120, squad: []
+        createdAt: Number(previousEntry.createdAt || previousEntry.joinedAt || Date.now()),
+        spent: Number(previousEntry.spent || 0),
+        budgetRemaining: previousEntry.budgetRemaining ?? data.settings?.budget ?? 120,
+        squad: Array.isArray(previousEntry.squad) ? previousEntry.squad : []
       });
     } catch (historyError) {
-      console.warn('Could not save room history entry:', historyError?.message || historyError);
+      console.error('Could not save room history entry:', historyError?.message || historyError);
+    }
+
+    // Refresh the inactivity heartbeat separately; do not let it block history.
+    try {
+      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+    } catch (activityError) {
+      console.warn('Could not refresh room activity after joining:', activityError?.message || activityError);
     }
 
     // Sync updated player count/list to Supabase so Public Lobbies show live player counts
