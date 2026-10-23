@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ref, update } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 const VoiceChat = ({ roomId }) => {
   const { user } = useAuth();
@@ -44,16 +46,15 @@ const VoiceChat = ({ roomId }) => {
         roomRef.current = room;
         const refresh = () => syncParticipants(room);
         room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          // Record real speaking activity, not merely an open voice connection.
-          if (!speakers.some((speaker) => speaker.identity === room.localParticipant.identity)) return;
+          // Real speaking by any participant keeps the room alive; a connected-but-silent
+          // voice panel does not. Write directly to the authorized RTDB activity field.
+          if (!speakers.length) return;
           const now = Date.now();
           if (now - lastVoiceActivityPingRef.current < 10000) return;
           lastVoiceActivityPingRef.current = now;
-          void user.getIdToken().then((token) => fetch('/api/room-activity', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-            body: JSON.stringify({ roomId })
-          })).catch(() => {});
+          void update(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((err) => {
+            console.warn('[VoiceChat] Could not update room activity:', err?.message || err);
+          });
         });
         room.on(RoomEvent.ParticipantConnected, refresh);
         room.on(RoomEvent.ParticipantDisconnected, refresh);
