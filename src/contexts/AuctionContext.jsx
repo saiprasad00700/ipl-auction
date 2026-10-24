@@ -735,16 +735,7 @@ export const AuctionProvider = ({ children }) => {
         const settleSale = httpsCallable(getFunctions(app), 'applySaleSettlement');
         const settlementResponse = await settleSale({ roomId, playerId: auctionState.playerId });
         const settlement = settlementResponse.data;
-        const finalTeamData = {
-          auctionId: roomId,
-          userId: auctionState.highBidderId,
-          teamId: auctionState.highBidderTeamId,
-          teamName: teamDetails?.name || auctionState.highBidderName || 'Unknown',
-          budgetRemaining: settlement.budgetRemaining,
-          spent: settlement.spent,
-          squad: Array.from({ length: settlement.squadCount }, (_, index) => ({ id: index === settlement.squadCount - 1 ? auctionState.playerId : '' })),
-          retentionCardsRemaining: successfullyRetainedPlayer ? Math.max(0, Number(preTeamsData?.[teamDocId]?.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - (settlement.alreadyApplied ? 0 : 1)) : Number(preTeamsData?.[teamDocId]?.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE)
-        };
+        const finalTeamData = settlement.team;
         teamSaleApplied = !settlement.alreadyApplied;
         newTeamData = finalTeamData;
 
