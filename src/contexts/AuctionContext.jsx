@@ -1579,38 +1579,15 @@ export const AuctionProvider = ({ children }) => {
   }, [user, currentAuction, getSyncedTime]);
 
   const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayer) => {
-    if (!user) throw new Error('Sign in to submit your Playing XI');
-    const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-    if (!roomSnap.exists()) throw new Error('Auction room not found');
-    const roomData = roomSnap.val();
-    if (roomData.status !== 'awaiting_xi') throw new Error('Playing XI submissions are closed');
-    if (getSyncedTime() > Number(roomData.xiSubmissionDeadline || 0)) throw new Error('Submission deadline has passed');
-    const teamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`));
-    if (!teamSnap.exists()) throw new Error('Your franchise squad was not found');
-    const teamData = teamSnap.val();
-    if (teamData.disqualified) {
-      throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
-    }
-    if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [], IPL_PLAYERS)) {
-      const overseasCount = (startingXI || []).filter((item) => {
-        const playerId = typeof item === 'string' ? item : item?.id;
-        const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
-        return player && player.country !== 'IND';
-      }).length;
-      if (overseasCount > 4) {
-        throw new Error('An IPL Playing XI can include a maximum of 4 overseas players. Please replace an overseas player with an Indian player.');
-      }
-      throw new Error('Choose 11 unique players and one different Impact Player from your squad');
-    }
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
-      playingXI: { startingXI, impactPlayer, submittedAt: getSyncedTime(), autoSelected: false }
-    });
+    if (!user?.uid) throw new Error('Sign in to submit your Playing XI');
+    const call = httpsCallable(getFunctions(app), 'submitPlayingXI');
+    await call({ roomId, startingXI, impactPlayer });
     await push(ref(rtdb, `auctions/${roomId}/messages`), {
       userId: 'system', userName: 'System',
-      text: `${teamData.teamName || teamData.teamId} submitted its Playing XI.`,
+      text: `Playing XI submitted.`,
       type: 'log', timestamp: serverTimestampRtdb()
     });
-  }, [user, getSyncedTime]);
+  }, [user]);
 
   // One client claims the analysis phase transactionally after the deadline.
   // All other clients observe the same persisted result through the room listener.
