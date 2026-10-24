@@ -1530,53 +1530,23 @@ export const AuctionProvider = ({ children }) => {
 
   // End the bidding phase and open the shared two-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
-    if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-    const roomRef = ref(rtdb, `auctions/${roomId}/room`);
-    const roomSnap = await get(roomRef);
-    if (!roomSnap.exists()) throw new Error('Auction room not found');
-    const roomData = roomSnap.val();
-    if (roomData.hostId !== user.uid) throw new Error('Only the host can end the auction');
-    if (roomData.status === 'awaiting_xi' || roomData.status === 'analyzing' || roomData.status === 'completed') return;
-    // The 18-player minimum applies to the standard Mega Auction. Sprint modes
-    // intentionally have squad caps below 18, so they are exempt.
+    if (!user?.uid) throw new Error('Sign in before ending the auction.');
+    const call = httpsCallable(getFunctions(app), 'endAuction');
+    const result = await call({ roomId });
+    const disqualifiedNames = result.data?.disqualifiedNames || [];
+    const roomData = currentAuction || {};
     const minimumSquadRuleApplies = (roomData.auctionType || 'mega') === 'mega';
-    const disqualifiedNames = [];
-    if (minimumSquadRuleApplies) {
-      const teamsRef = ref(rtdb, `auctions/${roomId}/teams`);
-      const teamsSnap = await get(teamsRef);
-      const teamsData = teamsSnap.val() || {};
-      const teamUpdates = {};
-      Object.entries(teamsData).forEach(([teamKey, teamData]) => {
-        if (!teamData?.teamId || teamData.teamId === 'NONE') return;
-        const squadCount = Array.isArray(teamData.squad) ? teamData.squad.length : 0;
-        const disqualified = squadCount < 18;
-        teamUpdates[`${teamKey}/disqualified`] = disqualified;
-        teamUpdates[`${teamKey}/disqualificationReason`] = disqualified
-          ? `Only ${squadCount} players bought; at least 18 are required.`
-          : null;
-        teamUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
-        if (disqualified) disqualifiedNames.push(`${teamData.teamName || teamData.teamId} (${squadCount}/18)`);
-      });
-      if (Object.keys(teamUpdates).length) await updateRtdb(teamsRef, teamUpdates);
-    }
-
-    const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
-    await updateRtdb(roomRef, {
-      status: 'awaiting_xi',
-      xiSubmissionStartedAt: getSyncedTime(),
-      xiSubmissionDeadline: deadline,
-      winnerAnalysisStatus: 'collecting',
-      minimumSquadSize: minimumSquadRuleApplies ? 18 : null
-    });
     const ruleMessage = minimumSquadRuleApplies
       ? ` Minimum squad size is 18; franchises below 18 are disqualified. ${disqualifiedNames.length ? `Disqualified: ${disqualifiedNames.join(', ')}.` : 'All franchises met the minimum squad size.'}`
       : '';
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System',
-      text: `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
-  }, [user, currentAuction, getSyncedTime]);
+    if (!result.data?.alreadyEnded) {
+      await push(ref(rtdb, `auctions/${roomId}/messages`), {
+        userId: 'system', userName: 'System',
+        text: `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
+        type: 'log', timestamp: serverTimestampRtdb()
+      });
+    }
+  }, [user, currentAuction]);
 
   const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayer) => {
     if (!user?.uid) throw new Error('Sign in to submit your Playing XI');
