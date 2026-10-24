@@ -88,3 +88,16 @@ test('host cannot bypass roster protection by writing the room parent', async ()
     players: [{ id: 'host-1' }, { id: 'forged-user', isHost: true }]
   }));
 });
+
+test('members can send only chat messages under their own identity', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertSucceeds(set(ref(memberDb, `auctions/${roomId}/messages/chat-1`), {
+    userId: 'member-1', userName: 'Member', text: 'Hello everyone', type: 'text', timestamp: Date.now()
+  }));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/fake-system`), {
+    userId: 'system', userName: 'System', text: 'Auction ended!', type: 'log', timestamp: Date.now()
+  }));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/spoofed-user`), {
+    userId: 'host-1', userName: 'Host', text: 'Fake host message', type: 'text', timestamp: Date.now()
+  }));
+});
