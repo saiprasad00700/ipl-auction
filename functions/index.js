@@ -633,15 +633,82 @@ export const retryWinnerAnalysis = onCall({ enforceAppCheck: false }, async (req
 });
 
 
+export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, expectedPlayerId } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof expectedPlayerId !== "string" || !PLAYER_CATALOG[expectedPlayerId]) {
+    throw new HttpsError("invalid-argument", "Invalid current player.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const [roomSnap, orderSnap] = await Promise.all([roomRef.get(), root.child("playerOrderIds").get()]);
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const players = Array.isArray(room.players) ? room.players : [];
+  if (!players.some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Only an active room member can advance the auction.");
+  if (room.status !== "active") reject("The auction is not active.");
+  const order = orderSnap.val();
+  if (!Array.isArray(order) || !order.length || order.some((id) => typeof id !== "string" || !PLAYER_CATALOG[id])) {
+    reject("The server-side player order is missing or invalid.");
+  }
+  const liveRef = root.child("live");
+  const now = Date.now();
+  let reachedEnd = false;
+  const tx = await liveRef.transaction((current) => {
+    if (!current || current.playerId !== expectedPlayerId || !["sold", "unsold"].includes(current.status)) return;
+    if (!Number.isFinite(Number(current.transitionDeadline)) || now < Number(current.transitionDeadline)) return;
+    const currentIndex = order.indexOf(current.playerId);
+    const nextId = currentIndex >= 0 ? order[currentIndex + 1] : null;
+    if (!nextId) {
+      reachedEnd = true;
+      return {
+        ...current,
+        status: "awaiting_xi",
+        transitionDeadline: null
+      };
+    }
+    return {
+      playerId: nextId,
+      currentBid: 0,
+      highBidderId: "",
+      highBidderName: "No Bids",
+      highBidderTeamId: "",
+      timerEndsAt: now + Math.max(3, Math.min(30, Number(room.settings?.bidTimer) || 15)) * 1000,
+      status: "bidding"
+    };
+  }, undefined, false);
+  if (!tx.committed) return { ok: false, advanced: false };
+  if (reachedEnd) {
+    await roomRef.update({
+      status: "awaiting_xi",
+      xiSubmissionStartedAt: now,
+      xiSubmissionDeadline: now + 120000,
+      winnerAnalysisStatus: "collecting",
+      lastActivityAt: now
+    });
+  } else {
+    await roomRef.child("lastActivityAt").set(now);
+  }
+  return { ok: true, advanced: true, reachedEnd };
+});
+
+
 export const startAuction = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
-  const { roomId, playerOrder, firstPlayerId } = request.data || {};
+  const { roomId, playerOrder, playerOrderIds, firstPlayerId } = request.data || {};
   requireRoomId(roomId);
   if (!Array.isArray(playerOrder) || playerOrder.length < 1 || playerOrder.length > 1000 ||
       playerOrder.some((index) => !Number.isInteger(index) || index < 0 || index > 999) ||
       new Set(playerOrder).size !== playerOrder.length ||
       typeof firstPlayerId !== "string" || !PLAYER_CATALOG[firstPlayerId]) {
     throw new HttpsError("invalid-argument", "Invalid auction player order.");
+  }
+  if (!Array.isArray(playerOrderIds) || playerOrderIds.length !== playerOrder.length ||
+      playerOrderIds.some((id) => typeof id !== "string" || !PLAYER_CATALOG[id]) ||
+      new Set(playerOrderIds).size !== playerOrderIds.length ||
+      playerOrderIds[0] !== firstPlayerId) {
+    throw new HttpsError("invalid-argument", "Invalid canonical player order.");
   }
   const root = database.ref(`auctions/${roomId}`);
   const roomRef = root.child("room");
@@ -663,6 +730,7 @@ export const startAuction = onCall({ enforceAppCheck: false }, async (request) =
     "room/playerOrder": playerOrder,
     "room/lastActivityAt": now,
     "playerOrder": playerOrder,
+    "playerOrderIds": playerOrderIds,
     "live": {
       playerId: firstPlayerId,
       currentBid: 0,
