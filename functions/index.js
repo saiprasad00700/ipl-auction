@@ -321,6 +321,76 @@ const FRANCHISES = {
   RR: "Rajasthan Royals", SRH: "Sunrisers Hyderabad", GT: "Gujarat Titans", LSG: "Lucknow Super Giants"
 };
 
+
+export const completeWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, rankings, model } = request.data || {};
+  requireRoomId(roomId);
+  if (!Array.isArray(rankings) || rankings.length < 1 || rankings.length > 20) {
+    throw new HttpsError("invalid-argument", "Invalid winner rankings.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room not found.");
+  if (room.hostId !== uid) reject("Only the host can save winner rankings.");
+  if (room.status !== "analyzing") reject("Winner analysis is not currently running.");
+
+  const teamsSnap = await root.child("teams").get();
+  const teams = Object.values(teamsSnap.val() || {}).filter((t) => t?.teamId && t.teamId !== "NONE");
+  const expectedIds = new Set(teams.map((t) => t.teamId));
+  const seenIds = new Set();
+  const seenRanks = new Set();
+  for (const item of rankings) {
+    if (!item || typeof item.franchiseId !== "string" || !expectedIds.has(item.franchiseId) ||
+        seenIds.has(item.franchiseId) || !Number.isInteger(item.rank) || item.rank < 1 ||
+        item.rank > rankings.length || seenRanks.has(item.rank)) {
+      throw new HttpsError("invalid-argument", "Rankings must include valid, unique franchises and ranks.");
+    }
+    if (typeof item.summary !== "string" || item.summary.length > 3000 ||
+        (item.strengths != null && (!Array.isArray(item.strengths) || item.strengths.length > 20)) ||
+        (item.risks != null && (!Array.isArray(item.risks) || item.risks.length > 20))) {
+      throw new HttpsError("invalid-argument", "Ranking details are invalid.");
+    }
+    seenIds.add(item.franchiseId);
+    seenRanks.add(item.rank);
+  }
+  if (seenIds.size !== expectedIds.size || seenRanks.size !== rankings.length) {
+    throw new HttpsError("invalid-argument", "Every franchise must appear exactly once.");
+  }
+  const normalizedModel = typeof model === "string" ? model.slice(0, 80) : "AI";
+  const result = await roomRef.transaction((current) => {
+    if (!current || current.status !== "analyzing") return;
+    return { ...current, status: "completed", winnerAnalysisStatus: "completed",
+      winnerRankings: rankings, winnerAnalysisModel: normalizedModel,
+      winnerAnalysisCompletedAt: Date.now(), winnerAnalysisError: null };
+  }, undefined, false);
+  if (!result.committed) reject("Winner analysis was already completed.");
+  await database.ref(`publicRooms/${roomId}`).remove().catch(() => {});
+  return { ok: true };
+});
+
+export const failWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, errorMessage } = request.data || {};
+  requireRoomId(roomId);
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const snap = await roomRef.get();
+  const room = snap.val();
+  if (!room) reject("Auction room not found.");
+  if (room.hostId !== uid) reject("Only the host can mark winner analysis as failed.");
+  const message = typeof errorMessage === "string" ? errorMessage.slice(0, 500) : "AI analysis failed";
+  const result = await roomRef.transaction((current) => {
+    if (!current || current.status !== "analyzing") return;
+    return { ...current, status: "analysis_failed", winnerAnalysisStatus: "failed",
+      winnerAnalysisError: message, lastActivityAt: Date.now() };
+  }, undefined, false);
+  if (!result.committed) reject("Winner analysis state has already changed.");
+  return { ok: true };
+});
+
 export const claimWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId } = request.data || {};
