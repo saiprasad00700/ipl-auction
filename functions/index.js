@@ -315,6 +315,75 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
 });
 
 
+const FRANCHISES = {
+  MI: "Mumbai Indians", CSK: "Chennai Super Kings", RCB: "Royal Challengers Bengaluru",
+  KKR: "Kolkata Knight Riders", DC: "Delhi Capitals", PBKS: "Punjab Kings",
+  RR: "Rajasthan Royals", SRH: "Sunrisers Hyderabad", GT: "Gujarat Titans", LSG: "Lucknow Super Giants"
+};
+
+export const manageAuctionBots = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, action, teamId, botUserId } = request.data || {};
+  requireRoomId(roomId);
+  if (!["add", "remove", "fill_empty"].includes(action)) {
+    throw new HttpsError("invalid-argument", "Invalid bot-management action.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const snap = await roomRef.get();
+  const room = snap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can manage bots.");
+  if (room.status && !["waiting", "lobby"].includes(room.status)) {
+    reject("Bots can only be managed before the auction starts.");
+  }
+  const players = Array.isArray(room.players) ? room.players : [];
+  const budget = Number(room.settings?.budget || 120);
+  const teamRecord = (id) => ({
+    auctionId: roomId, userId: `bot_${id}`, teamId: id, teamName: FRANCHISES[id],
+    budgetRemaining: budget, spent: 0, squad: [], retentionCardsRemaining: 2
+  });
+
+  if (action === "remove") {
+    const match = /^bot_(MI|CSK|RCB|KKR|DC|PBKS|RR|SRH|GT|LSG)$/.exec(String(botUserId || ""));
+    if (!match) throw new HttpsError("invalid-argument", "Invalid bot identifier.");
+    const targetId = match[0];
+    const nextPlayers = players.filter((p) => p?.id !== targetId);
+    if (nextPlayers.length === players.length) reject("That bot is not in the room.");
+    await root.update({
+      "room/players": nextPlayers,
+      [`teams/${roomId}_${targetId}`]: null,
+      "room/lastActivityAt": Date.now()
+    });
+    return { ok: true, action };
+  }
+
+  const teamIds = action === "add" ? [teamId] : Object.keys(FRANCHISES);
+  if (action === "add" && !Object.prototype.hasOwnProperty.call(FRANCHISES, teamId)) {
+    throw new HttpsError("invalid-argument", "Invalid franchise.");
+  }
+  const added = [];
+  const transaction = await roomRef.child("players").transaction((current) => {
+    const roster = Array.isArray(current) ? current : [];
+    const next = [...roster];
+    const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
+    for (const id of teamIds) {
+      if (taken.has(id) || next.some((p) => p?.id === `bot_${id}`)) continue;
+      next.push({ id: `bot_${id}`, name: `${FRANCHISES[id]} Bot`, team: id,
+        teamName: FRANCHISES[id], isHost: false, isBot: true });
+      taken.add(id);
+      added.push(id);
+    }
+    return next;
+  }, undefined, false);
+  if (!transaction.committed) reject("Could not update the room roster.");
+  const updates = { "room/lastActivityAt": Date.now() };
+  for (const id of added) updates[`teams/${roomId}_bot_${id}`] = teamRecord(id);
+  if (added.length) await root.update(updates);
+  return { ok: true, action, added };
+});
+
+
 export const kickAuctionPlayer = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, playerId } = request.data || {};
