@@ -337,10 +337,7 @@ export const AuctionProvider = ({ children }) => {
       playerOrder: randomizedIndices,
       firstPlayerId: IPL_PLAYERS[randomizedIndices[0]].id
     });
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System', text: 'Auction has started!',
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
+    await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_started' });
   }, [user]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
@@ -756,11 +753,7 @@ export const AuctionProvider = ({ children }) => {
               xiSubmissionDeadline: deadline,
               winnerAnalysisStatus: 'collecting'
             });
-            await push(ref(rtdb, `auctions/${roomId}/messages`), {
-              userId: 'system', userName: 'System',
-              text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
-              type: 'log', timestamp: serverTimestampRtdb()
-            });
+            await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'bidding_ended' });
           }
         } finally {
           // Always release the lock — even if any async step above throws or component unmounts
@@ -846,11 +839,7 @@ export const AuctionProvider = ({ children }) => {
         xiSubmissionDeadline: now + PLAYING_XI_DEADLINE_MS,
         winnerAnalysisStatus: 'collecting'
       });
-      await push(ref(rtdb, `auctions/${roomId}/messages`), {
-        userId: 'system', userName: 'System',
-        text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
-        type: 'log', timestamp: serverTimestampRtdb()
-      });
+      await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'bidding_ended' });
       return;
     }
 
@@ -1372,20 +1361,14 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid) throw new Error('Sign in before pausing the auction.');
     const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
     await call({ roomId, action: 'pause' });
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System', text: 'Auction PAUSED by Admin',
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
+    await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_paused' });
   }, [user]);
 
   const resumeAuction = useCallback(async (roomId) => {
     if (!user?.uid) throw new Error('Sign in before resuming the auction.');
     const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
     await call({ roomId, action: 'resume' });
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System', text: 'Auction RESUMED by Admin',
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
+    await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_resumed' });
   }, [user]);
 
   // End the bidding phase and open the shared two-minute Playing XI window.
@@ -1400,11 +1383,7 @@ export const AuctionProvider = ({ children }) => {
       ? ` Minimum squad size is 18; franchises below 18 are disqualified. ${disqualifiedNames.length ? `Disqualified: ${disqualifiedNames.join(', ')}.` : 'All franchises met the minimum squad size.'}`
       : '';
     if (!result.data?.alreadyEnded) {
-      await push(ref(rtdb, `auctions/${roomId}/messages`), {
-        userId: 'system', userName: 'System',
-        text: `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
-        type: 'log', timestamp: serverTimestampRtdb()
-      });
+      await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_ended' });
     }
   }, [user, currentAuction]);
 
@@ -1412,11 +1391,7 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid) throw new Error('Sign in to submit your Playing XI');
     const call = httpsCallable(getFunctions(app), 'submitPlayingXI');
     await call({ roomId, startingXI, impactPlayer });
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System',
-      text: `Playing XI submitted.`,
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
+    await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'xi_submitted' });
   }, [user]);
 
   // One client claims the analysis phase transactionally after the deadline.
@@ -1516,13 +1491,7 @@ export const AuctionProvider = ({ children }) => {
       const completeCall = httpsCallable(getFunctions(app), 'completeWinnerAnalysis');
       await completeCall({ roomId, rankings, model: analysisModel });
       // The trusted backend persists results and removes the room from the public lobby.
-      await push(ref(rtdb, `auctions/${roomId}/messages`), {
-        userId: 'system', userName: 'System',
-        text: disqualifiedFranchises.length
-          ? `Auction rankings are ready. ${disqualifiedFranchises.length} franchise(s) disqualified for buying fewer than 18 players. Open Auction Summary to view the results.`
-          : 'AI franchise rankings are ready. Open Auction Summary to view the results.',
-        type: 'log', timestamp: serverTimestampRtdb()
-      });
+      await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_completed' });
       await flushAuctionToFirestore(roomId);
     } catch (error) {
       try {
