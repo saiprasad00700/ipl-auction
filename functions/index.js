@@ -313,3 +313,66 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
   await roomRef.child("room/lastActivityAt").set(Date.now());
   return { ok: true, teamId, teamName };
 });
+
+
+export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, action, settings } = request.data || {};
+  requireRoomId(roomId);
+  if (!["update_settings", "pause", "resume"].includes(action)) {
+    throw new HttpsError("invalid-argument", "Invalid auction control action.");
+  }
+  const roomRef = database.ref(`auctions/${roomId}/room`);
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can change auction controls.");
+
+  if (action === "update_settings") {
+    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+      throw new HttpsError("invalid-argument", "Invalid auction settings.");
+    }
+    const safeSettings = {};
+    const allowed = new Set(["bidTimer", "budget", "squadLimit", "overseasLimit", "auctionType"]);
+    for (const [key, value] of Object.entries(settings)) {
+      if (!allowed.has(key)) continue;
+      if (key === "bidTimer" && ![3, 5, 10, 15].includes(Number(value))) {
+        throw new HttpsError("invalid-argument", "Bid timer must be 3, 5, 10, or 15 seconds.");
+      }
+      if (key === "budget" && (!Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > 1000)) {
+        throw new HttpsError("invalid-argument", "Invalid team budget.");
+      }
+      if (key === "squadLimit" && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 40)) {
+        throw new HttpsError("invalid-argument", "Invalid squad limit.");
+      }
+      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10)) {
+        throw new HttpsError("invalid-argument", "Invalid overseas-player limit.");
+      }
+      if (key === "auctionType" && !["mega", "sprint11", "sprint5"].includes(value)) {
+        throw new HttpsError("invalid-argument", "Invalid auction mode.");
+      }
+      safeSettings[key] = key === "auctionType" ? value : Number(value);
+    }
+    if (!Object.keys(safeSettings).length) throw new HttpsError("invalid-argument", "No valid settings were supplied.");
+    await roomRef.child("settings").update(safeSettings);
+    await roomRef.child("lastActivityAt").set(Date.now());
+    return { ok: true, settings: safeSettings };
+  }
+
+  const liveRef = database.ref(`auctions/${roomId}/live`);
+  const liveSnap = await liveRef.get();
+  const live = liveSnap.val();
+  if (!live) reject("Auction lot could not be found.");
+  if (action === "pause") {
+    if (live.status !== "bidding") reject("Only an active bidding timer can be paused.");
+    const remainingMs = Math.max(0, Number(live.timerEndsAt || Date.now()) - Date.now());
+    await liveRef.update({ status: "paused", pausedRemainingMs: remainingMs, pausedAt: Date.now() });
+  } else {
+    if (live.status !== "paused") reject("The auction is not paused.");
+    const seconds = Number(room.settings?.bidTimer || 10);
+    const remainingMs = Math.max(1000, Number(live.pausedRemainingMs || seconds * 1000));
+    await liveRef.update({ status: "bidding", timerEndsAt: Date.now() + remainingMs, pausedRemainingMs: null, pausedAt: null });
+  }
+  await roomRef.child("lastActivityAt").set(Date.now());
+  return { ok: true, action };
+});
