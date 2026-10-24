@@ -321,6 +321,55 @@ const FRANCHISES = {
   RR: "Rajasthan Royals", SRH: "Sunrisers Hyderabad", GT: "Gujarat Titans", LSG: "Lucknow Super Giants"
 };
 
+export const claimWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId } = request.data || {};
+  requireRoomId(roomId);
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (!(Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) {
+    reject("Only an active room member can start winner analysis.");
+  }
+  if (room.status !== "awaiting_xi") reject("The auction is not waiting for Playing XI submissions.");
+  const teamsSnap = await root.child("teams").get();
+  const teams = Object.values(teamsSnap.val() || {}).filter((t) => t?.teamId && t.teamId !== "NONE" && !t.disqualified);
+  const allSubmitted = teams.length >= 2 && teams.every((t) =>
+    Array.isArray(t.playingXI?.startingXI) && t.playingXI.startingXI.length === 11 && Boolean(t.playingXI.impactPlayer));
+  const now = Date.now();
+  if (now < Number(room.xiSubmissionDeadline || 0) && !allSubmitted) {
+    reject("Winner analysis cannot start until every eligible franchise submits or the deadline passes.");
+  }
+  const result = await roomRef.transaction((current) => {
+    if (!current || current.status !== "awaiting_xi") return;
+    return { ...current, status: "analyzing", winnerAnalysisStatus: "analyzing", lastActivityAt: now };
+  }, undefined, false);
+  if (!result.committed) reject("Winner analysis has already been claimed by another client.");
+  return { ok: true, claimed: true };
+});
+
+export const retryWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId } = request.data || {};
+  requireRoomId(roomId);
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can retry winner analysis.");
+  if (room.status !== "analysis_failed") reject("There is no failed winner analysis to retry.");
+  const result = await roomRef.transaction((current) => {
+    if (!current || current.status !== "analysis_failed") return;
+    return { ...current, status: "awaiting_xi", winnerAnalysisStatus: "collecting", winnerAnalysisError: null };
+  }, undefined, false);
+  if (!result.committed) reject("Winner analysis retry was already claimed.");
+  return { ok: true };
+});
+
+
 export const startAuction = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, playerOrder, firstPlayerId } = request.data || {};
