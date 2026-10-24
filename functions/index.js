@@ -378,6 +378,52 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
 });
 
 
+export const endAuction = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId } = request.data || {};
+  requireRoomId(roomId);
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can end the auction.");
+  if (["awaiting_xi", "analyzing", "completed"].includes(room.status)) {
+    return { ok: true, alreadyEnded: true };
+  }
+  if (!["active", "bidding", "paused"].includes(room.status)) {
+    reject("This auction cannot be ended from its current state.");
+  }
+
+  const teamsSnap = await root.child("teams").get();
+  const teams = teamsSnap.val() || {};
+  const minimumSquadRuleApplies = (room.auctionType || "mega") === "mega";
+  const disqualifiedNames = [];
+  const updates = {};
+  for (const [teamKey, team] of Object.entries(teams)) {
+    if (!team?.teamId || team.teamId === "NONE") continue;
+    const squadCount = Array.isArray(team.squad) ? team.squad.length : 0;
+    const disqualified = minimumSquadRuleApplies && squadCount < 18;
+    updates[`teams/${teamKey}/disqualified`] = disqualified;
+    updates[`teams/${teamKey}/disqualificationReason`] = disqualified
+      ? `Only ${squadCount} players bought; at least 18 are required.` : null;
+    updates[`teams/${teamKey}/squadCountAtEnd`] = squadCount;
+    if (disqualified) disqualifiedNames.push(`${team.teamName || team.teamId} (${squadCount}/18)`);
+  }
+
+  const now = Date.now();
+  const deadline = now + 120000;
+  updates["room/status"] = "awaiting_xi";
+  updates["room/xiSubmissionStartedAt"] = now;
+  updates["room/xiSubmissionDeadline"] = deadline;
+  updates["room/winnerAnalysisStatus"] = "collecting";
+  updates["room/minimumSquadSize"] = minimumSquadRuleApplies ? 18 : null;
+  updates["room/lastActivityAt"] = now;
+  await root.update(updates);
+  return { ok: true, deadline, disqualifiedNames };
+});
+
+
 export const submitPlayingXI = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, startingXI, impactPlayer } = request.data || {};
