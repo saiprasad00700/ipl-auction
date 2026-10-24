@@ -376,3 +376,52 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
   await roomRef.child("lastActivityAt").set(Date.now());
   return { ok: true, action };
 });
+
+
+export const submitPlayingXI = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, startingXI, impactPlayer } = request.data || {};
+  requireRoomId(roomId);
+  const playerIdOf = (item) => typeof item === "string" ? item : item?.id;
+  if (!Array.isArray(startingXI) || startingXI.length !== 11 || !impactPlayer) {
+    throw new HttpsError("invalid-argument", "Choose 11 starting players and one Impact Player.");
+  }
+  const ids = startingXI.map(playerIdOf);
+  const impactId = playerIdOf(impactPlayer);
+  if (ids.some((id) => typeof id !== "string" || !PLAYER_CATALOG[id]) ||
+      !PLAYER_CATALOG[impactId] || new Set(ids).size !== 11 || ids.includes(impactId)) {
+    throw new HttpsError("invalid-argument", "The Playing XI must contain 11 unique valid players and a different Impact Player.");
+  }
+
+  const root = database.ref(`auctions/${roomId}`);
+  const roomSnap = await root.child("room").get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.status !== "awaiting_xi") reject("Playing XI submissions are closed.");
+  const now = Date.now();
+  if (now > Number(room.xiSubmissionDeadline || 0)) reject("The Playing XI submission deadline has passed.");
+  if (!(Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) {
+    reject("Only an active room member can submit a Playing XI.");
+  }
+
+  const teamRef = root.child("teams").child(`${roomId}_${uid}`);
+  const teamSnap = await teamRef.get();
+  const team = teamSnap.val();
+  if (!team || team.userId !== uid || !team.teamId || team.teamId === "NONE") reject("Your franchise squad was not found.");
+  if (team.disqualified) reject(team.disqualificationReason || "Your franchise is disqualified.");
+  const squad = Array.isArray(team.squad) ? team.squad : [];
+  const squadIds = new Set(squad.map(playerIdOf));
+  if (ids.concat(impactId).some((id) => !squadIds.has(id))) {
+    throw new HttpsError("invalid-argument", "Every selected player must belong to your purchased squad.");
+  }
+  const overseasCount = ids.filter((id) => PLAYER_CATALOG[id].country !== "IND").length;
+  if (overseasCount > 4) throw new HttpsError("invalid-argument", "A Playing XI can include a maximum of four overseas players.");
+
+  const result = await teamRef.child("playingXI").transaction((current) => {
+    if (current && Number(current.submittedAt || 0) > 0) return;
+    return { startingXI: ids, impactPlayer: impactId, submittedAt: now, autoSelected: false };
+  }, undefined, false);
+  if (!result.committed) reject("A Playing XI has already been submitted for this franchise.");
+  await root.child("room/lastActivityAt").set(now);
+  return { ok: true, submittedAt: now };
+});
