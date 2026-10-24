@@ -69,7 +69,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
 
 export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
-  const { roomId, amount } = request.data || {};
+  const { roomId, amount, botAction = false } = request.data || {};
   requireRoomId(roomId);
   const counterBid = Number(Number(amount).toFixed(2));
   if (!Number.isFinite(counterBid) || counterBid <= 0) throw new HttpsError("invalid-argument", "Enter a valid counter-bid.");
@@ -81,17 +81,27 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   ]);
   const room = roomSnapshot.val();
   const team = teamSnapshot.val();
-  if (!room || !team) reject("Auction room or your franchise could not be found.");
+  if (!room) reject("Auction room could not be found.");
+  if (botAction) {
+    if (room.hostId !== uid || !BOT_IDS.has(`bot_${String(request.data?.botTeamId || "").replace(/^bot_/, "")}`)) {
+      reject("Only the room host may submit a bot counter-bid.");
+    }
+  } else if (!team) {
+    reject("Your franchise could not be found.");
+  }
 
   const liveRef = roomRef.child("live");
   const now = Date.now();
   const result = await liveRef.transaction((live) => {
     if (!live || live.status !== "processing_sale") return;
     const offer = live.retentionOffer;
-    if (!offer || offer.status !== "pending" || offer.phase !== "counter_bid" || offer.buyerId !== uid) return;
+    if (!offer || offer.status !== "pending" || offer.phase !== "counter_bid") return;
+    if (botAction) {
+      if (offer.buyerId !== request.data?.botTeamId || room.hostId !== uid || !BOT_IDS.has(offer.buyerId)) return;
+    } else if (offer.buyerId !== uid) return;
     if (now > Number(offer.expiresAt || 0)) return;
     if (counterBid <= Number(offer.bid || 0)) return;
-    const purse = Number(team.budgetRemaining ?? room.settings?.budget ?? 120);
+    const purse = Number((botAction ? null : team?.budgetRemaining) ?? room.settings?.budget ?? 120);
     if (counterBid > purse || counterBid > purse + Number(team.spent || 0)) return;
     offer.counterBid = counterBid;
     offer.phase = "match_decision";
