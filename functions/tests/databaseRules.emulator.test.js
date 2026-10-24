@@ -19,6 +19,13 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   });
 });
 
+test('clients cannot forge the room inactivity heartbeat', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  const hostDb = env.authenticatedContext('host-1').database();
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/room/lastActivityAt`), Date.now()));
+  await assertFails(set(ref(hostDb, `auctions/${roomId}/room/lastActivityAt`), Date.now()));
+});
+
 test('anonymous clients cannot change auction status', async () => {
   await assertFails(set(ref(env.unauthenticatedContext().database(), `auctions/${roomId}/room/status`), 'completed'));
 });
