@@ -1333,7 +1333,13 @@ export const AuctionProvider = ({ children }) => {
       type,
       timestamp: serverTimestampRtdb()
     });
-    await httpsCallable(getFunctions(app), 'touchAuctionActivity')({ roomId });
+    // The message is already saved; activity-heartbeat failure must not make
+    // the chat appear to have failed after the message was delivered.
+    try {
+      await httpsCallable(getFunctions(app), 'touchAuctionActivity')({ roomId });
+    } catch (activityError) {
+      console.warn('Could not refresh room activity after sending a message:', activityError?.message || activityError);
+    }
   }, [user]);
 
   const placeBid = useCallback(async () => {
