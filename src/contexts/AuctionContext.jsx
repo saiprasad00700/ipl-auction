@@ -620,19 +620,9 @@ export const AuctionProvider = ({ children }) => {
         }
         auctionState = settleTx.snapshot.val();
         if (auctionState.retentionOffer?.status === 'accepted') {
-          await push(ref(rtdb, `auctions/${roomId}/messages`), {
-            userId: 'system', userName: 'System',
-            text: `${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} through RTM for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
-            type: 'retention_accepted',
-            metadata: { playerId: auctionState.playerId, teamId: auctionState.highBidderTeamId, bid: auctionState.currentBid },
-            timestamp: serverTimestampRtdb()
-          });
+          await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'rtm_result' });
         } else if (auctionState.retentionOffer?.status === 'declined' || auctionState.retentionOffer?.status === 'expired') {
-          await push(ref(rtdb, `auctions/${roomId}/messages`), {
-            userId: 'system', userName: 'System',
-            text: `RTM not matched. ${IPL_PLAYERS.find(p => p.id === auctionState.playerId)?.name || 'Player'} goes to ${auctionState.highBidderName} for ₹${Number(auctionState.currentBid).toFixed(2)} Cr.`,
-            type: 'log', timestamp: serverTimestampRtdb()
-          });
+          await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'rtm_result' });
         }
       }
       // Deduct a card only when the original franchise actually retained the player:
@@ -690,20 +680,7 @@ export const AuctionProvider = ({ children }) => {
       const syncPromises = [];
       // A concurrent/recovery client that finds the player already in the squad
       // must not emit a second sale message.
-      if (!isSold || teamSaleApplied) syncPromises.push(push(ref(rtdb, `auctions/${roomId}/messages`), {
-        userId: 'system',
-        userName: 'System',
-        text: logText,
-        type: isSold ? 'sold_card' : 'log',
-        metadata: isSold ? {
-          playerId: auctionState.playerId,
-          teamId: auctionState.highBidderTeamId,
-          bid: auctionState.currentBid,
-          buyerId: auctionState.highBidderId,
-          buyerName: auctionState.highBidderName
-        } : null,
-        timestamp: serverTimestampRtdb()
-      }));
+      if (!isSold || teamSaleApplied) syncPromises.push(httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'sale_result' }));
       await Promise.all(syncPromises);
 
       const waitTime = isSold ? 5000 : 2000;
@@ -978,11 +955,7 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid) throw new Error('Sign in before removing a player.');
     const call = httpsCallable(getFunctions(app), 'kickAuctionPlayer');
     const result = await call({ roomId, playerId: playerObj?.id });
-    await push(ref(rtdb, `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System',
-      text: `${result.data?.playerName || playerObj?.name || 'Player'} has been removed from the session.`,
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
+    await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'player_removed' });
   }, [user]);
 
   // Listen to current auction state live
