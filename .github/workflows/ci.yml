@@ -29,6 +29,11 @@ jobs:
         run: npm --prefix functions install
       - name: Verify Cloud Functions source
         run: npm --prefix functions test
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
       - name: Run Realtime Database emulator security tests
