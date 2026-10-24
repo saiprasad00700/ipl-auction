@@ -88,7 +88,10 @@
           // Lot lifecycle. The host-fallback that closes an expired lot can run
           // on any client, so this cannot be host-only.
           "status": {
-            ".write": "auth != null && (root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid || data.val() == newData.val() || (data.val() == 'awaiting_xi' && newData.val() == 'analyzing') || (data.val() == 'analyzing' && (newData.val() == 'completed' || newData.val() == 'analysis_failed')))",
+            // All lifecycle transitions are performed by host-authorized client actions
+            // or trusted Admin SDK Cloud Functions. Never let a non-host client write
+            // a status transition directly.
+            ".write": "auth != null && root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid",
             ".validate": "newData.val() == 'waiting' || newData.val() == 'active' || newData.val() == 'paused' || newData.val() == 'awaiting_xi' || newData.val() == 'analyzing' || newData.val() == 'analysis_failed' || newData.val() == 'completed'"
           },
 
