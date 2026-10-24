@@ -303,6 +303,41 @@ export const joinAuctionRoom = onCall({ enforceAppCheck: false }, async (request
 });
 
 
+export const sendAuctionChatMessage = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, text } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof text !== "string") {
+    throw new HttpsError("invalid-argument", "Enter a valid message.");
+  }
+  const cleanText = text.trim();
+  if (!cleanText || cleanText.length > 500) {
+    throw new HttpsError("invalid-argument", "Messages must contain 1 to 500 characters.");
+  }
+
+  const roomRef = database.ref(`auctions/${roomId}/room`);
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const member = (Array.isArray(room.players) ? room.players : []).find((p) => p?.id === uid);
+  if (!member || room.bannedPlayers?.includes(uid)) {
+    reject("Only an active room member can send messages.");
+  }
+
+  const messageRef = database.ref(`auctions/${roomId}/messages`).push();
+  const now = Date.now();
+  await messageRef.set({
+    userId: uid,
+    userName: String(member.name || "Manager").slice(0, 80),
+    text: cleanText,
+    type: "text",
+    timestamp: now
+  });
+  await roomRef.child("lastActivityAt").set(now);
+  return { ok: true, messageId: messageRef.key, timestamp: now };
+});
+
+
 export const touchAuctionActivity = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId } = request.data || {};
