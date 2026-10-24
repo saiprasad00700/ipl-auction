@@ -699,17 +699,13 @@ export const AuctionProvider = ({ children }) => {
         try {
           if (roomData.status !== 'active') return;
 
-          const settings = roomData.settings;
           const currentPlayerId = auctionState.playerId;
           const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
           const currentPlayerIndexInOrder = order.findIndex(idx => IPL_PLAYERS[idx] && IPL_PLAYERS[idx].id === currentPlayerId);
           const nextIndexInOrder = currentPlayerIndexInOrder !== -1 ? order[currentPlayerIndexInOrder + 1] : order[0];
 
           if (nextIndexInOrder !== undefined && IPL_PLAYERS[nextIndexInOrder]) {
-            const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-            // Guard the local timeout with the same settled-lot identity as the
-            // recovery path. If another client already advanced it, do not reset
-            // the next player's timer or overwrite newer live state.
+            // The server checks the settled lot identity and deadline before advancing.
             await httpsCallable(getFunctions(app), 'advanceAuctionPlayer')({
               roomId, expectedPlayerId: currentPlayerId
             });
