@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - main
+      - security/firebase-rule-syntax-fix
 
 jobs:
   build-and-test:
@@ -16,6 +17,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -25,6 +31,8 @@ jobs:
         run: npm install
       - name: Run unit tests
         run: npm test
+      - name: Run Firebase Realtime Database rules tests
+        run: npm run test:firebase-rules
       - name: Build production frontend
         run: npm run build
 
