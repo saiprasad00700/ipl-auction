@@ -732,27 +732,20 @@ export const AuctionProvider = ({ children }) => {
 
         // A transaction makes the squad append and budget deduction atomic. If
         // multiple browsers settle the same lot, only the first can apply it.
-        const teamTx = await runTransactionRtdb(teamRef, (current) => {
-          const tData = current || {};
-          const squad = Array.isArray(tData.squad) ? tData.squad : [];
-          if (squad.some((p) => p?.id === auctionState.playerId)) return;
-          return {
-            ...tData,
-            auctionId: roomId,
-            userId: auctionState.highBidderId,
-            teamId: auctionState.highBidderTeamId || tData.teamId || '',
-            teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
-            budgetRemaining: Math.max(0, Number(tData.budgetRemaining ?? defaultBudget) - Number(auctionState.currentBid)),
-            spent: Number(tData.spent || 0) + Number(auctionState.currentBid),
-            retentionCardsRemaining: successfullyRetainedPlayer
-              ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-              : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid }]
-          };
-        });
-
-        const finalTeamData = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
-        teamSaleApplied = Boolean(teamTx.committed);
+        const settleSale = httpsCallable(getFunctions(app), 'applySaleSettlement');
+        const settlementResponse = await settleSale({ roomId, playerId: auctionState.playerId });
+        const settlement = settlementResponse.data;
+        const finalTeamData = {
+          auctionId: roomId,
+          userId: auctionState.highBidderId,
+          teamId: auctionState.highBidderTeamId,
+          teamName: teamDetails?.name || auctionState.highBidderName || 'Unknown',
+          budgetRemaining: settlement.budgetRemaining,
+          spent: settlement.spent,
+          squad: Array.from({ length: settlement.squadCount }, (_, index) => ({ id: index === settlement.squadCount - 1 ? auctionState.playerId : '' })),
+          retentionCardsRemaining: successfullyRetainedPlayer ? Math.max(0, Number(preTeamsData?.[teamDocId]?.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - (settlement.alreadyApplied ? 0 : 1)) : Number(preTeamsData?.[teamDocId]?.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE)
+        };
+        teamSaleApplied = !settlement.alreadyApplied;
         newTeamData = finalTeamData;
 
         // Reconcile room-level counters from the committed team record, not by
