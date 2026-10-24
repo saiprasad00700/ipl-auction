@@ -8,6 +8,82 @@ const database = getDatabase();
 const BOT_IDS = new Set(["bot_MI", "bot_CSK", "bot_RCB", "bot_KKR", "bot_DC", "bot_PBKS", "bot_RR", "bot_SRH", "bot_GT", "bot_LSG"]);
 const DECISIONS = new Set(["accept", "decline", "match", "decline_counter"]);
 
+const PLAYER_CATALOG = {"p_621":{"basePrice":2,"country":"IND"},"p_622":{"basePrice":2,"country":"IND"},"p_101":{"basePrice":2,"country":"IND"},"p_102":{"basePrice":2,"country":"IND"},"p_103":{"basePrice":2,"country":"IND"},"p_104":{"basePrice":2,"country":"IND"},"p_105":{"basePrice":2,"country":"OS"},"p_106":{"basePrice":2,"country":"IND"},"p_107":{"basePrice":2,"country":"OS"},"p_108":{"basePrice":2,"country":"OS"},"p_109":{"basePrice":2,"country":"OS"},"p_110":{"basePrice":2,"country":"OS"},"p_111":{"basePrice":2,"country":"IND"},"p_112":{"basePrice":2,"country":"IND"},"p_114":{"basePrice":2,"country":"OS"},"p_116":{"basePrice":2,"country":"OS"},"p_117":{"basePrice":2,"country":"OS"},"p_118":{"basePrice":2,"country":"IND"},"p_119":{"basePrice":2,"country":"IND"},"p_120":{"basePrice":2,"country":"IND"},"p_121":{"basePrice":2,"country":"OS"},"p_122":{"basePrice":2,"country":"OS"},"p_123":{"basePrice":2,"country":"OS"},"p_124":{"basePrice":2,"country":"OS"},"p_125":{"basePrice":2,"country":"OS"},"p_126":{"basePrice":2,"country":"IND"},"p_127":{"basePrice":2,"country":"IND"},"p_128":{"basePrice":2,"country":"IND"},"p_129":{"basePrice":2,"country":"IND"},"p_130":{"basePrice":2,"country":"IND"},"p_132":{"basePrice":2,"country":"IND"},"p_134":{"basePrice":2,"country":"IND"},"p_135":{"basePrice":2,"country":"IND"},"p_136":{"basePrice":2,"country":"IND"},"p_137":{"basePrice":2,"country":"OS"},"p_138":{"basePrice":2,"country":"OS"},"p_139":{"basePrice":2,"country":"OS"},"p_140":{"basePrice":2,"country":"OS"},"p_141":{"basePrice":2,"country":"IND"},"p_142":{"basePrice":2,"country":"IND"},"p_144":{"basePrice":2,"country":"IND"},"p_145":{"basePrice":2,"country":"IND"},"p_100":{"basePrice":2,"country":"OS"},"p_113":{"basePrice":2,"country":"OS"},"p_115":{"basePrice":2,"country":"OS"},"p_131":{"basePrice":2,"country":"OS"},"p_133":{"basePrice":2,"country":"OS"},"p_143":{"basePrice":2,"country":"OS"},"p_271":{"basePrice":2,"country":"OS"},"p_272":{"basePrice":2,"country":"OS"},"p_279":{"basePrice":2,"country":"OS"},"p_282":{"basePrice":2,"country":"OS"},"p_289":{"basePrice":1,"country":"OS"},"p_146":{"basePrice":1,"country":"IND"},"p_150":{"basePrice":1,"country":"IND"},"p_158":{"basePrice":1,"country":"IND"},"p_159":{"basePrice":1,"country":"IND"},"p_162":{"basePrice":1,"country":"IND"},"p_166":{"basePrice":1,"country":"IND"},"p_167":{"basePrice":1,"country":"OS"},"p_296":{"basePrice":2,"country":"OS"},"p_304":{"basePrice":2,"country":"IND"},"p_172":{"basePrice":0.75,"country":"OS"},"p_216":{"basePrice":0.3,"country":"IND"},"p_254":{"basePrice":0.3,"country":"IND"},"p_264":{"basePrice":0.3,"country":"IND"},"p_193":{"basePrice":0.5,"country":"IND"},"p_196":{"basePrice":0.5,"country":"IND"},"p_240":{"basePrice":0.3,"country":"IND"},"p_281":{"basePrice":2,"country":"IND"},"p_285":{"basePrice":2,"country":"OS"},"p_147":{"basePrice":1,"country":"IND"},"p_148":{"basePrice":1,"country":"OS"},"p_149":{"basePrice":1,"country":"IND"},"p_151":{"basePrice":1,"country":"OS"},"p_152":{"basePrice":1,"country":"IND"},"p_153":{"basePrice":1,"country":"IND"},"p_154":{"basePrice":1,"country":"IND"},"p_155":{"basePrice":1,"country":"IND"},"p_156":{"basePrice":1,"country":"OS"},"p_157":{"basePrice":1,"country":"IND"},"p_160":{"basePrice":1,"country":"OS"},"p_161":{"basePrice":1,"country":"OS"},"p_164":{"basePrice":1,"country":"OS"},"p_165":{"basePrice":1,"country":"IND"},"p_168":{"basePrice":1,"country":"IND"},"p_292":{"basePrice":2,"country":"OS"},"p_300":{"basePrice":2,"country":"OS"},"p_301":{"basePrice":2,"country":"OS"},"p_303":{"basePrice":1,"country":"IND"},"p_174":{"basePrice":0.75,"country":"OS"},"p_180":{"basePrice":0.75,"country":"IND"},"p_183":{"basePrice":0.75,"country":"IND"},"p_185":{"basePrice":0.75,"country":"IND"},"p_186":{"basePrice":0.75,"country":"OS"},"p_220":{"basePrice":0.3,"country":"IND"},"p_241":{"basePrice":0.3,"country":"IND"},"p_245":{"basePrice":0.3,"country":"IND"},"p_188":{"basePrice":0.5,"country":"IND"},"p_189":{"basePrice":0.5,"country":"IND"},"p_190":{"basePrice":0.5,"country":"IND"},"p_198":{"basePrice":0.5,"country":"IND"},"p_199":{"basePrice":0.5,"country":"IND"},"p_203":{"basePrice":0.5,"country":"IND"},"p_219":{"basePrice":0.3,"country":"IND"},"p_253":{"basePrice":0.3,"country":"IND"},"p_275":{"basePrice":0.75,"country":"IND"},"p_276":{"basePrice":0.75,"country":"IND"},"p_280":{"basePrice":2,"country":"OS"},"p_163":{"basePrice":1,"country":"IND"},"p_291":{"basePrice":1,"country":"IND"},"p_181":{"basePrice":0.75,"country":"OS"},"p_218":{"basePrice":0.3,"country":"IND"},"p_243":{"basePrice":0.3,"country":"IND"},"p_195":{"basePrice":0.5,"country":"IND"},"p_197":{"basePrice":0.5,"country":"IND"},"p_200":{"basePrice":0.5,"country":"IND"},"p_201":{"basePrice":0.5,"country":"IND"},"p_202":{"basePrice":0.5,"country":"IND"},"p_206":{"basePrice":0.3,"country":"IND"},"p_226":{"basePrice":0.3,"country":"IND"},"p_237":{"basePrice":0.3,"country":"IND"},"p_250":{"basePrice":0.3,"country":"IND"},"p_268":{"basePrice":0.3,"country":"IND"},"p_295":{"basePrice":2,"country":"OS"},"p_209":{"basePrice":0.3,"country":"IND"},"p_235":{"basePrice":0.3,"country":"IND"},"p_259":{"basePrice":0.3,"country":"IND"},"p_260":{"basePrice":0.3,"country":"IND"},"p_262":{"basePrice":0.3,"country":"IND"},"p_297":{"basePrice":2,"country":"OS"},"p_169":{"basePrice":0.75,"country":"OS"},"p_170":{"basePrice":0.75,"country":"OS"},"p_171":{"basePrice":0.75,"country":"OS"},"p_173":{"basePrice":0.75,"country":"OS"},"p_175":{"basePrice":0.75,"country":"OS"},"p_176":{"basePrice":0.75,"country":"IND"},"p_177":{"basePrice":0.75,"country":"OS"},"p_178":{"basePrice":0.75,"country":"OS"},"p_179":{"basePrice":0.75,"country":"OS"},"p_182":{"basePrice":0.75,"country":"OS"},"p_184":{"basePrice":0.75,"country":"OS"},"p_187":{"basePrice":0.75,"country":"OS"},"p_191":{"basePrice":0.5,"country":"IND"},"p_192":{"basePrice":0.5,"country":"IND"},"p_194":{"basePrice":0.5,"country":"IND"},"p_204":{"basePrice":0.3,"country":"IND"},"p_205":{"basePrice":0.3,"country":"IND"},"p_207":{"basePrice":0.3,"country":"IND"},"p_208":{"basePrice":0.3,"country":"IND"},"p_210":{"basePrice":0.3,"country":"IND"},"p_211":{"basePrice":0.3,"country":"IND"},"p_212":{"basePrice":0.3,"country":"IND"},"p_213":{"basePrice":0.3,"country":"IND"},"p_214":{"basePrice":0.3,"country":"IND"},"p_215":{"basePrice":0.3,"country":"IND"},"p_217":{"basePrice":0.3,"country":"IND"},"p_221":{"basePrice":0.3,"country":"OS"},"p_222":{"basePrice":0.3,"country":"OS"},"p_223":{"basePrice":0.3,"country":"IND"},"p_224":{"basePrice":0.3,"country":"IND"},"p_225":{"basePrice":0.3,"country":"IND"},"p_227":{"basePrice":0.3,"country":"IND"},"p_228":{"basePrice":0.3,"country":"IND"},"p_229":{"basePrice":0.3,"country":"IND"},"p_230":{"basePrice":0.3,"country":"OS"},"p_231":{"basePrice":0.3,"country":"OS"},"p_232":{"basePrice":0.3,"country":"IND"},"p_233":{"basePrice":0.3,"country":"IND"},"p_234":{"basePrice":0.3,"country":"IND"},"p_236":{"basePrice":0.3,"country":"IND"},"p_238":{"basePrice":0.3,"country":"IND"},"p_239":{"basePrice":0.3,"country":"IND"},"p_242":{"basePrice":0.3,"country":"IND"},"p_244":{"basePrice":0.3,"country":"IND"},"p_246":{"basePrice":0.3,"country":"IND"},"p_247":{"basePrice":0.3,"country":"IND"},"p_248":{"basePrice":0.3,"country":"IND"},"p_249":{"basePrice":0.3,"country":"IND"},"p_251":{"basePrice":0.3,"country":"IND"},"p_252":{"basePrice":0.3,"country":"IND"},"p_255":{"basePrice":0.3,"country":"IND"},"p_256":{"basePrice":0.3,"country":"IND"},"p_257":{"basePrice":0.3,"country":"IND"},"p_258":{"basePrice":0.3,"country":"IND"},"p_261":{"basePrice":0.3,"country":"IND"},"p_263":{"basePrice":0.3,"country":"IND"},"p_265":{"basePrice":0.3,"country":"IND"},"p_266":{"basePrice":0.3,"country":"IND"},"p_267":{"basePrice":0.3,"country":"IND"},"p_269":{"basePrice":0.3,"country":"IND"},"p_270":{"basePrice":0.3,"country":"IND"},"p_284":{"basePrice":2,"country":"OS"},"p_294":{"basePrice":2,"country":"OS"},"p_298":{"basePrice":0.75,"country":"IND"},"p_299":{"basePrice":1.5,"country":"OS"},"p_308":{"basePrice":0.3,"country":"IND"},"p_309":{"basePrice":0.3,"country":"IND"},"p_310":{"basePrice":0.3,"country":"IND"},"p_311":{"basePrice":0.3,"country":"IND"},"p_314":{"basePrice":0.5,"country":"IND"},"p_315":{"basePrice":0.3,"country":"IND"},"p_317":{"basePrice":0.3,"country":"IND"},"p_318":{"basePrice":0.3,"country":"IND"},"p_320":{"basePrice":0.3,"country":"IND"},"p_321":{"basePrice":0.3,"country":"IND"},"p_322":{"basePrice":0.3,"country":"IND"},"p_324":{"basePrice":0.3,"country":"IND"},"p_327":{"basePrice":0.3,"country":"IND"},"p_328":{"basePrice":0.3,"country":"IND"},"p_329":{"basePrice":0.3,"country":"IND"},"p_330":{"basePrice":0.3,"country":"IND"},"p_332":{"basePrice":0.3,"country":"IND"},"p_333":{"basePrice":0.3,"country":"IND"},"p_334":{"basePrice":0.5,"country":"IND"},"p_335":{"basePrice":0.3,"country":"IND"},"p_336":{"basePrice":0.3,"country":"IND"},"p_338":{"basePrice":0.3,"country":"IND"},"p_340":{"basePrice":0.3,"country":"IND"},"p_343":{"basePrice":0.75,"country":"OS"},"p_344":{"basePrice":0.75,"country":"IND"},"p_349":{"basePrice":1,"country":"OS"},"p_351":{"basePrice":2,"country":"OS"},"p_352":{"basePrice":0.75,"country":"OS"},"p_353":{"basePrice":2,"country":"OS"},"p_354":{"basePrice":1.5,"country":"OS"},"p_357":{"basePrice":0.75,"country":"OS"},"p_359":{"basePrice":0.75,"country":"OS"},"p_360":{"basePrice":2,"country":"OS"},"p_364":{"basePrice":1.5,"country":"OS"},"p_365":{"basePrice":2,"country":"OS"},"p_366":{"basePrice":2,"country":"OS"},"p_368":{"basePrice":0.75,"country":"IND"},"p_369":{"basePrice":2,"country":"OS"},"p_370":{"basePrice":2,"country":"OS"},"p_371":{"basePrice":2,"country":"OS"},"p_373":{"basePrice":1.5,"country":"IND"},"p_382":{"basePrice":0.3,"country":"IND"},"p_387":{"basePrice":0.3,"country":"IND"},"p_390":{"basePrice":0.3,"country":"IND"},"p_391":{"basePrice":0.3,"country":"IND"},"p_393":{"basePrice":0.3,"country":"IND"},"p_395":{"basePrice":0.3,"country":"IND"},"p_398":{"basePrice":0.3,"country":"IND"},"p_400":{"basePrice":0.3,"country":"IND"},"p_402":{"basePrice":0.3,"country":"IND"},"p_403":{"basePrice":0.3,"country":"IND"},"p_404":{"basePrice":0.3,"country":"IND"},"p_406":{"basePrice":0.3,"country":"IND"},"p_407":{"basePrice":0.3,"country":"IND"},"p_408":{"basePrice":0.3,"country":"IND"},"p_410":{"basePrice":0.3,"country":"IND"},"p_413":{"basePrice":0.3,"country":"IND"},"p_901":{"basePrice":0.3,"country":"IND"},"p_902":{"basePrice":0.75,"country":"RSA"},"p_903":{"basePrice":1.5,"country":"ENG"},"p_904":{"basePrice":0.3,"country":"IND"},"p_906":{"basePrice":0.3,"country":"IND"},"p_907":{"basePrice":0.3,"country":"IND"},"p_908":{"basePrice":0.75,"country":"ZIM"},"p_909":{"basePrice":0.75,"country":"IND"},"p_910":{"basePrice":0.3,"country":"IND"},"p_911":{"basePrice":1,"country":"RSA"},"p_912":{"basePrice":1.5,"country":"RSA"},"p_913":{"basePrice":0.75,"country":"AUS"},"p_914":{"basePrice":0.3,"country":"IND"},"p_915":{"basePrice":0.3,"country":"IND"},"p_916":{"basePrice":0.3,"country":"IND"},"p_917":{"basePrice":0.3,"country":"IND"},"p_918":{"basePrice":1,"country":"ENG"},"p_919":{"basePrice":0.3,"country":"IND"},"p_920":{"basePrice":0.75,"country":"ENG"},"p_921":{"basePrice":0.75,"country":"AUS"}};
+
+export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, botAction = false, botUserId, botTeamId, botName, maxValuation, botBudget, timerSeconds } = request.data || {};
+  requireRoomId(roomId);
+  const roomRef = database.ref(`auctions/${roomId}`);
+  const roomSnapshot = await roomRef.child("room").get();
+  const room = roomSnapshot.val();
+  if (!room) reject("Auction room not found.");
+
+  let bidderId = uid;
+  let bidderTeamId;
+  let bidderName;
+  let maxBid = Number.POSITIVE_INFINITY;
+  if (botAction) {
+    if (room.hostId !== uid || typeof botUserId !== "string" || !BOT_IDS.has(botUserId)
+      || botUserId !== `bot_${String(botTeamId || "").replace(/^bot_/, "")}`) {
+      reject("Only the host may submit a bot bid.");
+    }
+    bidderId = botUserId;
+    bidderTeamId = botTeamId;
+    bidderName = typeof botName === "string" ? botName.slice(0, 80) : "Manager Bot";
+    maxBid = Math.min(Number.isFinite(Number(maxValuation)) ? Number(maxValuation) : 0,
+      Number.isFinite(Number(botBudget)) ? Number(botBudget) : 0);
+  } else {
+    const players = Array.isArray(room.players) ? room.players : [];
+    const member = players.find((p) => p?.id === uid);
+    if (!member || room.bannedPlayers?.includes(uid)) reject("You are not allowed to bid in this room.");
+    bidderTeamId = member.team;
+    bidderName = typeof member.name === "string" ? member.name.slice(0, 80) : "Manager";
+  }
+  if (!bidderTeamId || bidderTeamId === "NONE") reject("Select a franchise before bidding.");
+  const teamSnapshot = await roomRef.child("teams").child(`${roomId}_${bidderId}`).get();
+  const team = teamSnapshot.val();
+  if (!team || team.userId !== bidderId || team.teamId !== bidderTeamId) reject("Your franchise record is not valid.");
+
+  const liveRef = roomRef.child("live");
+  const now = Date.now();
+  const result = await liveRef.transaction((live) => {
+    if (!live || live.status !== "bidding") return;
+    if (live.highBidderId === bidderId) return;
+    if (live.timerEndsAt && now >= Number(live.timerEndsAt)) return;
+    const player = PLAYER_CATALOG[live.playerId];
+    if (!player) return;
+    const squad = Array.isArray(team.squad) ? team.squad : [];
+    if (squad.some((p) => p?.id === live.playerId)) return;
+    const squadLimit = Number(room.squadLimit || 25);
+    if (squad.length >= squadLimit) return;
+    const overseasLimit = Number(room.overseasLimit || 8);
+    const overseasCount = squad.reduce((n, item) => {
+      const entry = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
+      return n + (entry && entry.country !== "IND" ? 1 : 0);
+    }, 0);
+    if (player.country !== "IND" && overseasCount >= overseasLimit) return;
+    const currentBid = Number(live.currentBid || 0);
+    const nextBid = currentBid === 0 ? Number(player.basePrice || 0)
+      : Number((currentBid + (currentBid < 5 ? 0.20 : 0.25)).toFixed(2));
+    if (nextBid > Number(team.budgetRemaining || 0) || nextBid > maxBid) return;
+    live.currentBid = nextBid;
+    live.highBidderId = bidderId;
+    live.highBidderName = bidderName;
+    live.highBidderTeamId = bidderTeamId;
+    const seconds = botAction
+      ? Math.max(3, Math.min(30, Number(timerSeconds) || Number(room.settings?.bidTimer) || 10))
+      : Math.max(3, Math.min(30, Number(room.settings?.bidTimer) || 10));
+    live.timerEndsAt = now + seconds * 1000;
+    live.lastActivityAt = now;
+    return live;
+  }, undefined, false);
+
+  if (!result.committed) reject("Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.");
+  return { ok: true, amount: result.snapshot.val()?.currentBid };
+});
+
+
 function requireAuth(request) {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in before making an RTM decision.");
   return request.auth.uid;
