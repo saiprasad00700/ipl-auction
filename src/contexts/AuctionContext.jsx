@@ -1503,49 +1503,30 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const updateRoomSettings = useCallback(async (roomId, settings) => {
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings });
-  }, []);
+    if (!user?.uid) throw new Error('Sign in before updating auction settings.');
+    const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
+    await call({ roomId, action: 'update_settings', settings });
+  }, [user]);
 
   const pauseAuction = useCallback(async (roomId) => {
-    if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-    
-    // Fire both writes in parallel — no Firestore read needed
-    await Promise.all([
-      updateRtdb(liveRef, { status: 'paused' }),
-      push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `Auction PAUSED by Admin`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      })
-    ]);
-  }, [user, currentAuction]);
+    if (!user?.uid) throw new Error('Sign in before pausing the auction.');
+    const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
+    await call({ roomId, action: 'pause' });
+    await push(ref(rtdb, `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System', text: 'Auction PAUSED by Admin',
+      type: 'log', timestamp: serverTimestampRtdb()
+    });
+  }, [user]);
 
   const resumeAuction = useCallback(async (roomId) => {
-    if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-    
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-    
-    // Use cached settings — no Firestore read needed
-    await Promise.all([
-      updateRtdb(liveRef, { 
-        status: 'bidding',
-        timerEndsAt: getSyncedTime() + (currentAuction.settings?.bidTimer || 10) * 1000
-      }),
-      push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `Auction RESUMED by Admin`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      })
-    ]);
-  }, [getSyncedTime, user, currentAuction]);
+    if (!user?.uid) throw new Error('Sign in before resuming the auction.');
+    const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
+    await call({ roomId, action: 'resume' });
+    await push(ref(rtdb, `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System', text: 'Auction RESUMED by Admin',
+      type: 'log', timestamp: serverTimestampRtdb()
+    });
+  }, [user]);
 
   // End the bidding phase and open the shared two-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
