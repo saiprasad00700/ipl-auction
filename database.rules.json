@@ -144,9 +144,10 @@
           }
         },
 
-        // Whole-tree team sync happens from every client on each sale.
+        // Team budgets, squads and retention cards are written only by trusted
+        // Admin SDK Cloud Functions. Client SDK writes are denied.
         "teams": {
-          ".write": "auth != null"
+          ".write": false
         },
 
         // A user may only write their own presence entry.
