@@ -1496,13 +1496,13 @@ export const AuctionProvider = ({ children }) => {
     const deadlinePassed = getSyncedTime() >= Number(roomData.xiSubmissionDeadline || 0);
     if (!deadlinePassed && !allSubmitted) return;
 
-    const claim = await runTransactionRtdb(roomRef, (current) => {
-      if (!current || current.status !== 'awaiting_xi') return;
-      const stillBeforeDeadline = getSyncedTime() < Number(current.xiSubmissionDeadline || 0);
-      if (stillBeforeDeadline && !allSubmitted) return;
-      return { ...current, status: 'analyzing', winnerAnalysisStatus: 'analyzing' };
-    });
-    if (!claim.committed) return;
+    const claimCall = httpsCallable(getFunctions(app), 'claimWinnerAnalysis');
+    try {
+      await claimCall({ roomId });
+    } catch (error) {
+      // Another client may have claimed analysis, or the submission window may still be open.
+      return;
+    }
 
     try {
       const teamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
@@ -1597,19 +1597,11 @@ export const AuctionProvider = ({ children }) => {
   // Allow a manager to retry a failed AI analysis after fixing the server API configuration.
   // A transaction ensures only one connected client can reclaim the analysis phase.
   const retryWinnerAnalysis = useCallback(async (roomId) => {
-    const roomRef = ref(rtdb, `auctions/${roomId}/room`);
-    const retryClaim = await runTransactionRtdb(roomRef, (current) => {
-      if (!current || current.status !== 'analysis_failed') return;
-      return {
-        ...current,
-        status: 'awaiting_xi',
-        winnerAnalysisStatus: 'collecting',
-        winnerAnalysisError: null
-      };
-    });
-    if (!retryClaim.committed) return;
+    if (!user?.uid) throw new Error('Sign in before retrying winner analysis.');
+    const call = httpsCallable(getFunctions(app), 'retryWinnerAnalysis');
+    await call({ roomId });
     await finalizeWinnerAnalysis(roomId);
-  }, [finalizeWinnerAnalysis]);
+  }, [user, finalizeWinnerAnalysis]);
 
 
 
