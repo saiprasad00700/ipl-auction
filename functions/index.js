@@ -240,5 +240,5 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
     if (!Array.isArray(players)) return;
     return players.map((p) => p.id === buyerId ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: finalTeam.squad.length } : p);
   }, undefined, false);
-  return { ok: true, alreadyApplied: wasAlreadySettled, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, spent: finalTeam.spent, squadCount: finalTeam.squad.length };
+  return { ok: true, alreadyApplied: wasAlreadySettled, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, spent: finalTeam.spent, squadCount: finalTeam.squad.length, team: finalTeam };
 });
