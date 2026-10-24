@@ -2,6 +2,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { applySaleToTeam } from "./saleSettlementHelpers.js";
+import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 
 initializeApp();
 const database = getDatabase();
@@ -630,6 +631,60 @@ export const retryWinnerAnalysis = onCall({ enforceAppCheck: false }, async (req
   }, undefined, false);
   if (!result.committed) reject("Winner analysis retry was already claimed.");
   return { ok: true };
+});
+
+
+export const expireAuctionLot = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, expectedPlayerId } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof expectedPlayerId !== "string" || !PLAYER_CATALOG[expectedPlayerId]) {
+    throw new HttpsError("invalid-argument", "Invalid current player.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const [roomSnap, teamsSnap] = await Promise.all([root.child("room").get(), root.child("teams").get()]);
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const roster = Array.isArray(room.players) ? room.players : [];
+  if (!roster.some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Only an active room member can expire a lot.");
+  if (room.status !== "active") reject("The auction is not active.");
+  const teams = teamsSnap.val() || {};
+  const now = Date.now();
+  let outcome = null;
+  const liveRef = root.child("live");
+  const tx = await liveRef.transaction((live) => {
+    outcome = null;
+    if (!live || live.playerId !== expectedPlayerId || live.status !== "bidding") return;
+    if (Number(live.timerEndsAt) > now) return;
+    const sold = Boolean(live.highBidderId);
+    let offer = null;
+    if (sold) {
+      const originalFranchiseId = PLAYER_ORIGINAL_FRANCHISES[live.playerId];
+      const buyerFranchiseId = live.highBidderTeamId;
+      const eligiblePlayer = roster.find((p) => p?.team === originalFranchiseId && p.id !== live.highBidderId);
+      const teamEntry = Object.entries(teams).find(([, t]) => t?.userId === eligiblePlayer?.id && t?.teamId === originalFranchiseId);
+      const team = teamEntry?.[1] || {};
+      const cards = Number(team.retentionCardsRemaining ?? 2);
+      const purse = Number(team.budgetRemaining ?? room.settings?.budget ?? 120);
+      if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer && cards > 0 && purse >= Number(live.currentBid || 0)) {
+        offer = {
+          playerId: live.playerId, originalFranchiseId, eligibleUserId: eligiblePlayer.id,
+          eligibleTeamName: eligiblePlayer.teamName || originalFranchiseId,
+          buyerId: live.highBidderId, buyerTeamId: buyerFranchiseId, buyerName: live.highBidderName,
+          bid: Number(live.currentBid || 0), counterBid: null, phase: "initial_decision",
+          rtmUsed: false, expiresAt: now + 10000, status: "pending", decision: null
+        };
+      }
+    }
+    live.status = offer ? "processing_sale" : (sold ? "sold" : "unsold");
+    if (offer) live.retentionOffer = offer;
+    else live.transitionDeadline = now + (sold ? 5000 : 2000) + 2500;
+    outcome = offer ? "rtm_opened" : (sold ? "sold" : "unsold");
+    return live;
+  }, undefined, false);
+  if (!tx.committed) return { ok: false, committed: false, state: tx.snapshot.val() || null };
+  await root.child("room/lastActivityAt").set(now);
+  return { ok: true, committed: true, outcome, state: tx.snapshot.val() };
 });
 
 
