@@ -1683,117 +1683,22 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const addBotTeam = useCallback(async (roomId, teamId) => {
-    const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-    const teamDetails = TEAMS.find(t => t.id === teamId);
-    if (!teamDetails) return;
-
-    const botUserId = `bot_${teamId}`;
-    const botName = `${teamDetails.name} Bot`;
-
-    const existingPlayers = data.players || [];
-    if (existingPlayers.some(p => p.id === botUserId || p.team === teamId)) return;
-
-    const updatedPlayers = [...existingPlayers, {
-      id: botUserId,
-      name: botName,
-      team: teamId,
-      teamName: teamDetails.name,
-      isHost: false,
-      isBot: true
-    }];
-
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    const teamDataToSet = {
-      auctionId: roomId,
-      userId: botUserId,
-      teamId,
-      teamName: teamDetails.name,
-      budgetRemaining: data.settings?.budget || 120.0,
-      spent: 0,
-      squad: []
-    };
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${botUserId}`), teamDataToSet);
-  }, []);
+    if (!user?.uid) throw new Error('Sign in before adding a bot.');
+    const call = httpsCallable(getFunctions(app), 'manageAuctionBots');
+    await call({ roomId, action: 'add', teamId });
+  }, [user]);
 
   const removeBotTeam = useCallback(async (roomId, botUserId) => {
-    const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const updatedPlayers = (data.players || []).filter(p => p.id !== botUserId);
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    await set(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
-  }, []);
+    if (!user?.uid) throw new Error('Sign in before removing a bot.');
+    const call = httpsCallable(getFunctions(app), 'manageAuctionBots');
+    await call({ roomId, action: 'remove', botUserId });
+  }, [user]);
 
   const fillEmptyTeamsWithBots = useCallback(async (roomId) => {
-    const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const existingPlayers = data.players || [];
-    const takenTeamIds = new Set(existingPlayers.map(p => p.team).filter(Boolean));
-
-    const updatedPlayers = [...existingPlayers];
-    const teamsToSet = {};
-
-    TEAMS.forEach(t => {
-      if (!takenTeamIds.has(t.id)) {
-        const botUserId = `bot_${t.id}`;
-        const botName = `${t.name} Bot`;
-        updatedPlayers.push({
-          id: botUserId,
-          name: botName,
-          team: t.id,
-          teamName: t.name,
-          isHost: false,
-          isBot: true
-        });
-        teamsToSet[`${roomId}_${botUserId}`] = {
-          auctionId: roomId,
-          userId: botUserId,
-          teamId: t.id,
-          teamName: t.name,
-          budgetRemaining: data.settings?.budget || 120.0,
-          spent: 0,
-          squad: []
-        };
-      }
-    });
-
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    if (Object.keys(teamsToSet).length > 0) {
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/teams`), teamsToSet);
-    }
-  }, []);
+    if (!user?.uid) throw new Error('Sign in before filling empty teams with bots.');
+    const call = httpsCallable(getFunctions(app), 'manageAuctionBots');
+    await call({ roomId, action: 'fill_empty' });
+  }, [user]);
 
   // Guard ref: track the last timer cycle (timerEndsAt) that a bot bid was queued for.
   // Prevents multiple bot bids from being scheduled when currentAuction re-renders
