@@ -128,8 +128,7 @@ export const AuctionProvider = ({ children }) => {
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
     const overseasLimit = isSprint5 ? 2 : 4;
 
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    await set(liveRef, { status: 'waiting' });
+    // Live state is created by the trusted startAuction callable, not by the client.
 
     // Instantly set host online presence in RTDB
     const hostPresenceRef = ref(rtdb, `auctions/${roomId}/presence/${userId}`);
