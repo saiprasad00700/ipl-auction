@@ -215,6 +215,7 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
   const teamSnap = await teamRef.get();
   const team = teamSnap.val();
   if (!team || team.userId !== buyerId || team.teamId !== live.highBidderTeamId) reject("Invalid winning franchise.");
+  const wasAlreadySettled = Array.isArray(team.squad) && team.squad.some((p) => (typeof p === "string" ? p : p?.id) === playerId);
   const price = Number(live.currentBid);
   if (!Number.isFinite(price) || price < 0) reject("Invalid sale price.");
   const offer = live.retentionOffer;
@@ -239,5 +240,5 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
     if (!Array.isArray(players)) return;
     return players.map((p) => p.id === buyerId ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: finalTeam.squad.length } : p);
   }, undefined, false);
-  return { ok: true, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, squadCount: finalTeam.squad.length };
+  return { ok: true, alreadyApplied: wasAlreadySettled, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, squadCount: finalTeam.squad.length };
 });
