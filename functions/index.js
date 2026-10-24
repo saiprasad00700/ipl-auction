@@ -54,7 +54,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
     const player = PLAYER_CATALOG[live.playerId];
     if (!player) return;
     const squad = Array.isArray(team.squad) ? team.squad : [];
-    if (squad.some((p) => p?.id === live.playerId)) return;
+    if (squad.some((p) => (typeof p === "string" ? p : p?.id) === live.playerId)) return;
     const squadLimit = Number(room.squadLimit || 25);
     if (squad.length >= squadLimit) return;
     const overseasLimit = Number(room.overseasLimit || 8);
