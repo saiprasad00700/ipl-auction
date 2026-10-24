@@ -314,28 +314,48 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
     auction_resumed: "Auction RESUMED by Admin",
     auction_ended: "Auction ended. Submit your Playing XI within 2 minutes.",
     xi_submitted: "Playing XI submitted.",
-    auction_completed: "Auction rankings are ready. Open Auction Summary to view the results."
+    auction_completed: "Auction rankings are ready. Open Auction Summary to view the results.",
+    sale_result: "",
+    rtm_result: "",
+    player_removed: "A player has been removed from the session."
   };
   if (!Object.hasOwn(messages, event)) {
     throw new HttpsError("invalid-argument", "Unsupported system event.");
   }
   const root = database.ref("auctions/" + roomId);
-  const roomSnap = await root.child("room").get();
+  const [roomSnap, liveSnap] = await Promise.all([root.child("room").get(), root.child("live").get()]);
   const room = roomSnap.val();
+  const live = liveSnap.val();
   if (!room) reject("Auction room could not be found.");
   const member = (Array.isArray(room.players) ? room.players : []).some((p) => p && p.id === uid);
   if (!member || (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid))) {
     reject("Only an active room member can post system events.");
   }
-  if (["auction_started", "auction_paused", "auction_resumed", "auction_ended"].includes(event) && room.hostId !== uid) {
+  if (["auction_started", "auction_paused", "auction_resumed", "auction_ended", "player_removed"].includes(event) && room.hostId !== uid) {
     reject("Only the room host can post this event.");
   }
   if (event === "auction_started" && room.status !== "active") reject("The auction has not started.");
   if (event === "bidding_ended" && room.status !== "awaiting_xi") reject("Bidding has not ended.");
   if (event === "auction_completed" && !["completed", "analyzing"].includes(room.status)) reject("Auction results are not ready.");
+  let text = messages[event];
+  let type = "log";
+  if (event === "sale_result") {
+    if (!["sold", "unsold"].includes(live?.status)) reject("There is no completed player lot to announce.");
+    text = live.status === "sold"
+      ? String(live.playerId) + " SOLD to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr"
+      : String(live.playerId) + " UNSOLD";
+    type = live.status === "sold" ? "sold_card" : "log";
+  } else if (event === "rtm_result") {
+    const offer = live?.retentionOffer;
+    if (live?.status !== "sold" || !["accepted", "declined", "expired"].includes(offer?.status)) reject("The RTM result is not final.");
+    text = offer.status === "accepted"
+      ? "RTM decision completed for " + String(live.highBidderName || "winning franchise") + "."
+      : "RTM not matched. " + String(live.playerId) + " goes to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr.";
+    type = offer.status === "accepted" ? "retention_accepted" : "log";
+  }
   const now = Date.now();
   const messageRef = root.child("messages").push();
-  await messageRef.set({ userId: "system", userName: "System", text: messages[event], type: "log", timestamp: now });
+  await messageRef.set({ userId: "system", userName: "System", text, type, timestamp: now });
   await root.child("room/lastActivityAt").set(now);
   return { ok: true, messageId: messageRef.key };
 });
