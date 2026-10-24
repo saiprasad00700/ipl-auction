@@ -321,6 +321,53 @@ const FRANCHISES = {
   RR: "Rajasthan Royals", SRH: "Sunrisers Hyderabad", GT: "Gujarat Titans", LSG: "Lucknow Super Giants"
 };
 
+export const startAuction = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, playerOrder, firstPlayerId } = request.data || {};
+  requireRoomId(roomId);
+  if (!Array.isArray(playerOrder) || playerOrder.length < 1 || playerOrder.length > 1000 ||
+      playerOrder.some((index) => !Number.isInteger(index) || index < 0 || index > 999) ||
+      new Set(playerOrder).size !== playerOrder.length ||
+      typeof firstPlayerId !== "string" || !PLAYER_CATALOG[firstPlayerId]) {
+    throw new HttpsError("invalid-argument", "Invalid auction player order.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can start the auction.");
+  if (!["waiting", "lobby"].includes(room.status || "waiting")) reject("The auction has already started.");
+  const roster = Array.isArray(room.players) ? room.players : [];
+  if (!roster.some((p) => p?.id === uid && !room.bannedPlayers?.includes(uid))) {
+    reject("The host must be an active room member.");
+  }
+  const now = Date.now();
+  const liveRef = root.child("live");
+  const liveSnap = await liveRef.get();
+  if (liveSnap.exists()) reject("Auction live state already exists.");
+  const updates = {
+    "room/status": "active",
+    "room/playerOrder": playerOrder,
+    "room/lastActivityAt": now,
+    "playerOrder": playerOrder,
+    "live": {
+      playerId: firstPlayerId,
+      currentBid: 0,
+      highBidderId: "",
+      highBidderName: "No Bids",
+      highBidderTeamId: "",
+      timerEndsAt: now + Math.max(3, Math.min(30, Number(room.settings?.bidTimer) || 15)) * 1000,
+      status: "bidding"
+    },
+    "room/winnerAnalysisStatus": null
+  };
+  await root.update(updates);
+  try { await database.ref(`publicRooms/${roomId}`).update({ status: "active" }); } catch {}
+  return { ok: true, startedAt: now };
+});
+
+
 export const manageAuctionBots = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, action, teamId, botUserId } = request.data || {};
