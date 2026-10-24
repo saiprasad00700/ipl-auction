@@ -150,28 +150,30 @@ const AuctionRoom = () => {
 
    const retentionOffer = displayAuctionState?.retentionOffer;
 
-   // A settled-lot announcement is a temporary visual state, not the source of
-   // truth for auction progression. Hide it after five seconds even if a delayed
-   // RTDB transition leaves the live status at "sold"/"unsold" for longer.
+   // Show one settlement announcement per settled player/status for at most five
+   // seconds. Do not depend on transitionDeadline: recovery may refresh that field
+   // while the lot is still settled, which would restart the timeout and replay it.
    const [settlementCardVisible, setSettlementCardVisible] = useState(false);
+   const settlementAnnouncementKeyRef = useRef(null);
    useEffect(() => {
       const status = displayAuctionState?.status;
       if (status !== 'sold' && status !== 'unsold') {
          setSettlementCardVisible(false);
+         settlementAnnouncementKeyRef.current = null;
          return undefined;
       }
 
+      const announcementKey = `${displayAuctionState?.playerId || 'unknown'}:${status}`;
+      if (settlementAnnouncementKeyRef.current === announcementKey) return undefined;
+
+      settlementAnnouncementKeyRef.current = announcementKey;
       setSettlementCardVisible(true);
       const timeoutId = window.setTimeout(() => {
          setSettlementCardVisible(false);
       }, 5000);
 
       return () => window.clearTimeout(timeoutId);
-   }, [
-      displayAuctionState?.status,
-      displayAuctionState?.playerId,
-      displayAuctionState?.transitionDeadline
-   ]);
+   }, [displayAuctionState?.status, displayAuctionState?.playerId]);
 
    // RTM pending state is local, but offers are shared and change stages.
    // Clear a completed action's stale lock so later offers remain interactive.
