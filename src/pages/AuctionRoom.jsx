@@ -150,23 +150,25 @@ const AuctionRoom = () => {
 
    const retentionOffer = displayAuctionState?.retentionOffer;
 
-   // Show one settlement announcement per settled player/status for at most five
-   // seconds. Do not depend on transitionDeadline: recovery may refresh that field
-   // while the lot is still settled, which would restart the timeout and replay it.
+   // Show a settlement announcement only once per player/status in this room view.
+   // Keep seen keys even if a stale or competing client briefly changes the status
+   // away from sold/unsold and then back again for the same lot.
    const [settlementCardVisible, setSettlementCardVisible] = useState(false);
-   const settlementAnnouncementKeyRef = useRef(null);
+   const settlementAnnouncementKeysRef = useRef(new Set());
    useEffect(() => {
       const status = displayAuctionState?.status;
       if (status !== 'sold' && status !== 'unsold') {
          setSettlementCardVisible(false);
-         settlementAnnouncementKeyRef.current = null;
          return undefined;
       }
 
       const announcementKey = `${displayAuctionState?.playerId || 'unknown'}:${status}`;
-      if (settlementAnnouncementKeyRef.current === announcementKey) return undefined;
+      if (settlementAnnouncementKeysRef.current.has(announcementKey)) {
+         setSettlementCardVisible(false);
+         return undefined;
+      }
 
-      settlementAnnouncementKeyRef.current = announcementKey;
+      settlementAnnouncementKeysRef.current.add(announcementKey);
       setSettlementCardVisible(true);
       const timeoutId = window.setTimeout(() => {
          setSettlementCardVisible(false);
