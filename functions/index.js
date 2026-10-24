@@ -400,6 +400,7 @@ export const claimWinnerAnalysis = onCall({ enforceAppCheck: false }, async (req
   const roomSnap = await roomRef.get();
   const room = roomSnap.val();
   if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can start winner analysis.");
   if (!(Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) {
     reject("Only an active room member can start winner analysis.");
   }
