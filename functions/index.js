@@ -320,6 +320,50 @@ export const touchAuctionActivity = onCall({ enforceAppCheck: false }, async (re
 });
 
 
+export const syncRoomPlayerStats = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, userId } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof userId !== "string" || !userId) {
+    throw new HttpsError("invalid-argument", "A valid team member is required.");
+  }
+
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const [roomSnap, teamSnap] = await Promise.all([
+    roomRef.get(),
+    root.child("teams").child(`${roomId}_${userId}`).get()
+  ]);
+  const room = roomSnap.val();
+  const team = teamSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const activeCaller = (Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid);
+  if (!activeCaller || room.bannedPlayers?.includes(uid)) {
+    reject("Only an active room member can synchronize team totals.");
+  }
+  if (!team || team.userId !== userId) reject("The authoritative team record could not be found.");
+  const playersRef = roomRef.child("players");
+  const result = await playersRef.transaction((current) => {
+    if (!Array.isArray(current)) return;
+    if (!current.some((p) => p?.id === userId)) return;
+    return current.map((p) => p?.id === userId
+      ? {
+          ...p,
+          spent: Number(team.spent || 0),
+          squadCount: Array.isArray(team.squad) ? team.squad.length : 0
+        }
+      : p);
+  }, undefined, false);
+  if (!result.committed) reject("Could not synchronize team totals to the room roster.");
+  return {
+    ok: true,
+    userId,
+    spent: Number(team.spent || 0),
+    squadCount: Array.isArray(team.squad) ? team.squad.length : 0
+  };
+});
+
+
 export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, userId, teamId } = request.data || {};
