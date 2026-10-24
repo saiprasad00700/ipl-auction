@@ -262,6 +262,47 @@ const FRANCHISES = {
   LSG: "Lucknow Super Giants"
 };
 
+export const joinAuctionRoom = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, userId, userName } = request.data || {};
+  requireRoomId(roomId);
+  if (userId !== uid) reject("You can only join a room as yourself.");
+  if (typeof userName !== "string" || !userName.trim() || userName.trim().length > 80) {
+    throw new HttpsError("invalid-argument", "Enter a valid display name.");
+  }
+
+  const roomRef = database.ref(`auctions/${roomId}/room`);
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.status === "completed") reject("This auction has already ended.");
+  if (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid)) {
+    reject("You have been removed from this room and cannot rejoin.");
+  }
+
+  const rosterRef = roomRef.child("players");
+  const joinedAt = Date.now();
+  const result = await rosterRef.transaction((current) => {
+    const players = Array.isArray(current) ? current : [];
+    if (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid)) return;
+    const existing = players.find((p) => p?.id === uid || p?.userId === uid);
+    const cleaned = players.filter((p) => p && p.id !== uid && p.userId !== uid);
+    cleaned.push({
+      ...(existing || {}),
+      id: uid,
+      name: userName.trim(),
+      team: existing?.team || "",
+      teamName: existing?.teamName || "Unknown",
+      isHost: uid === room.hostId
+    });
+    return cleaned;
+  }, undefined, false);
+  if (!result.committed) reject("Could not join the room. Please try again.");
+  await roomRef.child("lastActivityAt").set(joinedAt);
+  return { ok: true, joinedAt };
+});
+
+
 export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, userId, teamId } = request.data || {};
