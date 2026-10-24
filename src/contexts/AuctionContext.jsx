@@ -335,6 +335,7 @@ export const AuctionProvider = ({ children }) => {
     await call({
       roomId,
       playerOrder: randomizedIndices,
+      playerOrderIds: randomizedIndices.map(index => IPL_PLAYERS[index].id),
       firstPlayerId: IPL_PLAYERS[randomizedIndices[0]].id
     });
     await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'auction_started' });
@@ -709,17 +710,8 @@ export const AuctionProvider = ({ children }) => {
             // Guard the local timeout with the same settled-lot identity as the
             // recovery path. If another client already advanced it, do not reset
             // the next player's timer or overwrite newer live state.
-            await runTransactionRtdb(liveRef, (current) => {
-              if (!current || current.playerId !== currentPlayerId
-                || !['sold', 'unsold'].includes(current.status)) return;
-              return {
-                playerId: nextPlayer.id,
-                currentBid: 0,
-                highBidderId: '',
-                highBidderName: 'No Bids',
-                timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
-                status: 'bidding'
-              };
+            await httpsCallable(getFunctions(app), 'advanceAuctionPlayer')({
+              roomId, expectedPlayerId: currentPlayerId
             });
           } else {
             // Natural end of bidding must enter the same shared XI phase as host-triggered end.
@@ -801,36 +793,17 @@ export const AuctionProvider = ({ children }) => {
     const nextIndex = currentIndex >= 0 ? order[currentIndex + 1] : order[0];
 
     if (nextIndex === undefined || !IPL_PLAYERS[nextIndex]) {
-      const claim = await runTransactionRtdb(liveRef, (current) => {
-        if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-        if (Number(current.transitionDeadline) > getSyncedTime()) return;
-        current.status = 'awaiting_xi';
-        current.transitionDeadline = null;
-        return current;
+      const advanced = await httpsCallable(getFunctions(app), 'advanceAuctionPlayer')({
+        roomId, expectedPlayerId: live.playerId
       });
-      if (!claim.committed) return;
-      const now = getSyncedTime();
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
-        status: 'awaiting_xi',
-        xiSubmissionStartedAt: now,
-        xiSubmissionDeadline: now + PLAYING_XI_DEADLINE_MS,
-        winnerAnalysisStatus: 'collecting'
-      });
-      await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'bidding_ended' });
+      if (advanced.data?.reachedEnd) {
+        await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'bidding_ended' });
+      }
       return;
     }
 
-    await runTransactionRtdb(liveRef, (current) => {
-      if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-      if (Number(current.transitionDeadline) > getSyncedTime()) return;
-      return {
-        playerId: IPL_PLAYERS[nextIndex].id,
-        currentBid: 0,
-        highBidderId: '',
-        highBidderName: 'No Bids',
-        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || 10) * 1000,
-        status: 'bidding'
-      };
+    await httpsCallable(getFunctions(app), 'advanceAuctionPlayer')({
+      roomId, expectedPlayerId: live.playerId
     });
   }, [getSyncedTime]);
 
