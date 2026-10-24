@@ -50,3 +50,19 @@ test('team members cannot directly change their own squad or retention cards', a
     retentionCardsRemaining: 0
   }));
 });
+
+test('host cannot bypass team protection through a team-record write', async () => {
+  const hostDb = env.authenticatedContext('host-1').database();
+  await assertFails(update(ref(hostDb, `auctions/${roomId}/teams/ABC123_member`), {
+    budgetRemaining: 999,
+    squad: [{ id: 'p_999' }]
+  }));
+});
+
+test('host cannot replace the entire auction tree to bypass child rules', async () => {
+  const hostDb = env.authenticatedContext('host-1').database();
+  await assertFails(set(ref(hostDb, `auctions/${roomId}`), {
+    room: { hostId: 'host-1', status: 'completed' },
+    teams: { ABC123_member: { budgetRemaining: 999, squad: [{ id: 'p_999' }] } }
+  }));
+});
