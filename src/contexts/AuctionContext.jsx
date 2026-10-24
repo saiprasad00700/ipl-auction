@@ -884,26 +884,10 @@ export const AuctionProvider = ({ children }) => {
         && (offer.decision === 'match'
           || (offer.phase === 'counter_bid' && offer.decision === 'accept'));
 
-      const teamTx = await runTransactionRtdb(teamRef, (current) => {
-        const team = current || {};
-        const squad = Array.isArray(team.squad) ? team.squad : [];
-        // A player in the squad means another client already applied the charge.
-        if (squad.some((p) => p?.id === live.playerId)) return;
-        return {
-          ...team,
-          auctionId: roomId,
-          userId: live.highBidderId,
-          teamId: live.highBidderTeamId || team.teamId || getPlayerOriginalFranchise(live.playerId) || '',
-          teamName: teamDetails?.name || live.highBidderName || team.teamName || 'Unknown',
-          budgetRemaining: Math.max(0, Number(team.budgetRemaining ?? defaultBudget) - Number(live.currentBid || 0)),
-          spent: Number(team.spent || 0) + Number(live.currentBid || 0),
-          retentionCardsRemaining: successfullyRetainedPlayer
-            ? Math.max(0, Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-            : Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0) }]
-        };
-      });
-      const finalTeam = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
+      const settleSale = httpsCallable(getFunctions(app), 'applySaleSettlement');
+      const settlementResponse = await settleSale({ roomId, playerId: live.playerId });
+      const settlement = settlementResponse.data;
+      const finalTeam = settlement.team || null;
       if (!finalTeam) throw new Error('Sale recovery could not find or create the winning team record.');
 
       const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
