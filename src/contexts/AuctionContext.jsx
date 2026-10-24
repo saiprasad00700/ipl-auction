@@ -178,17 +178,8 @@ export const AuctionProvider = ({ children }) => {
     }
 
     if (playerDetails.team) {
-      const rtdbTeamRef = ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`);
-      await set(rtdbTeamRef, {
-        auctionId: roomId,
-        userId: userId,
-        teamId: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        budgetRemaining: budget,
-        spent: 0,
-        squad: [],
-        retentionCardsRemaining: 2
-      });
+      const selectFranchise = httpsCallable(getFunctions(app), 'updatePlayerTeam');
+      await selectFranchise({ roomId, userId, teamId: playerDetails.team });
     }
 
     // Record history without blocking room creation if rules are not deployed yet.
@@ -1010,28 +1001,8 @@ export const AuctionProvider = ({ children }) => {
 
     // Create/Update team in RTDB if team is provided
     if (playerDetails.team) {
-      const rtdbTeamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`));
-      if (!rtdbTeamSnap.exists()) {
-        const teamDataToSet = {
-          auctionId: roomId,
-          userId: userId,
-          teamId: playerDetails.team,
-          teamName: teamDetails?.name || 'Unknown',
-          budgetRemaining: data.settings?.budget || 120.0,
-          spent: 0,
-          squad: [],
-          retentionCardsRemaining: 2
-        };
-        await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
-      } else {
-        const tData = rtdbTeamSnap.val();
-        if (tData.teamId !== playerDetails.team) {
-          await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), {
-            teamId: playerDetails.team,
-            teamName: teamDetails?.name || 'Unknown'
-          });
-        }
-      }
+      const selectFranchise = httpsCallable(getFunctions(app), 'updatePlayerTeam');
+      await selectFranchise({ roomId, userId, teamId: playerDetails.team });
     }
   }, []);
 
