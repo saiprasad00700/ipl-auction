@@ -39,6 +39,14 @@ test('non-host cannot replace the entire auction room', async () => {
   await assertFails(set(ref(env.authenticatedContext('member-1').database(), `auctions/${roomId}`), { room: { hostId: 'member-1', status: 'completed' } }));
 });
 
-test('documents currently permissive team budget write (must be fixed)', async () => {
-  await assertSucceeds(update(ref(env.authenticatedContext('outsider').database(), `auctions/${roomId}/teams/ABC123_member`), { budgetRemaining: 999 }));
+test('unrelated authenticated users cannot change a team budget', async () => {
+  await assertFails(update(ref(env.authenticatedContext('outsider').database(), `auctions/${roomId}/teams/ABC123_member`), { budgetRemaining: 999 }));
+});
+
+test('team members cannot directly change their own squad or retention cards', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(update(ref(memberDb, `auctions/${roomId}/teams/ABC123_member`), {
+    squad: [{ id: 'p_101' }],
+    retentionCardsRemaining: 0
+  }));
 });
