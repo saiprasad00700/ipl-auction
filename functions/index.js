@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { applySaleToTeam } from "./saleSettlementHelpers.js";
 
 initializeApp();
 const database = getDatabase();
@@ -193,4 +194,50 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
 
   if (!result.committed) reject("Counter-bid must be higher than the current price and within your remaining budget, and the RTM window must still be open.");
   return { ok: true, counterBid };
+});
+
+
+export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, playerId } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof playerId !== "string" || !PLAYER_CATALOG[playerId]) {
+    throw new HttpsError("invalid-argument", "Invalid player.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const [roomSnap, liveSnap] = await Promise.all([root.child("room").get(), root.child("live").get()]);
+  const room = roomSnap.val();
+  const live = liveSnap.val();
+  if (!room || !live || live.status !== "sold" || live.playerId !== playerId || !live.highBidderId) reject("Sale is not ready to settle.");
+  if (!(Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Not authorized for this room.");
+  const buyerId = live.highBidderId;
+  const teamRef = root.child("teams").child(`${roomId}_${buyerId}`);
+  const teamSnap = await teamRef.get();
+  const team = teamSnap.val();
+  if (!team || team.userId !== buyerId || team.teamId !== live.highBidderTeamId) reject("Invalid winning franchise.");
+  const price = Number(live.currentBid);
+  if (!Number.isFinite(price) || price < 0) reject("Invalid sale price.");
+  const offer = live.retentionOffer;
+  const retained = offer?.status === "accepted" && team.teamId === offer.originalFranchiseId
+    && (offer.decision === "match" || (offer.phase === "counter_bid" && offer.decision === "accept"));
+  const result = await teamRef.transaction((current) => {
+    if (!current || current.userId !== buyerId || current.teamId !== live.highBidderTeamId) return;
+    const squad = Array.isArray(current.squad) ? current.squad : [];
+    if (squad.some((p) => (typeof p === "string" ? p : p?.id) === playerId)) return current;
+    const player = PLAYER_CATALOG[playerId];
+    const overseas = squad.reduce((n, item) => {
+      const p = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
+      return n + (p && p.country !== "IND" ? 1 : 0);
+    }, 0);
+    if (squad.length >= Number(room.squadLimit || 25) || (player.country !== "IND" && overseas >= Number(room.overseasLimit || 8))) return;
+    return applySaleToTeam(current, playerId, price, retained);
+  }, undefined, false);
+  const finalTeam = result.snapshot.val();
+  const alreadyApplied = Array.isArray(finalTeam?.squad) && finalTeam.squad.some((p) => (typeof p === "string" ? p : p?.id) === playerId);
+  if (!alreadyApplied) reject("Sale settlement failed; purse or squad limits may have changed.");
+  await root.child("room/players").transaction((players) => {
+    if (!Array.isArray(players)) return;
+    return players.map((p) => p.id === buyerId ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: finalTeam.squad.length } : p);
+  }, undefined, false);
+  return { ok: true, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, squadCount: finalTeam.squad.length };
 });
