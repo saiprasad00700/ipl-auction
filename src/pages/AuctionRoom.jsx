@@ -150,6 +150,29 @@ const AuctionRoom = () => {
 
    const retentionOffer = displayAuctionState?.retentionOffer;
 
+   // A settled-lot announcement is a temporary visual state, not the source of
+   // truth for auction progression. Hide it after five seconds even if a delayed
+   // RTDB transition leaves the live status at "sold"/"unsold" for longer.
+   const [settlementCardVisible, setSettlementCardVisible] = useState(false);
+   useEffect(() => {
+      const status = displayAuctionState?.status;
+      if (status !== 'sold' && status !== 'unsold') {
+         setSettlementCardVisible(false);
+         return undefined;
+      }
+
+      setSettlementCardVisible(true);
+      const timeoutId = window.setTimeout(() => {
+         setSettlementCardVisible(false);
+      }, 5000);
+
+      return () => window.clearTimeout(timeoutId);
+   }, [
+      displayAuctionState?.status,
+      displayAuctionState?.playerId,
+      displayAuctionState?.transitionDeadline
+   ]);
+
    // RTM pending state is local, but offers are shared and change stages.
    // Clear a completed action's stale lock so later offers remain interactive.
    useEffect(() => {
@@ -1275,7 +1298,7 @@ const AuctionRoom = () => {
                <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center custom-scrollbar">
                   <div className="w-full max-w-4xl flex flex-col gap-4 md:gap-6">
                      <AnimatePresence mode="wait">
-                        {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') ? (() => {
+                        {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') && settlementCardVisible ? (() => {
                             const isSold = displayAuctionState.status === 'sold';
                             const buyerTeam = isSold ? TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId) : null;
                             const slogan = isSold ? (TEAM_SLOGANS[buyerTeam?.id] || { slogan: 'IPL 2026!', hashtag: '#IPL' }) : null;
@@ -1369,7 +1392,18 @@ const AuctionRoom = () => {
                                   </div>
                                </motion.div>
                             );
-                         })() : (
+                         })() : (['sold', 'unsold'].includes(displayAuctionState?.status) ? (
+                           <motion.div
+                              key="settlement-pending"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="w-full max-w-md mx-auto rounded-2xl border border-white/10 bg-white/5 p-8 text-center"
+                           >
+                              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-emerald-400" />
+                              <p className="text-sm font-black uppercase tracking-widest text-white">Moving to next player…</p>
+                              <p className="mt-2 text-xs text-gray-400">The announcement has closed. The auction is syncing the next lot.</p>
+                           </motion.div>
+                        ) : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
                               <div className="bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]">
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
@@ -1507,7 +1541,7 @@ const AuctionRoom = () => {
                                  </div>
                               </div>
                            </motion.div>
-                        )}
+                        ))}
                      </AnimatePresence>
                   </div>
                </main>
