@@ -555,45 +555,12 @@ export const AuctionProvider = ({ children }) => {
         });
 
         // A decision is accepted only if it was made by the eligible manager before expiry.
-        const settleTx = await runTransactionRtdb(liveRef, (currentData) => {
-          if (!currentData || currentData.status !== 'processing_sale') return;
-          const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending') return;
-          const now = getSyncedTime();
-          const initialDeclined = offer.phase === 'initial_decision'
-            && offer.decision === 'decline'
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          const matchDecisionMade = offer.phase === 'match_decision'
-            && ['match', 'decline_counter'].includes(offer.decision)
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
-          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
-            currentData.highBidderId = offer.eligibleUserId;
-            currentData.highBidderName = offer.eligibleTeamName;
-            currentData.highBidderTeamId = offer.originalFranchiseId;
-            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
-            offer.status = 'accepted';
-          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
-            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
-              currentData.highBidderId = offer.eligibleUserId;
-              currentData.highBidderName = offer.eligibleTeamName;
-              currentData.highBidderTeamId = offer.originalFranchiseId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'accepted';
-            } else {
-              currentData.highBidderId = offer.buyerId;
-              currentData.highBidderName = offer.buyerName;
-              currentData.highBidderTeamId = offer.buyerTeamId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'declined';
-            }
-          } else {
-            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
-          }
-          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
-          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
-          return currentData;
-        });
+        const settleResponse = await httpsCallable(getFunctions(app), 'finalizeExpiredRetentionOffer')({ roomId });
+        const settleData = settleResponse.data || {};
+        const settleTx = {
+          committed: Boolean(settleData.committed),
+          snapshot: { val: () => settleData.state || null }
+        };
         if (!settleTx.committed) {
           const failedState = settleTx.snapshot?.val() || null;
           const failedOffer = failedState?.retentionOffer || null;
