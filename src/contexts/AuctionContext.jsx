@@ -1502,85 +1502,13 @@ export const AuctionProvider = ({ children }) => {
     await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
   }, [user]);
 
-  const placeBid = useCallback(async (amount) => {
+  const placeBid = useCallback(async () => {
     if (!currentAuction) throw new Error("Auction not found!");
-    if (!user) throw new Error("Please log in to bid!");
+    if (!user?.uid) throw new Error("Please log in to bid!");
     if (!team) throw new Error("You must select a team in the lobby to participate!");
-    if (currentAuction.bannedPlayers && currentAuction.bannedPlayers.includes(user.uid)) {
-      throw new Error("You have been removed from this auction and cannot bid.");
-    }
-    if (currentAuction.currentAuction?.status !== 'bidding') throw new Error("Auction is not accepting bids right now.");
-    if (currentAuction.currentAuction?.highBidderId === user.uid) throw new Error("You are already the highest bidder!");
-
-    // Squad limit check
-    const squadLimit = currentAuction.squadLimit || 25;
-    if (team.squad && team.squad.length >= squadLimit) {
-      throw new Error(`You have reached the squad limit of ${squadLimit} players!`);
-    }
-
-    // Overseas limit check
-    const player = IPL_PLAYERS.find(p => p.id === currentAuction.currentAuction?.playerId);
-    const isOverseas = player && player.country !== 'IND';
-    const overseasLimit = currentAuction.overseasLimit || 8;
-    if (isOverseas && team.squad) {
-      const currentOverseasCount = team.squad.reduce((count, s) => {
-        const pInfo = IPL_PLAYERS.find(p => p.id === (typeof s === 'string' ? s : s.id));
-        return pInfo && pInfo.country !== 'IND' ? count + 1 : count;
-      }, 0);
-      if (currentOverseasCount >= overseasLimit) {
-        throw new Error(`You have reached the overseas quota of ${overseasLimit} players for this mode!`);
-      }
-    }
-
-    // ── Bug Fix 1: Budget pre-flight check OUTSIDE the transaction ──
-    // The transaction update function is retried by Firebase on conflicts — using team.budgetRemaining
-    // inside it reads a stale React closure each retry, not the live DB value. We do the check here
-    // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
-    const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const incSnapshot = cBidSnapshot < 5 ? 0.20 : 0.25;
-    const nextBidSnapshot = cBidSnapshot === 0
-      ? (player?.basePrice || 0)
-      : parseFloat((cBidSnapshot + incSnapshot).toFixed(2));
-    const myBudget = team.budgetRemaining || 0;
-    if (myBudget < nextBidSnapshot) {
-      throw new Error('Insufficient budget to place this bid.');
-    }
-
-    const liveRef = ref(rtdb, `auctions/${currentAuction.id}/live`);
-    const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === user.uid) return; // abort
-
-      const now = getSyncedTime();
-      // Server-side guard: Reject late bids if timer has already expired
-      if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
-        return; // abort transaction
-      }
-
-      const cBid = currentData.currentBid || 0;
-      const inc = cBid < 5 ? 0.20 : 0.25;
-      const nAmount = cBid === 0
-        ? (IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0)
-        : parseFloat((cBid + inc).toFixed(2));
-
-      // Guard: Abort retried transaction if updated bid exceeds user's budget
-      if (nAmount > myBudget) return;
-
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = user.uid;
-      currentData.highBidderName = user.displayName || 'Manager';
-      currentData.highBidderTeamId = team.teamId;
-      currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || 10) * 1000;
-      currentData.lastActivityAt = now;
-
-      return currentData;
-    });
-
-    if (!txResult.committed) {
-      throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
-    }
-  }, [currentAuction, user, team, getSyncedTime]);
+    const call = httpsCallable(getFunctions(app), 'placeBid');
+    await call({ roomId: currentAuction.id });
+  }, [currentAuction, user, team]);
 
   const decideRetention = useCallback(async (roomId, decision, botAction = false) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
@@ -1911,35 +1839,19 @@ export const AuctionProvider = ({ children }) => {
   // ─── Bot Management & Bidding Engine ───
 
   const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName, timerSeconds = 10, maxValuation = Infinity, botBudget = Infinity) => {
-    if (!roomId) return;
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-
-    await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === botUserId) return; // abort
-
-      const now = getSyncedTime();
-      // Reject if timer has already expired server-side
-      if (currentData.timerEndsAt && now >= currentData.timerEndsAt) return;
-      
-      const cBid = currentData.currentBid || 0;
-      const inc = cBid < 5 ? 0.20 : 0.25;
-      const nAmount = cBid === 0 ? IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0 : parseFloat((cBid + inc).toFixed(2));
-
-      // Guard: Abort retried transaction if updated bid exceeds bot's max valuation or remaining budget
-      if (nAmount > maxValuation || nAmount > botBudget) return;
-
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = botUserId;
-      currentData.highBidderName = botName;
-      currentData.highBidderTeamId = botTeamId;
-      // Use the room's configured timer, NOT a hardcoded 10 seconds
-      currentData.timerEndsAt = now + (timerSeconds * 1000);
-      
-      return currentData;
+    if (!roomId || !user?.uid) return;
+    const call = httpsCallable(getFunctions(app), 'placeBid');
+    await call({
+      roomId,
+      botAction: true,
+      botUserId,
+      botTeamId,
+      botName,
+      timerSeconds,
+      maxValuation: Number.isFinite(maxValuation) ? maxValuation : 0,
+      botBudget: Number.isFinite(botBudget) ? botBudget : 0
     });
-  }, [getSyncedTime]);
+  }, [user]);
 
   const addBotTeam = useCallback(async (roomId, teamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
