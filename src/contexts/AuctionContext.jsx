@@ -985,7 +985,7 @@ export const AuctionProvider = ({ children }) => {
 
     // Refresh the inactivity heartbeat separately; do not let it block history.
     try {
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+      await httpsCallable(getFunctions(app), 'touchAuctionActivity')({ roomId });
     } catch (activityError) {
       console.warn('Could not refresh room activity after joining:', activityError?.message || activityError);
     }
@@ -1357,7 +1357,7 @@ export const AuctionProvider = ({ children }) => {
       type,
       timestamp: serverTimestampRtdb()
     });
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+    await httpsCallable(getFunctions(app), 'touchAuctionActivity')({ roomId });
   }, [user]);
 
   const placeBid = useCallback(async () => {
