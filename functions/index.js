@@ -315,11 +315,7 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
 });
 
 
-const FRANCHISES = {
-  MI: "Mumbai Indians", CSK: "Chennai Super Kings", RCB: "Royal Challengers Bengaluru",
-  KKR: "Kolkata Knight Riders", DC: "Delhi Capitals", PBKS: "Punjab Kings",
-  RR: "Rajasthan Royals", SRH: "Sunrisers Hyderabad", GT: "Gujarat Titans", LSG: "Lucknow Super Giants"
-};
+
 
 
 export const completeWinnerAnalysis = onCall({ enforceAppCheck: false }, async (request) => {
