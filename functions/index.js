@@ -315,6 +315,38 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
 });
 
 
+export const kickAuctionPlayer = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, playerId } = request.data || {};
+  requireRoomId(roomId);
+  if (typeof playerId !== "string" || playerId.length < 1 || playerId.length > 128) {
+    throw new HttpsError("invalid-argument", "Invalid player.");
+  }
+  const root = database.ref(`auctions/${roomId}`);
+  const roomRef = root.child("room");
+  const roomSnap = await roomRef.get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  if (room.hostId !== uid) reject("Only the room host can remove a player.");
+  if (room.status && !["waiting", "lobby"].includes(room.status)) {
+    reject("Players can only be removed before the auction starts.");
+  }
+
+  const members = Array.isArray(room.players) ? room.players : [];
+  const target = members.find((player) => player?.id === playerId);
+  if (!target) reject("That player is no longer in this room.");
+  const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
+  const updates = {
+    "room/players": members.filter((player) => player?.id !== playerId),
+    "room/bannedPlayers": [...new Set([...banned, playerId])],
+    "room/lastActivityAt": Date.now(),
+  };
+  updates[`teams/${roomId}_${playerId}`] = null;
+  await root.update(updates);
+  return { ok: true, playerName: String(target.name || "Player").slice(0, 80) };
+});
+
+
 export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, action, settings } = request.data || {};
