@@ -62,7 +62,7 @@
           runs after a sale will simply no-op for non-hosts (it is wrapped in a
           try/catch); use scripts/cleanup-rtdb-auctions.js to purge old rooms.
         */
-        ".write": "auth != null && !newData.exists() && data.child('room/hostId').val() == auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('room/hostId').val() == auth.uid) || (!newData.exists() && data.child('room/hostId').val() == auth.uid))",
 
         "room": {
           ".read": "auth != null",
