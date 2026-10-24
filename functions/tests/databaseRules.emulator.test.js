@@ -108,3 +108,11 @@ test('members cannot replace the messages collection or write a forged system ev
     fake: { userId: 'system', userName: 'System', text: 'Forged', type: 'log', timestamp: Date.now() }
   }));
 });
+
+test('clients cannot directly mutate live auction state', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  const hostDb = env.authenticatedContext('host-1').database();
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/live/currentBid`), 999));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/live/status`), 'sold'));
+  await assertFails(set(ref(hostDb, `auctions/${roomId}/live/status`), 'awaiting_xi'));
+});
