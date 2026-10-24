@@ -150,6 +150,29 @@ const AuctionRoom = () => {
 
    const retentionOffer = displayAuctionState?.retentionOffer;
 
+   // A settled-lot announcement is a temporary visual state, not the source of
+   // truth for auction progression. Hide it after five seconds even if a delayed
+   // RTDB transition leaves the live status at "sold"/"unsold" for longer.
+   const [settlementCardVisible, setSettlementCardVisible] = useState(false);
+   useEffect(() => {
+      const status = displayAuctionState?.status;
+      if (status !== 'sold' && status !== 'unsold') {
+         setSettlementCardVisible(false);
+         return undefined;
+      }
+
+      setSettlementCardVisible(true);
+      const timeoutId = window.setTimeout(() => {
+         setSettlementCardVisible(false);
+      }, 5000);
+
+      return () => window.clearTimeout(timeoutId);
+   }, [
+      displayAuctionState?.status,
+      displayAuctionState?.playerId,
+      displayAuctionState?.transitionDeadline
+   ]);
+
    // RTM pending state is local, but offers are shared and change stages.
    // Clear a completed action's stale lock so later offers remain interactive.
    useEffect(() => {
@@ -1275,7 +1298,7 @@ const AuctionRoom = () => {
                <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center custom-scrollbar">
                   <div className="w-full max-w-4xl flex flex-col gap-4 md:gap-6">
                      <AnimatePresence mode="wait">
-                        {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') ? (() => {
+                        {(displayAuctionState?.status === 'sold' || displayAuctionState?.status === 'unsold') && settlementCardVisible ? (() => {
                             const isSold = displayAuctionState.status === 'sold';
                             const buyerTeam = isSold ? TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId) : null;
                             const slogan = isSold ? (TEAM_SLOGANS[buyerTeam?.id] || { slogan: 'IPL 2026!', hashtag: '#IPL' }) : null;
