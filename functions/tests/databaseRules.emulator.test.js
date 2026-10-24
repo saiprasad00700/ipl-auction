@@ -74,3 +74,10 @@ test('ordinary members cannot directly alter the room roster', async () => {
     { id: 'outsider', isHost: true }
   ]));
 });
+
+test('host cannot bypass roster protection by writing the room parent', async () => {
+  const hostDb = env.authenticatedContext('host-1').database();
+  await assertFails(update(ref(hostDb, `auctions/${roomId}/room`), {
+    players: [{ id: 'host-1' }, { id: 'forged-user', isHost: true }]
+  }));
+});
