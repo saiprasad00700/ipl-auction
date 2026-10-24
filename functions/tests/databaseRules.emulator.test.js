@@ -101,3 +101,10 @@ test('members can send only chat messages under their own identity', async () =>
     userId: 'host-1', userName: 'Host', text: 'Fake host message', type: 'text', timestamp: Date.now()
   }));
 });
+
+test('members cannot replace the messages collection or write a forged system event', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages`), {
+    fake: { userId: 'system', userName: 'System', text: 'Forged', type: 'log', timestamp: Date.now() }
+  }));
+});
