@@ -1324,22 +1324,10 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const sendMessage = useCallback(async (roomId, text, type = 'text') => {
-    if (!user) return;
-    const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-    await push(msgRef, {
-      userId: user.uid,
-      userName: user.displayName || 'Manager',
-      text,
-      type,
-      timestamp: serverTimestampRtdb()
-    });
-    // The message is already saved; activity-heartbeat failure must not make
-    // the chat appear to have failed after the message was delivered.
-    try {
-      await httpsCallable(getFunctions(app), 'touchAuctionActivity')({ roomId });
-    } catch (activityError) {
-      console.warn('Could not refresh room activity after sending a message:', activityError?.message || activityError);
-    }
+    if (!user?.uid) throw new Error('Sign in before sending a message.');
+    if (type !== 'text') throw new Error('Only regular chat messages can be sent through chat.');
+    const sendChat = httpsCallable(getFunctions(app), 'sendAuctionChatMessage');
+    await sendChat({ roomId, text });
   }, [user]);
 
   const placeBid = useCallback(async () => {
