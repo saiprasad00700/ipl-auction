@@ -81,8 +81,8 @@
 
           // Activity heartbeat used by the scheduled 30-minute inactivity cleanup.
           "lastActivityAt": {
-            ".write": "auth != null",
-            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+            // Updated only by trusted server functions.
+            ".write": false
           },
 
           // Lot lifecycle. The host-fallback that closes an expired lot can run
