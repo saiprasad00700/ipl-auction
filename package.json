@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/auctionWinnerRules.test.js tests/playerOriginalFranchises.test.js",
     "test:firebase-rules": "firebase emulators:exec --only database --project demo-ss-auction-rules \"node --test tests/firebaseRules.test.js\""
   },
   "dependencies": {
