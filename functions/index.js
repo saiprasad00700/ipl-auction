@@ -19,6 +19,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
   const roomSnapshot = await roomRef.child("room").get();
   const room = roomSnapshot.val();
   if (!room) reject("Auction room not found.");
+  if (room.status !== "active") reject("Bidding is not open for this auction.");
 
   let bidderId = uid;
   let bidderTeamId;
