@@ -301,17 +301,15 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
     retentionCardsRemaining: Number(existingTeam?.retentionCardsRemaining ?? 2)
   };
 
-  const [memberUpdate, teamUpdate] = await Promise.all([
-    roomRef.child("room/players").transaction((current) => {
-      if (!Array.isArray(current)) return;
-      if (current.some((p) => p?.id !== userId && p?.team === teamId)) return;
-      const index = current.findIndex((p) => p?.id === userId);
-      if (index < 0) return;
-      return current.map((p) => p.id === userId ? { ...p, team: teamId, teamName } : p);
-    }, undefined, false),
-    teamRef.set(teamRecord)
-  ]);
+  const memberUpdate = await roomRef.child("room/players").transaction((current) => {
+    if (!Array.isArray(current)) return;
+    if (current.some((p) => p?.id !== userId && p?.team === teamId)) return;
+    const index = current.findIndex((p) => p?.id === userId);
+    if (index < 0) return;
+    return current.map((p) => p.id === userId ? { ...p, team: teamId, teamName } : p);
+  }, undefined, false);
   if (!memberUpdate.committed) reject("That franchise was just selected by another manager. Please choose another.");
+  await teamRef.set(teamRecord);
   await roomRef.child("room/lastActivityAt").set(Date.now());
   return { ok: true, teamId, teamName };
 });
