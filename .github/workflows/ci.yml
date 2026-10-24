@@ -25,6 +25,10 @@ jobs:
         run: npm install
       - name: Run unit tests
         run: npm test
+      - name: Install Firebase rules test tools
+        run: npm install --no-save --package-lock=false @firebase/rules-unit-testing firebase-tools
+      - name: Test Realtime Database rules in emulator
+        run: npx firebase emulators:exec --only database --project demo-ss-auction-rules "node --test tests/firebaseRules.test.js"
       - name: Build production frontend
         run: npm run build
 
