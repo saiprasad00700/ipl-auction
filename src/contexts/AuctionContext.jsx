@@ -379,110 +379,15 @@ export const AuctionProvider = ({ children }) => {
         }
       }
 
-      // Read the room and franchise roster before claiming the expired lot.
-      const preRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-      const preRoomData = preRoomSnap.exists() ? preRoomSnap.val() : {};
-      const preTeamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
-      const preTeamsData = preTeamsSnap.exists() ? preTeamsSnap.val() : {};
-      const { getPlayerOriginalFranchise } = await import('../data/playerOriginalFranchises');
-      const { RETENTION_DECISION_MS, RETENTION_CARDS_PER_FRANCHISE, canUseRetentionCard } = await import('../lib/auctionWinnerRules');
-
-      // Claim the lot atomically. If an eligible original franchise manager is present,
-      // pause settlement for the five-second retention decision before charging anyone.
-      const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData) return;
-        const now = getSyncedTime();
-
-        // Recovery path: if the client that opened a retention offer disconnected,
-        // any connected client can settle it after its deadline.
-        if (currentData.status === 'processing_sale') {
-          const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending') return;
-          // Another client may still be inside the current RTM decision window.
-          // Do not abort the transaction just because this timer tick arrived early.
-          if (now < Number(offer.expiresAt) + 1500) return;
-          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
-            // Original franchise exercised RTM but the winning bidder did not raise in time.
-            currentData.highBidderId = offer.eligibleUserId;
-            currentData.highBidderName = offer.eligibleTeamName;
-            currentData.highBidderTeamId = offer.originalFranchiseId;
-            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
-            offer.status = 'accepted';
-          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
-            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
-              currentData.highBidderId = offer.eligibleUserId;
-              currentData.highBidderName = offer.eligibleTeamName;
-              currentData.highBidderTeamId = offer.originalFranchiseId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'accepted';
-            } else {
-              currentData.highBidderId = offer.buyerId;
-              currentData.highBidderName = offer.buyerName;
-              currentData.highBidderTeamId = offer.buyerTeamId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'declined';
-            }
-          } else {
-            // No RTM, or the initial decision expired: the original winning bid stands.
-            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
-          }
-          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
-          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
-          return currentData;
-        }
-
-        if (currentData.status !== 'bidding') return;
-        if (currentData.timerEndsAt && now < currentData.timerEndsAt) return;
-
-        const isSold = !!currentData.highBidderId;
-        let retentionOffer = null;
-        if (isSold) {
-          const originalFranchiseId = getPlayerOriginalFranchise(currentData.playerId);
-          const buyerFranchiseId = currentData.highBidderTeamId;
-          const eligiblePlayer = (preRoomData.players || []).find((p) =>
-            p.team === originalFranchiseId && p.id !== currentData.highBidderId
-          );
-          const eligibleTeamEntry = Object.entries(preTeamsData).find(([, t]) =>
-            t.userId === eligiblePlayer?.id && t.teamId === originalFranchiseId
-          );
-          const eligibleTeamData = eligibleTeamEntry?.[1] || {};
-          const cardsRemaining = Number.isFinite(Number(eligibleTeamData.retentionCardsRemaining))
-            ? Number(eligibleTeamData.retentionCardsRemaining)
-            : RETENTION_CARDS_PER_FRANCHISE;
-          const purseRemaining = Number(eligibleTeamData.budgetRemaining ?? preRoomData.settings?.budget ?? 120);
-          if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer
-            && canUseRetentionCard({
-              originalFranchiseId,
-              eligibleFranchiseId: eligibleTeamData.teamId,
-              cardsRemaining,
-              purseRemaining,
-              winningBid: Number(currentData.currentBid || 0)
-            })) {
-            retentionOffer = {
-              playerId: currentData.playerId,
-              originalFranchiseId,
-              eligibleUserId: eligiblePlayer.id,
-              eligibleTeamName: eligiblePlayer.teamName || originalFranchiseId,
-              buyerId: currentData.highBidderId,
-              buyerTeamId: buyerFranchiseId,
-              buyerName: currentData.highBidderName,
-              bid: Number(currentData.currentBid || 0),
-              counterBid: null,
-              phase: 'initial_decision',
-              rtmUsed: false,
-              expiresAt: now + RETENTION_DECISION_MS,
-              status: 'pending',
-              decision: null
-            };
-          }
-        }
-        currentData.status = retentionOffer ? 'processing_sale' : (isSold ? 'sold' : 'unsold');
-        // Shared deadline lets another connected client recover if the coordinator tab closes.
-        if (!retentionOffer) currentData.transitionDeadline = now + (isSold ? 5000 : 2000) + 2500;
-        else delete currentData.transitionDeadline;
-        if (retentionOffer) currentData.retentionOffer = retentionOffer;
-        return currentData;
-      });
+      // Expiry and RTM offer creation are validated and committed by trusted server functions.
+      const transitionResponse = initialLive.status === 'processing_sale'
+        ? await httpsCallable(getFunctions(app), 'finalizeExpiredRetentionOffer')({ roomId })
+        : await httpsCallable(getFunctions(app), 'expireAuctionLot')({ roomId, expectedPlayerId: initialLive.playerId });
+      const transitionData = transitionResponse.data || {};
+      const txResult = {
+        committed: Boolean(transitionData.committed),
+        snapshot: { val: () => transitionData.state || null }
+      };
 
       if (!txResult.committed) {
         const latestState = txResult.snapshot?.val();
