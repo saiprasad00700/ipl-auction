@@ -633,6 +633,58 @@ export const retryWinnerAnalysis = onCall({ enforceAppCheck: false }, async (req
 });
 
 
+export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId } = request.data || {};
+  requireRoomId(roomId);
+  const root = database.ref(`auctions/${roomId}`);
+  const roomSnap = await root.child("room").get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const roster = Array.isArray(room.players) ? room.players : [];
+  if (!roster.some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Only an active room member can settle an expired RTM offer.");
+  const now = Date.now();
+  const liveRef = root.child("live");
+  const tx = await liveRef.transaction((live) => {
+    if (!live || live.status !== "processing_sale") return;
+    const offer = live.retentionOffer;
+    if (!offer || offer.status !== "pending") return;
+    const initialDeclined = offer.phase === "initial_decision" && offer.decision === "decline" && Number(offer.decidedAt) <= Number(offer.expiresAt);
+    const matchDecisionMade = offer.phase === "match_decision" && ["match", "decline_counter"].includes(offer.decision) && Number(offer.decidedAt) <= Number(offer.expiresAt);
+    if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
+    if (offer.phase === "counter_bid" && offer.rtmUsed) {
+      live.highBidderId = offer.eligibleUserId;
+      live.highBidderName = offer.eligibleTeamName;
+      live.highBidderTeamId = offer.originalFranchiseId;
+      live.currentBid = Number(offer.bid || live.currentBid || 0);
+      offer.status = "accepted";
+    } else if (offer.phase === "match_decision" && offer.counterBid != null) {
+      if (offer.decision === "match" && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
+        live.highBidderId = offer.eligibleUserId;
+        live.highBidderName = offer.eligibleTeamName;
+        live.highBidderTeamId = offer.originalFranchiseId;
+        live.currentBid = Number(offer.counterBid);
+        offer.status = "accepted";
+      } else {
+        live.highBidderId = offer.buyerId;
+        live.highBidderName = offer.buyerName;
+        live.highBidderTeamId = offer.buyerTeamId;
+        live.currentBid = Number(offer.counterBid);
+        offer.status = "declined";
+      }
+    } else {
+      offer.status = offer.decision === "decline" ? "declined" : "expired";
+    }
+    live.status = live.highBidderId ? "sold" : "unsold";
+    live.transitionDeadline = now + (live.status === "sold" ? 5000 : 2000) + 2500;
+    return live;
+  }, undefined, false);
+  if (!tx.committed) return { ok: false, committed: false, state: tx.snapshot.val() || null };
+  await root.child("room/lastActivityAt").set(now);
+  return { ok: true, committed: true, state: tx.snapshot.val() };
+});
+
+
 export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, expectedPlayerId } = request.data || {};
