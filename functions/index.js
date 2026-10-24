@@ -77,7 +77,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   const roomRef = database.ref(`auctions/${roomId}`);
   const [roomSnapshot, teamSnapshot] = await Promise.all([
     roomRef.child("room").get(),
-    roomRef.child("teams").child(`${roomId}_${uid}`).get()
+    roomRef.child("teams").child(`${roomId}_${botAction ? request.data?.botTeamId : uid}`).get()
   ]);
   const room = roomSnapshot.val();
   const team = teamSnapshot.val();
@@ -101,8 +101,8 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
     } else if (offer.buyerId !== uid) return;
     if (now > Number(offer.expiresAt || 0)) return;
     if (counterBid <= Number(offer.bid || 0)) return;
-    const purse = Number((botAction ? null : team?.budgetRemaining) ?? room.settings?.budget ?? 120);
-    if (counterBid > purse || counterBid > purse + Number(team.spent || 0)) return;
+    const purse = Number(team?.budgetRemaining ?? room.settings?.budget ?? 120);
+    if (counterBid > purse || counterBid > purse + Number(team?.spent || 0)) return;
     offer.counterBid = counterBid;
     offer.phase = "match_decision";
     offer.decision = null;
