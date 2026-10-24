@@ -29,6 +29,10 @@ jobs:
         run: npm --prefix functions install
       - name: Verify Cloud Functions source
         run: npm --prefix functions test
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+      - name: Run Realtime Database emulator security tests
+        run: firebase emulators:exec --only database --project demo-ss-auction-security "npm --prefix functions run test:rules"
       - name: Build production frontend
         run: npm run build
 
