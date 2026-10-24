@@ -163,8 +163,11 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
     if (room.hostId !== uid || !BOT_IDS.has(`bot_${String(request.data?.botTeamId || "").replace(/^bot_/, "")}`)) {
       reject("Only the room host may submit a bot counter-bid.");
     }
-  } else if (!team) {
+  } else if (!team || team.userId !== uid) {
     reject("Your franchise could not be found.");
+  }
+  if (!team || team.userId !== (botAction ? request.data?.botTeamId : uid)) {
+    reject("The counter-bidder franchise record is invalid.");
   }
 
   const liveRef = roomRef.child("live");
@@ -176,6 +179,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
     if (botAction) {
       if (offer.buyerId !== request.data?.botTeamId || room.hostId !== uid || !BOT_IDS.has(offer.buyerId)) return;
     } else if (offer.buyerId !== uid) return;
+    if (team.teamId !== offer.buyerTeamId) return;
     if (now > Number(offer.expiresAt || 0)) return;
     if (counterBid <= Number(offer.bid || 0)) return;
     const purse = Number(team?.budgetRemaining ?? room.settings?.budget ?? 120);
