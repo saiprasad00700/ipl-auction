@@ -957,8 +957,10 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Update the roster first, preserving its array shape.
-    await set(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers);
+    // Add/update the roster through a trusted callable; clients cannot write
+    // the room roster directly under the security rules.
+    const joinRoomCall = httpsCallable(getFunctions(app), 'joinAuctionRoom');
+    await joinRoomCall({ roomId, userId, userName: updatedPlayer.name });
 
     // Save history independently of the activity heartbeat. A heartbeat/rules
     // failure must never prevent a successfully joined room from being recorded.
