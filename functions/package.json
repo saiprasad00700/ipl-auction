@@ -7,10 +7,15 @@
   },
   "main": "index.js",
   "scripts": {
-    "test": "node --check index.js && node --test tests/*.test.js"
+    "test": "node --check index.js && node --test tests/saleSettlementHelpers.test.js",
+    "test:rules": "node --test tests/databaseRules.emulator.test.js"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^6.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^12.11.0"
   }
 }
