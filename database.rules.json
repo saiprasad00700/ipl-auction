@@ -69,7 +69,7 @@
 
           // Created by the host when the room node is empty; afterwards only the
           // host may replace the whole document.
-          ".write": "auth != null && (!data.exists() || data.child('hostId').val() == auth.uid)",
+          ".write": "auth != null && !data.exists() && newData.child('hostId').val() == auth.uid",
 
           // Host identity can never change once set.
           "hostId": { ".validate": "newData.isString() && (!data.exists() || newData.val() == data.val())" },
