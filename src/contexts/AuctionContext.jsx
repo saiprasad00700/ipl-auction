@@ -126,7 +126,7 @@ export const AuctionProvider = ({ children }) => {
     
     const budget = isSprint5 ? 60.0 : isSprint11 ? 90.0 : 120.0;
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
-    const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : 8;
+    const overseasLimit = isSprint5 ? 2 : 4;
 
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     await set(liveRef, { status: 'waiting' });
@@ -918,7 +918,7 @@ export const AuctionProvider = ({ children }) => {
               auctionType: sData.auction_type || 'mega',
               isPublic: sData.is_public !== false,
               squadLimit: sData.squad_limit || 25,
-              overseasLimit: sData.overseas_limit || 8,
+              overseasLimit: sData.overseas_limit || 4,
               players: sData.players || [],
               bannedPlayers: sData.banned_players || [],
               settings: sData.settings || { bidTimer: 10, budget: 120 }
