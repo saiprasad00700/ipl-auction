@@ -25,6 +25,10 @@ jobs:
         run: npm install
       - name: Run unit tests
         run: npm test
+      - name: Install Cloud Functions dependencies
+        run: npm --prefix functions install
+      - name: Verify Cloud Functions source
+        run: npm --prefix functions test
       - name: Build production frontend
         run: npm run build
 
