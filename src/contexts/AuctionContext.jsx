@@ -1089,46 +1089,15 @@ export const AuctionProvider = ({ children }) => {
 
   // Kick a player from the room
   const kickPlayer = useCallback(async (roomId, playerObj) => {
-    try {
-      const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-      if (!rtdbRoomSnap.exists()) return;
-      const data = rtdbRoomSnap.val();
-
-      // 1. Filter out the player and add to banned list
-      const updatedPlayers = (data.players || []).filter(p => p.id !== playerObj.id);
-      const updatedBanned = [...(data.bannedPlayers || []), playerObj.id];
-
-      // 2. Update RTDB
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { 
-        players: updatedPlayers,
-        bannedPlayers: updatedBanned 
-      });
-
-      // Sync player removal to Supabase
-      /*
-      try {
-        if (supabase) {
-          await supabase.from('auctions').update({ players: updatedPlayers, banned_players: updatedBanned }).eq('id', roomId);
-        }
-      } catch (sErr) {}
-      */
-
-      // 3. Delete team in RTDB
-      await set(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${playerObj.id}`), null);
-
-      // 4. Add to messages collection
-      const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-      await push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `${playerObj.name} has been removed from the session.`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      });
-    } catch (err) {
-      // Error kicking player
-    }
-  }, []);
+    if (!user?.uid) throw new Error('Sign in before removing a player.');
+    const call = httpsCallable(getFunctions(app), 'kickAuctionPlayer');
+    const result = await call({ roomId, playerId: playerObj?.id });
+    await push(ref(rtdb, `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System',
+      text: `${result.data?.playerName || playerObj?.name || 'Player'} has been removed from the session.`,
+      type: 'log', timestamp: serverTimestampRtdb()
+    });
+  }, [user]);
 
   // Listen to current auction state live
   const joinAuction = useCallback((auctionId, userId) => {
