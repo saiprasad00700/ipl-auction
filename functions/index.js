@@ -303,6 +303,44 @@ export const joinAuctionRoom = onCall({ enforceAppCheck: false }, async (request
 });
 
 
+export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, event } = request.data || {};
+  requireRoomId(roomId);
+  const messages = {
+    auction_started: "Auction has started!",
+    bidding_ended: "Bidding has ended. Submit your Playing XI within 2 minutes.",
+    auction_paused: "Auction PAUSED by Admin",
+    auction_resumed: "Auction RESUMED by Admin",
+    auction_ended: "Auction ended. Submit your Playing XI within 2 minutes.",
+    xi_submitted: "Playing XI submitted.",
+    auction_completed: "Auction rankings are ready. Open Auction Summary to view the results."
+  };
+  if (!Object.hasOwn(messages, event)) {
+    throw new HttpsError("invalid-argument", "Unsupported system event.");
+  }
+  const root = database.ref("auctions/" + roomId);
+  const roomSnap = await root.child("room").get();
+  const room = roomSnap.val();
+  if (!room) reject("Auction room could not be found.");
+  const member = (Array.isArray(room.players) ? room.players : []).some((p) => p && p.id === uid);
+  if (!member || (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid))) {
+    reject("Only an active room member can post system events.");
+  }
+  if (["auction_started", "auction_paused", "auction_resumed", "auction_ended"].includes(event) && room.hostId !== uid) {
+    reject("Only the room host can post this event.");
+  }
+  if (event === "auction_started" && room.status !== "active") reject("The auction has not started.");
+  if (event === "bidding_ended" && room.status !== "awaiting_xi") reject("Bidding has not ended.");
+  if (event === "auction_completed" && !["completed", "analyzing"].includes(room.status)) reject("Auction results are not ready.");
+  const now = Date.now();
+  const messageRef = root.child("messages").push();
+  await messageRef.set({ userId: "system", userName: "System", text: messages[event], type: "log", timestamp: now });
+  await root.child("room/lastActivityAt").set(now);
+  return { ok: true, messageId: messageRef.key };
+});
+
+
 export const sendAuctionChatMessage = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, text } = request.data || {};
