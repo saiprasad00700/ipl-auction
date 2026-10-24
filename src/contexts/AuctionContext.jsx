@@ -1497,47 +1497,11 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
-    const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    
-    const data = rtdbRoomSnap.val();
-    const teamDetails = TEAMS.find(t => t.id === newTeamId);
-    
-    const updatedPlayers = (data.players || []).map(p => 
-      p.id === userId ? { ...p, team: newTeamId, teamName: teamDetails?.name || 'Unknown' } : p
-    );
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    if (!user?.uid) throw new Error('Sign in before choosing a franchise.');
+    const call = httpsCallable(getFunctions(app), 'updatePlayerTeam');
+    await call({ roomId, userId, teamId: newTeamId });
+  }, [user]);
 
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    // Update RTDB team node (0 Firestore cost in lobby!)
-    const rtdbTeamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`));
-    if (rtdbTeamSnap.exists()) {
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), {
-        teamId: newTeamId,
-        teamName: teamDetails?.name || 'Unknown'
-      });
-    } else {
-      const teamDataToSet = {
-        auctionId: roomId,
-        userId: userId,
-        teamId: newTeamId,
-        teamName: teamDetails?.name || 'Unknown',
-        budgetRemaining: data.settings?.budget || 120.0,
-        spent: 0,
-        squad: [],
-        retentionCardsRemaining: 2
-      };
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
-    }
-  }, []);
-  
   const updateRoomSettings = useCallback(async (roomId, settings) => {
     await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings });
   }, []);
