@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - main
+      - security/firebase-rule-syntax-fix
 
 jobs:
   build-and-test:
