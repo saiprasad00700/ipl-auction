@@ -66,3 +66,11 @@ test('host cannot replace the entire auction tree to bypass child rules', async 
     teams: { ABC123_member: { budgetRemaining: 999, squad: [{ id: 'p_999' }] } }
   }));
 });
+
+test('ordinary members cannot directly alter the room roster', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/room/players`), [
+    { id: 'member-1' },
+    { id: 'outsider', isHost: true }
+  ]));
+});
