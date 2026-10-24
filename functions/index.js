@@ -58,7 +58,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
     if (squad.some((p) => (typeof p === "string" ? p : p?.id) === live.playerId)) return;
     const squadLimit = Number(room.squadLimit || 25);
     if (squad.length >= squadLimit) return;
-    const overseasLimit = Number(room.overseasLimit || 8);
+    const overseasLimit = Number(room.overseasLimit ?? 4);
     const overseasCount = squad.reduce((n, item) => {
       const entry = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
       return n + (entry && entry.country !== "IND" ? 1 : 0);
@@ -234,7 +234,7 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
       const p = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
       return n + (p && p.country !== "IND" ? 1 : 0);
     }, 0);
-    if (squad.length >= Number(room.squadLimit || 25) || (player.country !== "IND" && overseas >= Number(room.overseasLimit || 8))) return;
+    if (squad.length >= Number(room.squadLimit || 25) || (player.country !== "IND" && overseas >= Number(room.overseasLimit ?? 4))) return;
     return applySaleToTeam(current, playerId, price, retained);
   }, undefined, false);
   const finalTeam = result.snapshot.val();
@@ -609,8 +609,8 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
       if (key === "squadLimit" && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 40)) {
         throw new HttpsError("invalid-argument", "Invalid squad limit.");
       }
-      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 10)) {
-        throw new HttpsError("invalid-argument", "Invalid overseas-player limit.");
+      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 4)) {
+        throw new HttpsError("invalid-argument", "Overseas-player limit cannot exceed four.");
       }
       if (key === "auctionType" && !["mega", "sprint11", "sprint5"].includes(value)) {
         throw new HttpsError("invalid-argument", "Invalid auction mode.");
