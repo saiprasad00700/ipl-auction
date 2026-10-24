@@ -2081,7 +2081,6 @@ export const AuctionProvider = ({ children }) => {
     // rechecks the live offer, so a stale timer cannot override a human decision.
     setTimeout(async () => {
       const roomId = currentAuction.id;
-      const liveRef = ref(rtdb, `auctions/${roomId}/live`);
       const roomData = currentAuction;
       const player = IPL_PLAYERS.find((p) => p.id === offer.playerId);
       const botTeam = roomTeams.find((t) => t.userId === botId || t.id === `${roomId}_${botId}`);
@@ -2118,22 +2117,7 @@ export const AuctionProvider = ({ children }) => {
         if (phase === 'initial_decision' && offer.eligibleUserId === botId) {
           const shouldUseRtm = isMarquee && cardsRemaining > 0 && canAddPlayer
             && budget >= Number(offer.bid || 0);
-          await runTransactionRtdb(liveRef, (current) => {
-            const currentOffer = current?.retentionOffer;
-            if (!current || current.status !== 'processing_sale' || !currentOffer
-              || currentOffer.status !== 'pending' || currentOffer.phase !== 'initial_decision'
-              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
-              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
-            currentOffer.decision = shouldUseRtm ? 'accept' : 'decline';
-            currentOffer.decidedBy = user.uid;
-            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
-            if (shouldUseRtm) {
-              currentOffer.rtmUsed = true;
-              currentOffer.phase = 'counter_bid';
-              currentOffer.expiresAt = getSyncedTime() + 15000;
-            }
-            return current;
-          });
+          await decideRetention(roomId, shouldUseRtm ? 'accept' : 'decline', true);
         } else if (phase === 'counter_bid' && offer.buyerId === botId) {
           // Counter-prices are between ₹5 Cr and ₹20 Cr and must exceed the
           // original bid. If the bid is already ₹20 Cr or the bot cannot afford
@@ -2143,22 +2127,7 @@ export const AuctionProvider = ({ children }) => {
           if (canAddPlayer && maxCounter >= minCounter) {
             const steps = Math.floor((maxCounter - minCounter) * 4 + 0.0001);
             const counterBid = Number((minCounter + Math.floor(Math.random() * (steps + 1)) / 4).toFixed(2));
-            await runTransactionRtdb(liveRef, (current) => {
-              const currentOffer = current?.retentionOffer;
-              if (!current || current.status !== 'processing_sale' || !currentOffer
-                || currentOffer.status !== 'pending' || currentOffer.phase !== 'counter_bid'
-                || currentOffer.buyerId !== botId || currentOffer.decision !== 'accept'
-                || getSyncedTime() > Number(currentOffer.expiresAt)
-                || counterBid <= Number(currentOffer.bid)
-                || counterBid > 20
-                || counterBid > Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
-              currentOffer.counterBid = counterBid;
-              currentOffer.phase = 'match_decision';
-              currentOffer.decision = null;
-              currentOffer.expiresAt = getSyncedTime() + 10000;
-              current.currentBid = counterBid;
-              return current;
-            });
+            await submitRetentionCounterBid(roomId, counterBid, botId);
           }
         } else if (phase === 'match_decision' && offer.eligibleUserId === botId
           && offer.counterBid != null) {
@@ -2167,25 +2136,14 @@ export const AuctionProvider = ({ children }) => {
           const leavesEnoughPurse = slotsLeft <= 1 || (budget - counterBid) / slotsAfter >= 0.30;
           const shouldMatch = isMarquee && cardsRemaining > 0 && canAddPlayer
             && budget >= counterBid && leavesEnoughPurse;
-          await runTransactionRtdb(liveRef, (current) => {
-            const currentOffer = current?.retentionOffer;
-            if (!current || current.status !== 'processing_sale' || !currentOffer
-              || currentOffer.status !== 'pending' || currentOffer.phase !== 'match_decision'
-              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
-              || Number(currentOffer.counterBid) !== counterBid
-              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
-            currentOffer.decision = shouldMatch ? 'match' : 'decline_counter';
-            currentOffer.decidedBy = user.uid;
-            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
-            return current;
-          });
+          await decideRetention(roomId, shouldMatch ? 'match' : 'decline_counter', true);
         }
       } catch (error) {
         console.warn('[Bot RTM] Automated decision failed:', error);
         lastBotRtmActionRef.current = null;
       }
     }, 350 + Math.random() * 650);
-  }, [currentAuction, user, roomTeams, getSyncedTime]);
+  }, [currentAuction, user, roomTeams, getSyncedTime, decideRetention, submitRetentionCounterBid]);
 
   // Host Bidding Bot Loop Effect
   useEffect(() => {
