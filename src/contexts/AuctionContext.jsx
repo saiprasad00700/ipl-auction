@@ -683,20 +683,8 @@ export const AuctionProvider = ({ children }) => {
         // previous client committed the squad transaction but disconnected before
         // updating room.players.
         if (finalTeamData) {
-          const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
-          const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
-            if (!Array.isArray(currentPlayers)) return;
-            return currentPlayers.map((p) => p.id === auctionState.highBidderId
-              ? {
-                  ...p,
-                  spent: Number(finalTeamData.spent || 0),
-                  squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0
-                }
-              : p);
-          });
-          if (!playersTx.committed) {
-            throw new Error('Could not synchronize team totals to the room roster.');
-          }
+          const syncStats = httpsCallable(getFunctions(app), 'syncRoomPlayerStats');
+          await syncStats({ roomId, userId: auctionState.highBidderId });
         }
       }
 
@@ -829,20 +817,8 @@ export const AuctionProvider = ({ children }) => {
       const finalTeam = settlement.team || null;
       if (!finalTeam) throw new Error('Sale recovery could not find or create the winning team record.');
 
-      const playersRef = ref(rtdb, `auctions/${roomId}/room/players`);
-      const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
-        if (!Array.isArray(currentPlayers)) return;
-        return currentPlayers.map((p) => p.id === live.highBidderId
-          ? {
-              ...p,
-              spent: Number(finalTeam.spent || 0),
-              squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0
-            }
-          : p);
-      });
-      if (!playersTx.committed) {
-        throw new Error('Sale recovery could not synchronize the room roster totals.');
-      }
+      const syncStats = httpsCallable(getFunctions(app), 'syncRoomPlayerStats');
+      await syncStats({ roomId, userId: live.highBidderId });
     }
 
     let playerOrder = roomData.playerOrder;
