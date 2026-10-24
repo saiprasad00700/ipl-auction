@@ -1570,16 +1570,9 @@ export const AuctionProvider = ({ children }) => {
         };
       });
       const rankings = [...eligibleRankings, ...disqualifiedRankings].sort((a, b) => a.rank - b.rank);
-      await updateRtdb(roomRef, {
-        status: 'completed',
-        winnerAnalysisStatus: 'completed',
-        winnerRankings: rankings,
-        winnerAnalysisModel: analysisModel,
-        winnerAnalysisCompletedAt: getSyncedTime()
-      });
-      // Completed auctions should no longer appear in the public lobby.
-      try { await remove(ref(rtdb, `publicRooms/${roomId}`)); }
-      catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
+      const completeCall = httpsCallable(getFunctions(app), 'completeWinnerAnalysis');
+      await completeCall({ roomId, rankings, model: analysisModel });
+      // The trusted backend persists results and removes the room from the public lobby.
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: disqualifiedFranchises.length
@@ -1589,7 +1582,12 @@ export const AuctionProvider = ({ children }) => {
       });
       await flushAuctionToFirestore(roomId);
     } catch (error) {
-      await updateRtdb(roomRef, { status: 'analysis_failed', winnerAnalysisStatus: 'failed', winnerAnalysisError: String(error?.message || 'AI analysis failed') });
+      try {
+        const failCall = httpsCallable(getFunctions(app), 'failWinnerAnalysis');
+        await failCall({ roomId, errorMessage: String(error?.message || 'AI analysis failed') });
+      } catch (stateError) {
+        console.error('Could not record analysis failure securely:', stateError);
+      }
       throw error;
     }
   }, [getSyncedTime, flushAuctionToFirestore]);
