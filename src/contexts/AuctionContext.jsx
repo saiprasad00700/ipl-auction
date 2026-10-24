@@ -1,6 +1,7 @@
 // Modified from the upstream project by saiprasad00700.
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
+import app, { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { supabase } from '../lib/supabase';
 import { IPL_PLAYERS } from '../data/players';
 import { evaluateBotBid } from '../lib/botEngine';
@@ -1581,105 +1582,23 @@ export const AuctionProvider = ({ children }) => {
     }
   }, [currentAuction, user, team, getSyncedTime]);
 
-  const decideRetention = useCallback(async (roomId, decision) => {
+  const decideRetention = useCallback(async (roomId, decision, botAction = false) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
+    const call = httpsCallable(getFunctions(app), 'decideRetention');
+    await call({ roomId, decision, botAction });
+  }, [user]);
 
-    // Do not wait for the sync-readiness flag after the RTM countdown has begun.
-    // That wait can consume the entire short initial decision window. The RTDB
-    // transaction is the authority; use the cached server-adjusted clock and
-    // record the phase transition atomically.
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    // Capture when the manager actually clicked. A slow network must not turn an on-time
-    // choice into a rejection merely because the transaction reaches Firebase near expiry.
-    const decisionStartedAt = getSyncedTime();
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending') return;
-      const expiresAt = Number(offer.expiresAt);
-      // Allow a small network/UI scheduling grace for a click made at the countdown
-      // boundary. Store the decision at the deadline so settlement treats it as on-time.
-      if (decisionStartedAt > expiresAt + 1500) return;
-      const now = Math.min(decisionStartedAt, expiresAt);
-      const isInitialDecision = offer.phase === 'initial_decision';
-      const isMatchDecision = offer.phase === 'match_decision';
-      if (isInitialDecision) {
-        if (offer.eligibleUserId !== user.uid || !['accept', 'decline'].includes(decision)) return;
-        if (decision === 'accept') {
-          // Persist the affirmative choice as well as advancing the phase, so
-          // every client can distinguish an exercised RTM from an unanswered offer.
-          offer.rtmUsed = true;
-          offer.phase = 'counter_bid';
-          offer.decision = 'accept';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-          offer.expiresAt = now + 15000;
-        } else {
-          offer.decision = 'decline';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-        }
-      } else if (isMatchDecision) {
-        if (offer.eligibleUserId !== user.uid || !['match', 'decline_counter'].includes(decision)) return;
-        offer.decision = decision;
-        offer.decidedBy = user.uid;
-        offer.decidedAt = now;
-      } else {
-        return;
-      }
-      return currentData;
-    });
-
-    if (!result.committed) {
-      const latest = result.snapshot?.val();
-      const offer = latest?.retentionOffer;
-      console.error('[RTM] Decision transaction not committed', {
-        roomId, decision, uid: user.uid, status: latest?.status,
-        phase: offer?.phase, offerStatus: offer?.status,
-        eligibleUserId: offer?.eligibleUserId, expiresAt: offer?.expiresAt,
-        serverTime: getSyncedTime()
-      });
-      throw new Error('Your RTM decision was not saved. Please try again immediately if the offer is still open.');
-    }
-  }, [user, getSyncedTime]);
-
-  const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
+  const submitRetentionCounterBid = useCallback(async (roomId, amount, botTeamId = null) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
-    // Do not spend the short RTM counter-bid window waiting for the server-time
-    // readiness flag. As with decideRetention, the RTDB transaction remains
-    // authoritative; use the cached server-adjusted clock for the expiry check.
-    const liveRef = ref(rtdb, `auctions/${roomId}/live`);
-    // These reads are independent. Run them together so a short RTM window is
-    // not consumed by two sequential network round trips before the transaction.
-    const [roomSnap, teamSnap] = await Promise.all([
-      get(ref(rtdb, `auctions/${roomId}/room`)),
-      get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`))
-    ]);
-    const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const teamData = teamSnap.exists() ? teamSnap.val() : {};
-    const counterBid = Number(Number(amount).toFixed(2));
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending' || offer.phase !== 'counter_bid' || offer.buyerId !== user.uid) return;
-      if (getSyncedTime() > Number(offer.expiresAt)) return;
-      if (counterBid <= Number(offer.bid)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120) + Number(teamData.spent || 0)) return;
-      offer.counterBid = counterBid;
-      offer.phase = 'match_decision';
-      offer.decision = null;
-      // The original franchise gets 10 seconds to match or decline the counter-bid.
-      offer.expiresAt = getSyncedTime() + 10000;
-      currentData.currentBid = counterBid;
-      return currentData;
+    const call = httpsCallable(getFunctions(app), 'submitRetentionCounterBid');
+    await call({
+      roomId,
+      amount: Number(Number(amount).toFixed(2)),
+      ...(botTeamId ? { botAction: true, botTeamId } : {})
     });
-    if (!result.committed) {
-      throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
-    }
-  }, [user, getSyncedTime]);
+  }, [user]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
