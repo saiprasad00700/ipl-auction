@@ -656,6 +656,7 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
   const now = Date.now();
   let reachedEnd = false;
   const tx = await liveRef.transaction((current) => {
+    reachedEnd = false;
     if (!current || current.playerId !== expectedPlayerId || !["sold", "unsold"].includes(current.status)) return;
     if (!Number.isFinite(Number(current.transitionDeadline)) || now < Number(current.transitionDeadline)) return;
     const currentIndex = order.indexOf(current.playerId);
