@@ -206,3 +206,45 @@
 @keyframes ss-camera-cut-flash { 0% { opacity: .15; } 45% { opacity: 1; } 100% { opacity: .72; } }
 @media (max-width: 640px) { .ss-arena-camera-focus { top: .55rem; right: .55rem; font-size: .5rem; letter-spacing: .08em; } }
 @media (prefers-reduced-motion: reduce) { .ss-arena-camera-dot, .ss-cinematic-player-stage[data-focus-team]::after { animation: none; } }
+
+
+/* Active franchise spotlight: presentation-only; never affects bid validation or state. */
+.ss-franchise-table {
+  position: relative;
+  isolation: isolate;
+  transition: transform .32s cubic-bezier(.2,.8,.2,1), filter .32s ease, box-shadow .32s ease;
+}
+.ss-franchise-table.is-active {
+  z-index: 3;
+  transform: translateY(-.18rem) scale(1.035);
+  filter: saturate(1.18) brightness(1.12);
+  box-shadow: 0 0 0 1px rgba(110,231,183,.5), 0 0 1.6rem rgba(16,185,129,.28);
+}
+.ss-franchise-table.is-active .ss-franchise-table-light {
+  opacity: 1;
+  animation: ss-franchise-spotlight 1.8s ease-in-out infinite;
+}
+.ss-franchise-table.is-active .ss-franchise-table-state {
+  color: #a7f3d0;
+  text-shadow: 0 0 .7rem rgba(52,211,153,.7);
+}
+.ss-franchise-table.bid-paddle-raised,
+.ss-franchise-table.rtm-paddle-raised {
+  animation: ss-table-action-bump .42s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes ss-franchise-spotlight {
+  0%,100% { opacity: .55; filter: brightness(.9); }
+  50% { opacity: 1; filter: brightness(1.35); }
+}
+@keyframes ss-table-action-bump {
+  0%,100% { translate: 0 0; }
+  40% { translate: 0 -.32rem; }
+}
+@media (max-width: 640px) {
+  .ss-franchise-table.is-active { transform: translateY(-.08rem) scale(1.015); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-franchise-table, .ss-franchise-table.is-active { transition: none; transform: none; }
+  .ss-franchise-table.is-active .ss-franchise-table-light { animation: none; opacity: .8; }
+  .ss-franchise-table.bid-paddle-raised, .ss-franchise-table.rtm-paddle-raised { animation: none; }
+}
