@@ -157,7 +157,7 @@ export const AuctionProvider = ({ children }) => {
       }],
       bannedPlayers: [],
       settings: {
-        bidTimer: 10,
+        bidTimer: 15,
         budget
       }
     });
@@ -215,7 +215,7 @@ export const AuctionProvider = ({ children }) => {
             teamName: teamDetails?.name || 'Unknown',
             isHost: true
           }],
-          settings: { bidTimer: 10, budget }
+          settings: { bidTimer: 15, budget }
         });
 
         if (playerDetails.team) {
@@ -703,7 +703,7 @@ export const AuctionProvider = ({ children }) => {
               overseasLimit: sData.overseas_limit || 4,
               players: sData.players || [],
               bannedPlayers: sData.banned_players || [],
-              settings: sData.settings || { bidTimer: 10, budget: 120 }
+              settings: sData.settings || { bidTimer: 15, budget: 120 }
             };
             supabaseFound = true;
           }
@@ -971,7 +971,7 @@ export const AuctionProvider = ({ children }) => {
                   overseasLimit: sData.overseas_limit || 8,
                   players: sData.players || [],
                   bannedPlayers: sData.banned_players || [],
-                  settings: sData.settings || { bidTimer: 10, budget: 120 }
+                  settings: sData.settings || { bidTimer: 15, budget: 120 }
                 };
               }
             }
