@@ -5,7 +5,8 @@ import {
   DEFAULT_BID_TIMER_SECONDS,
   nextBidAmount,
   clampBidTimerSeconds,
-  effectiveOverseasLimit
+  effectiveOverseasLimit,
+  transitionBiddingTimer
 } from "../auctionRules.js";
 
 test("backend bid amount starts at base price and then increases by fifty lakh", () => {
