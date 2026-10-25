@@ -907,7 +907,7 @@ export const IPL_PLAYERS = [
     "role": "All-Rounder",
     "type": "Indian",
     "country": "IND",
-    "basePrice": 1,
+    "basePrice": 2,
     "set": "Marquee Set 1",
     "image": "https://documents.iplt20.com/ipl/IPLHeadshot2026/212.png",
     "stats": {
@@ -1111,7 +1111,7 @@ export const IPL_PLAYERS = [
     "role": "Batsman",
     "type": "Indian",
     "country": "IND",
-    "basePrice": 0.3,
+    "basePrice": 2,
     "set": "Marquee Set 1",
     "image": "https://documents.iplt20.com/ipl/IPLHeadshot2025/3498.png",
     "stats": {
