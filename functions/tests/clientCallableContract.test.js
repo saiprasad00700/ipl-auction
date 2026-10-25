@@ -162,3 +162,9 @@ test("system announcement, idempotency key and activity heartbeat commit atomica
   assert.ok(!source.includes("messageRef.transaction("));
   assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
+
+test("host timer control updates only the timer while an auction is active", () => {
+  const roomPage = readFileSync(new URL("../../src/pages/AuctionRoom.jsx", import.meta.url), "utf8");
+  assert.match(roomPage, /updateRoomSettings\(id,\s*\{\s*bidTimer:\s*newTimerValue\s*\}\)/);
+  assert.doesNotMatch(roomPage, /updateRoomSettings\(id,\s*\{\s*\.\.\.currentAuction\.settings,\s*bidTimer:/);
+});
