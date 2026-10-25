@@ -182,3 +182,27 @@
 @media (prefers-reduced-motion: reduce) {
   .ss-auction-result-stamp { animation:none; opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1); }
 }
+
+
+/* Cinematic focus cue: the arena shifts visual emphasis to the accepted highest bidder. */
+.ss-cinematic-player-stage { isolation: isolate; }
+.ss-cinematic-player-stage::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 18%, rgba(45,212,191,.11), transparent 58%);
+  opacity: .7; transition: opacity .35s ease, background-position .6s ease;
+}
+.ss-cinematic-player-stage[data-focus-team]:not([data-focus-team="auctioneer"])::after {
+  background: radial-gradient(ellipse at 50% 22%, rgba(45,212,191,.18), transparent 62%);
+  animation: ss-camera-cut-flash .55s ease-out both;
+}
+.ss-arena-camera-focus {
+  position: absolute; top: .75rem; right: .85rem; z-index: 40; display: inline-flex; align-items: center; gap: .45rem;
+  max-width: calc(100% - 1.7rem); padding: .42rem .65rem; border: 1px solid rgba(110,231,183,.28);
+  border-radius: 999px; background: rgba(2,6,23,.72); color: #d1fae5; font-size: .58rem; font-weight: 900;
+  letter-spacing: .12em; text-transform: uppercase; backdrop-filter: blur(10px);
+}
+.ss-arena-camera-dot { width: .42rem; height: .42rem; flex: 0 0 auto; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px rgba(52,211,153,.85); animation: ss-camera-live-pulse 1.3s ease-in-out infinite; }
+@keyframes ss-camera-live-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
+@keyframes ss-camera-cut-flash { 0% { opacity: .15; } 45% { opacity: 1; } 100% { opacity: .72; } }
+@media (max-width: 640px) { .ss-arena-camera-focus { top: .55rem; right: .55rem; font-size: .5rem; letter-spacing: .08em; } }
+@media (prefers-reduced-motion: reduce) { .ss-arena-camera-dot, .ss-cinematic-player-stage[data-focus-team]::after { animation: none; } }
