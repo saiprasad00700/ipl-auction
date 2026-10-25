@@ -164,69 +164,88 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
   requireRoomId(roomId);
   if (!DECISIONS.has(decision)) throw new HttpsError("invalid-argument", "Invalid RTM decision.");
 
-  const roomRef = database.ref(`auctions/${roomId}`);
-  const roomSnapshot = await roomRef.child("room").get();
-  const room = roomSnapshot.val();
-  if (!room) reject("Auction room not found.");
-  const liveRef = roomRef.child("live");
-  if (decision === "match") {
-    const liveBefore = (await liveRef.get()).val();
-    const offerBefore = liveBefore?.retentionOffer;
-    if (!offerBefore || offerBefore.status !== "pending" || offerBefore.phase !== "match_decision") {
-      reject("There is no active counter-price to match.");
+  // Validate the RTM phase, caller, expiry and matching purse against the same
+  // root snapshot that records the decision and activity heartbeat.
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const now = Date.now();
+  let failureReason = "This RTM offer is no longer available or you are not authorized to decide it.";
+  let resultingPhase = null;
+  const result = await rootRef.transaction((current) => {
+    failureReason = "This RTM offer is no longer available or you are not authorized to decide it.";
+    resultingPhase = null;
+    if (!current?.room || !current?.live) {
+      failureReason = "Auction room or live offer could not be found.";
+      return;
     }
-    if (botAction) {
-      if (room.hostId !== uid || !BOT_IDS.has(offerBefore.eligibleUserId)) {
-        reject("Only the host can decide for an auction bot.");
-      }
-    } else if (offerBefore.eligibleUserId !== uid
-      || room.bannedPlayers?.includes(uid)
-      || !(Array.isArray(room.players) ? room.players : []).some((player) => player?.id === uid)) {
-      reject("You are not eligible to match this RTM counter-price.");
-    }
-    const originalTeamSnapshot = await roomRef.child("teams").child(roomId + "_" + offerBefore.eligibleUserId).get();
-    if (!canAffordRtmMatch(originalTeamSnapshot.val(), offerBefore.counterBid)) {
-      reject("Your franchise does not have enough remaining purse to match this counter-price.");
-    }
-  }
-  const clickedAt = Date.now();
-  const result = await liveRef.transaction((live) => {
-    if (!live || live.status !== "processing_sale") return;
+    const room = current.room;
+    const live = current.live;
     const offer = live.retentionOffer;
-    if (!offer || offer.status !== "pending") return;
-    if (clickedAt > Number(offer.expiresAt || 0) + 1500) return;
-
-    const initial = offer.phase === "initial_decision";
-    const matching = offer.phase === "match_decision";
-    const permittedDecision = initial ? ["accept", "decline"].includes(decision)
-      : matching && ["match", "decline_counter"].includes(decision);
-    if (!permittedDecision) return;
-
-    if (botAction) {
-      if (room.hostId !== uid || !BOT_IDS.has(offer.eligibleUserId)) return;
-    } else if (offer.eligibleUserId !== uid
-      || room.bannedPlayers?.includes(uid)
-      || !(Array.isArray(room.players) ? room.players : []).some((player) => player?.id === uid)) {
+    if (room.status !== "active" || live.status !== "processing_sale" || !offer || offer.status !== "pending") {
+      failureReason = "There is no active RTM offer.";
+      return;
+    }
+    if (now > Number(offer.expiresAt || 0) + 1500) {
+      failureReason = "The RTM decision window has expired.";
       return;
     }
 
-    const now = Math.min(clickedAt, Number(offer.expiresAt));
-    offer.decision = decision;
-    offer.decidedBy = uid;
-    offer.decidedAt = now;
-    if (initial && decision === "accept") {
-      offer.rtmUsed = true;
-      offer.phase = "counter_bid";
-      offer.expiresAt = now + 15000;
+    const initial = offer.phase === "initial_decision";
+    const matching = offer.phase === "match_decision";
+    const permittedDecision = initial
+      ? ["accept", "decline"].includes(decision)
+      : matching && ["match", "decline_counter"].includes(decision);
+    if (!permittedDecision) {
+      failureReason = "That decision is not valid for the current RTM phase.";
+      return;
     }
-    live.retentionOffer = offer;
-    live.lastActivityAt = now;
-    return live;
+
+    const activeMembers = Array.isArray(room.players) ? room.players : [];
+    const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
+    if (botAction) {
+      if (room.hostId !== uid || !BOT_IDS.has(offer.eligibleUserId)
+        || !activeMembers.some((member) => member?.id === offer.eligibleUserId)
+        || banned.includes(offer.eligibleUserId)) {
+        failureReason = "Only the host can decide for an active auction bot.";
+        return;
+      }
+    } else if (offer.eligibleUserId !== uid || banned.includes(uid)
+      || !activeMembers.some((member) => member?.id === uid)) {
+      failureReason = "You are not eligible to decide this RTM offer.";
+      return;
+    }
+
+    if (decision === "match") {
+      const originalTeam = current.teams?.[`${roomId}_${offer.eligibleUserId}`];
+      if (!originalTeam || originalTeam.userId !== offer.eligibleUserId
+        || originalTeam.teamId !== offer.originalFranchiseId
+        || !canAffordRtmMatch(originalTeam, offer.counterBid)) {
+        failureReason = "Your franchise does not have enough remaining purse to match this counter-price.";
+        return;
+      }
+    }
+
+    const decidedAt = Math.min(now, Number(offer.expiresAt));
+    const nextOffer = {
+      ...offer,
+      decision,
+      decidedBy: uid,
+      decidedAt
+    };
+    if (initial && decision === "accept") {
+      nextOffer.rtmUsed = true;
+      nextOffer.phase = "counter_bid";
+      nextOffer.expiresAt = decidedAt + 15000;
+    }
+    resultingPhase = nextOffer.phase;
+    return {
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }
+    };
   }, undefined, false);
 
-  if (!result.committed) reject("This RTM offer is no longer available or you are not authorized to decide it.");
-  await roomRef.child("room/lastActivityAt").set(clickedAt);
-  return { ok: true, phase: result.snapshot.val()?.retentionOffer?.phase };
+  if (!result.committed) reject(failureReason);
+  return { ok: true, phase: result.snapshot.val()?.live?.retentionOffer?.phase || resultingPhase };
 });
 
 export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, async (request) => {
