@@ -123,3 +123,16 @@ test("advancing auction lots and entering the XI phase are atomic", () => {
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes("roomRef.update("));
 });
+
+test("room creation initializes protected room and initial team state through a trusted callable", () => {
+  const start = backendSource.indexOf("export const createAuctionRoom = onCall(");
+  const end = backendSource.indexOf("\n\nexport const joinAuctionRoom", start);
+  assert.ok(start >= 0 && end > start, "createAuctionRoom callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("teams"));
+  assert.ok(source.includes("publicRooms/"));
+  assert.ok(source.includes("lastActivityAt: now"));
+  assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]createAuctionRoom['"]\)/);
+  assert.doesNotMatch(clientSource, /set\(ref\(rtdb,\s*`auctions\/\$\{roomId\}\/room`/);
+});
