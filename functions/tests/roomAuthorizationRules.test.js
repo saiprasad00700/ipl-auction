@@ -46,3 +46,12 @@ test("only the host can submit a counter-bid for a bot buyer", () => {
   assert.equal(canSubmitRtmCounterBid({ uid: "buyer", room, offer, team, botAction: true, botIds }), false);
   assert.equal(canSubmitRtmCounterBid({ uid: "host", room, offer, team, botAction: true, botIds: [] }), false);
 });
+
+
+test("RTM counter-bids require an active room and active host for bot actions", () => {
+  const room = { hostId: "host", status: "active", players: [{ id: "host" }, { id: "buyer" }] };
+  const offer = { buyerId: "bot_CSK", buyerTeamId: "CSK" };
+  const team = { userId: "bot_CSK", teamId: "CSK" };
+  assert.equal(canSubmitRtmCounterBid({ uid: "host", room: { ...room, status: "completed" }, offer, team, botAction: true, botIds: ["bot_CSK"] }), false);
+  assert.equal(canSubmitRtmCounterBid({ uid: "host", room: { ...room, players: [{ id: "buyer" }] }, offer, team, botAction: true, botIds: ["bot_CSK"] }), false);
+});
