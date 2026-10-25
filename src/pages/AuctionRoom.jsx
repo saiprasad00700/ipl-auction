@@ -1466,6 +1466,7 @@ const AuctionRoom = () => {
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-left" aria-hidden="true" />
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-right" aria-hidden="true" />
                                  <div className="ss-cinematic-stage-grid" aria-hidden="true" />
+                                 <div className="ss-auctioneer-overlay" aria-hidden="true"><AuctioneerStage compact /></div>
                                  <FranchiseArenaStrip
                                     teams={TEAMS}
                                     activeTeamId={displayAuctionState?.highBidderTeamId || null}
