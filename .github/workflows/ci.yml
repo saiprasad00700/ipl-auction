@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/winner-calculation-retention-cards
+      - cinematic-3d-rebuild
   pull_request:
     branches:
       - main

@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage'
 import './index.css'
 
 // ── Lazy-loaded routes (split out of the initial bundle) ──────────────────────
+const CinematicPreview = lazy(() => import('./pages/CinematicPreview'))
 const AuctionRoom     = lazy(() => import('./pages/AuctionRoom'))
 const AuctionSummary  = lazy(() => import('./pages/AuctionSummary'))
 const Lobby           = lazy(() => import('./pages/Lobby'))
@@ -54,6 +55,9 @@ function App() {
                   <Route path="/" element={<LandingPage />} />
 
                   {/* All other routes are code-split into separate chunks */}
+                  <Route path="/cinematic-preview" element={
+                    <Suspense fallback={<PageFallback />}><CinematicPreview /></Suspense>
+                  } />
                   <Route path="/admin" element={
                     <Suspense fallback={<PageFallback />}><AdminPanel /></Suspense>
                   } />
