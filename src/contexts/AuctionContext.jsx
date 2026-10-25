@@ -128,57 +128,28 @@ export const AuctionProvider = ({ children }) => {
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
     const overseasLimit = isSprint5 ? 2 : 4;
 
-    // Live state is created by the trusted startAuction callable, not by the client.
-
-    // Instantly set host online presence in RTDB
-    const hostPresenceRef = ref(rtdb, `auctions/${roomId}/presence/${userId}`);
-    await set(hostPresenceRef, {
-      online: true,
-      lastSeen: serverTimestampRtdb()
-    });
-
-    // Sync to RTDB for real-time reads
-    const rtdbRoomRef = ref(rtdb, `auctions/${roomId}/room`);
-    await set(rtdbRoomRef, {
-      hostId: userId,
-      hostName: playerDetails.name,
-      status: 'waiting',
+    // The trusted callable creates room metadata and the initial team record
+    // atomically. Client-side writes to protected auction state are denied by rules.
+    if (!userId || !playerDetails?.name) throw new Error('Sign in and enter a display name before creating a room.');
+    const createRoomCall = httpsCallable(getFunctions(app), 'createAuctionRoom');
+    const creationResponse = await createRoomCall({
+      roomId,
+      userId,
+      userName: playerDetails.name,
       auctionType,
       isPublic: !!isPublic,
-      lastActivityAt: Date.now(),
-      squadLimit,
-      overseasLimit,
-      players: [{
-        id: userId,
-        name: playerDetails.name,
-        team: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        isHost: true
-      }],
-      bannedPlayers: [],
-      settings: {
-        bidTimer: 15,
-        budget
-      }
+      teamId: playerDetails.team || ''
     });
+    const createdAt = Number(creationResponse.data?.createdAt || Date.now());
 
-
-    // Publish only minimal metadata for public rooms; never expose auction state.
-    const publicRoomRef = ref(rtdb, `publicRooms/${roomId}`);
-    if (isPublic) {
-      await set(publicRoomRef, {
-        roomId,
-        hostId: userId,
-        hostName: playerDetails.name || 'Auction host',
-        status: 'waiting',
-        auctionType,
-        createdAt: Date.now()
+    // Presence is separate from protected room state and is best-effort.
+    try {
+      await set(ref(rtdb, `auctions/${roomId}/presence/${userId}`), {
+        online: true,
+        lastSeen: serverTimestampRtdb()
       });
-    }
-
-    if (playerDetails.team) {
-      const selectFranchise = httpsCallable(getFunctions(app), 'updatePlayerTeam');
-      await selectFranchise({ roomId, userId, teamId: playerDetails.team });
+    } catch (presenceError) {
+      console.warn('Could not set host presence:', presenceError?.message || presenceError);
     }
 
     // Record history without blocking room creation if rules are not deployed yet.
@@ -188,7 +159,7 @@ export const AuctionProvider = ({ children }) => {
         hostName: playerDetails.name || 'Manager',
         teamId: playerDetails.team || '',
         teamName: teamDetails?.name || 'Unknown',
-        mode: auctionType, status: 'waiting', createdAt: Date.now(),
+        mode: auctionType, status: 'waiting', createdAt,
         spent: 0, budgetRemaining: budget, squad: []
       });
     } catch (historyError) {
