@@ -1962,7 +1962,18 @@ const AuctionRoom = () => {
                               </div>
                               <span className="text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">{newTimerValue} Seconds</span>
                            </div>
-                           <input type="range" min="3" max="15" value={newTimerValue} onChange={(e) => setNewTimerValue(parseInt(e.target.value))} className="w-full accent-blue-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
+                           <div className="grid grid-cols-4 gap-2">
+                              {[3, 5, 10, 15].map((seconds) => (
+                                 <button
+                                    key={seconds}
+                                    type="button"
+                                    onClick={() => setNewTimerValue(seconds)}
+                                    className={`rounded-lg border px-2 py-2 text-xs font-black transition-all ${newTimerValue === seconds ? 'border-blue-400 bg-blue-500/20 text-blue-200' : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/30 hover:text-white'}`}
+                                 >
+                                    {seconds}s
+                                 </button>
+                              ))}
+                           </div>
                            <button onClick={async () => { await updateRoomSettings(id, { ...currentAuction.settings, bidTimer: newTimerValue }); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all mt-3 shadow-lg shadow-blue-500/20 active:scale-95 cursor-pointer">
                               Apply Timer Settings
                            </button>
