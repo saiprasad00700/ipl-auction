@@ -152,17 +152,20 @@ const AuctionRoom = () => {
             && !settingsPanelRef.current?.contains(target)
             && !settingsTriggerRef.current?.contains(target)) {
             setShowSettings(false);
+            settingsTriggerRef.current?.focus({ preventScroll: true });
          }
          if (showHeaderPanel
             && !headerPanelRef.current?.contains(target)
             && !activityTriggerRef.current?.contains(target)
             && !voiceChatTriggerRef.current?.contains(target)) {
             setShowHeaderPanel(false);
+            (sidebarTab === 'chat' ? voiceChatTriggerRef.current : activityTriggerRef.current)
+               ?.focus({ preventScroll: true });
          }
       };
       document.addEventListener('pointerdown', handleOutsidePointerDown);
       return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
-   }, [showSettings, showHeaderPanel]);
+   }, [showSettings, showHeaderPanel, sidebarTab]);
 
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
    // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
