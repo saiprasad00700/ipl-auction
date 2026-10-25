@@ -927,21 +927,37 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
   const uid = requireAuth(request);
   const { roomId } = request.data || {};
   requireRoomId(roomId);
-  const root = database.ref(`auctions/${roomId}`);
-  const roomSnap = await root.child("room").get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  const roster = Array.isArray(room.players) ? room.players : [];
-  if (!roster.some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Only an active room member can settle an expired RTM offer.");
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
-  const liveRef = root.child("live");
-  const tx = await liveRef.transaction((live) => {
-    if (!live || live.status !== "processing_sale") return;
+  let failureReason = "The RTM offer is not ready to finalize.";
+  let finalizedState = null;
+  const result = await rootRef.transaction((current) => {
+    failureReason = "The RTM offer is not ready to finalize.";
+    finalizedState = null;
+    if (!current?.room || !current?.live) {
+      failureReason = "Auction room or live offer could not be found.";
+      return;
+    }
+    const room = current.room;
+    const live = current.live;
+    const roster = Array.isArray(room.players) ? room.players : [];
+    if (!roster.some((player) => player?.id === uid) || room.bannedPlayers?.includes(uid)) {
+      failureReason = "Only an active room member can settle an expired RTM offer.";
+      return;
+    }
+    if (room.status !== "active" || live.status !== "processing_sale") {
+      failureReason = "The auction is not in an RTM settlement state.";
+      return;
+    }
     const offer = live.retentionOffer;
     if (!offer || offer.status !== "pending") return;
-    const initialDeclined = offer.phase === "initial_decision" && offer.decision === "decline" && Number(offer.decidedAt) <= Number(offer.expiresAt);
-    const matchDecisionMade = offer.phase === "match_decision" && ["match", "decline_counter"].includes(offer.decision) && Number(offer.decidedAt) <= Number(offer.expiresAt);
+    const initialDeclined = offer.phase === "initial_decision"
+      && offer.decision === "decline" && Number(offer.decidedAt) <= Number(offer.expiresAt);
+    const matchDecisionMade = offer.phase === "match_decision"
+      && ["match", "decline_counter"].includes(offer.decision)
+      && Number(offer.decidedAt) <= Number(offer.expiresAt);
     if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
+
     if (offer.phase === "counter_bid" && offer.rtmUsed) {
       live.highBidderId = offer.eligibleUserId;
       live.highBidderName = offer.eligibleTeamName;
@@ -967,13 +983,23 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
     }
     live.status = live.highBidderId ? "sold" : "unsold";
     live.transitionDeadline = now + (live.status === "sold" ? 5000 : 2000) + 2500;
-    return live;
+    live.lastActivityAt = now;
+    finalizedState = live;
+    return {
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      live
+    };
   }, undefined, false);
-  if (!tx.committed) return { ok: false, committed: false, state: tx.snapshot.val() || null };
-  await root.child("room/lastActivityAt").set(now);
-  return { ok: true, committed: true, state: tx.snapshot.val() };
-});
 
+  if (!result.committed) {
+    if (finalizedState === null && failureReason === "The RTM offer is not ready to finalize.") {
+      return { ok: false, committed: false, state: result.snapshot.val() || null };
+    }
+    reject(failureReason);
+  }
+  return { ok: true, committed: true, state: result.snapshot.val()?.live || finalizedState };
+});
 
 export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
@@ -982,60 +1008,80 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
   if (typeof expectedPlayerId !== "string" || !PLAYER_CATALOG[expectedPlayerId]) {
     throw new HttpsError("invalid-argument", "Invalid current player.");
   }
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const [roomSnap, orderSnap] = await Promise.all([roomRef.get(), root.child("playerOrderIds").get()]);
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  const players = Array.isArray(room.players) ? room.players : [];
-  if (!players.some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) reject("Only an active room member can advance the auction.");
-  if (room.status !== "active") reject("The auction is not active.");
-  const order = orderSnap.val();
-  if (!Array.isArray(order) || !order.length || order.some((id) => typeof id !== "string" || !PLAYER_CATALOG[id])) {
-    reject("The server-side player order is missing or invalid.");
-  }
-  const liveRef = root.child("live");
+
+  // Advance the live lot and room lifecycle in a single transaction so the
+  // final player cannot leave the room active or strand the XI deadline.
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
+  let failureReason = "Auction lot changed before it could advance.";
   let reachedEnd = false;
-  const tx = await liveRef.transaction((current) => {
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Auction lot changed before it could advance.";
     reachedEnd = false;
-    if (!current || current.playerId !== expectedPlayerId || !["sold", "unsold"].includes(current.status)) return;
-    if (!Number.isFinite(Number(current.transitionDeadline)) || now < Number(current.transitionDeadline)) return;
-    const currentIndex = order.indexOf(current.playerId);
+    if (!current?.room || !current?.live) {
+      failureReason = "Auction room or live lot could not be found.";
+      return;
+    }
+    const room = current.room;
+    const live = current.live;
+    const players = Array.isArray(room.players) ? room.players : [];
+    if (!players.some((player) => player?.id === uid) || room.bannedPlayers?.includes(uid)) {
+      failureReason = "Only an active room member can advance the auction.";
+      return;
+    }
+    if (room.status !== "active") {
+      failureReason = "The auction is not active.";
+      return;
+    }
+    const order = current.playerOrderIds;
+    if (!Array.isArray(order) || !order.length
+      || order.some((id) => typeof id !== "string" || !PLAYER_CATALOG[id])) {
+      failureReason = "The server-side player order is missing or invalid.";
+      return;
+    }
+    if (live.playerId !== expectedPlayerId || !["sold", "unsold"].includes(live.status)) return;
+    if (!Number.isFinite(Number(live.transitionDeadline)) || now < Number(live.transitionDeadline)) return;
+
+    const currentIndex = order.indexOf(live.playerId);
     const nextId = currentIndex >= 0 ? order[currentIndex + 1] : null;
     if (!nextId) {
       reachedEnd = true;
       return {
         ...current,
-        status: "awaiting_xi",
-        transitionDeadline: null
+        room: {
+          ...room,
+          status: "awaiting_xi",
+          xiSubmissionStartedAt: now,
+          xiSubmissionDeadline: now + 120000,
+          winnerAnalysisStatus: "collecting",
+          lastActivityAt: now
+        },
+        live: { ...live, status: "awaiting_xi", transitionDeadline: null, lastActivityAt: now }
       };
     }
+
     return {
-      playerId: nextId,
-      currentBid: 0,
-      highBidderId: "",
-      highBidderName: "No Bids",
-      highBidderTeamId: "",
-      timerEndsAt: now + clampBidTimerSeconds(room.settings?.bidTimer, 15) * 1000,
-      status: "bidding"
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      live: {
+        playerId: nextId,
+        currentBid: 0,
+        highBidderId: "",
+        highBidderName: "No Bids",
+        highBidderTeamId: "",
+        timerEndsAt: now + clampBidTimerSeconds(room.settings?.bidTimer, 15) * 1000,
+        status: "bidding",
+        lastActivityAt: now
+      }
     };
   }, undefined, false);
-  if (!tx.committed) return { ok: false, advanced: false };
-  if (reachedEnd) {
-    await roomRef.update({
-      status: "awaiting_xi",
-      xiSubmissionStartedAt: now,
-      xiSubmissionDeadline: now + 120000,
-      winnerAnalysisStatus: "collecting",
-      lastActivityAt: now
-    });
-  } else {
-    await roomRef.child("lastActivityAt").set(now);
+
+  if (!result.committed) {
+    if (failureReason !== "Auction lot changed before it could advance.") reject(failureReason);
+    return { ok: false, advanced: false };
   }
   return { ok: true, advanced: true, reachedEnd };
 });
-
 
 export const startAuction = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
