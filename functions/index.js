@@ -1043,7 +1043,11 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
     if (!Number.isFinite(Number(live.transitionDeadline)) || now < Number(live.transitionDeadline)) return;
 
     const currentIndex = order.indexOf(live.playerId);
-    const nextId = currentIndex >= 0 ? order[currentIndex + 1] : null;
+    if (currentIndex < 0) {
+      failureReason = "The current player is missing from the server-side player order.";
+      return;
+    }
+    const nextId = order[currentIndex + 1] || null;
     if (!nextId) {
       reachedEnd = true;
       return {
