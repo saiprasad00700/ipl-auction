@@ -581,14 +581,9 @@ export const AuctionProvider = ({ children }) => {
               roomId, expectedPlayerId: currentPlayerId
             });
           } else {
-            // Natural end of bidding must enter the same shared XI phase as host-triggered end.
-            const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
-            await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
-              status: 'awaiting_xi',
-              xiSubmissionStartedAt: getSyncedTime(),
-              xiSubmissionDeadline: deadline,
-              winnerAnalysisStatus: 'collecting'
-            });
+            // Room lifecycle is server-owned. Use the same trusted transition as
+            // the host's End Auction button; direct RTDB room writes are denied.
+            await httpsCallable(getFunctions(app), 'endAuction')({ roomId });
             await httpsCallable(getFunctions(app), 'postAuctionSystemEvent')({ roomId, event: 'bidding_ended' });
           }
         } finally {
@@ -990,7 +985,8 @@ export const AuctionProvider = ({ children }) => {
               currentRoomData = data;
               checkAndSet();
               checkLoaded();
-              await updateRtdb(ref(rtdb, `auctions/${auctionId}/room`), data);
+              // Persistent-store fallback is read-only. Do not copy legacy records
+              // into the protected RTDB room from a client.
             } else {
               // Room not found in any store
               setLoading(false);
@@ -1064,13 +1060,8 @@ export const AuctionProvider = ({ children }) => {
             }
             checkLoaded();
 
-            if (teamsArr.length > 0) {
-              const teamsToSync = {};
-              teamsArr.forEach(t => {
-                teamsToSync[t.id] = t;
-              });
-              await updateRtdb(ref(rtdb, `auctions/${auctionId}/teams`), teamsToSync);
-            }
+            // Persistent-store fallback is display-only. Team budgets, squads and
+            // retention cards are server-owned and cannot be copied from a client.
           } catch(e) { handleFirebaseError(e); }
         }, 500);
       }
