@@ -866,7 +866,7 @@ const AuctionRoom = () => {
 
       // Overseas Limit Check
       const isOverseas = currentPlayer?.country !== 'IND' && currentPlayer?.country !== 'IN';
-      const overseasLimit = getOverseasLimit(currentAuction?.mode, currentAuction?.overseasLimit);
+      const overseasLimit = getOverseasLimit(currentAuction?.auctionType, currentAuction?.overseasLimit);
       if (isOverseas) {
          const overseasCount = team?.squad?.filter(s => {
             const pid = typeof s === 'string' ? s : s.id;
@@ -1212,7 +1212,7 @@ const AuctionRoom = () => {
                                           <span>Overseas: <span className="text-white">{(teamDoc?.squad?.filter(s => {
                                              const pid = typeof s === 'string' ? s : s.id;
                                              return IPL_PLAYERS.find(pl => pl.id === pid)?.country !== 'IND';
-                                          }).length || 0)}/{getOverseasLimit(currentAuction?.mode, currentAuction?.overseasLimit)}</span></span>
+                                          }).length || 0)}/{getOverseasLimit(currentAuction?.auctionType, currentAuction?.overseasLimit)}</span></span>
                                        </div>
 
                                        {teamDoc?.squad?.length > 0 ? (
