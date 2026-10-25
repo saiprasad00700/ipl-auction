@@ -963,52 +963,43 @@ export const startAuction = onCall({ enforceAppCheck: false }, async (request) =
       playerOrderIds[0] !== firstPlayerId) {
     throw new HttpsError("invalid-argument", "Invalid canonical player order.");
   }
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const roomSnap = await roomRef.get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (room.hostId !== uid) reject("Only the room host can start the auction.");
-  const liveRef = root.child("live");
-  const liveSnap = await liveRef.get();
-  if (!canStartAuction(room, liveSnap.exists(), uid)) {
-    reject("The auction has already started or the host is not an active room member.");
-  }
+
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
-  const claim = await roomRef.transaction((current) => {
-    if (!canStartAuction(current, false, uid)) return;
-    return { ...current, status: "active", playerOrder, lastActivityAt: now };
-  }, undefined, false);
-  if (!claim.committed) reject("Another start request won the race. Refresh the room.");
-  const claimedRoom = claim.snapshot.val();
-  const updates = {
-    "playerOrder": playerOrder,
-    "playerOrderIds": playerOrderIds,
-    "live": {
-      playerId: firstPlayerId,
-      currentBid: 0,
-      highBidderId: "",
-      highBidderName: "No Bids",
-      highBidderTeamId: "",
-      timerEndsAt: now + clampBidTimerSeconds(claimedRoom.settings?.bidTimer, 15) * 1000,
-      status: "bidding"
-    },
-    "room/winnerAnalysisStatus": null
-  };
-  try {
-    await root.update(updates);
-  } catch (error) {
-    // If initialization fails after the room claim, allow a safe retry only
-    // while no live lot has been created.
-    const latestLive = await liveRef.get();
-    if (!latestLive.exists()) {
-      await roomRef.transaction((current) => {
-        if (!current || current.status !== "active" || current.lastActivityAt !== now) return;
-        return { ...current, status: room.status || "waiting", playerOrder: null, lastActivityAt: Date.now() };
-      }, undefined, false);
+  let failureReason = "The auction has already started or the host is not an active room member.";
+  const result = await rootRef.transaction((current) => {
+    failureReason = "The auction has already started or the host is not an active room member.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
     }
-    throw error;
-  }
+    if (!canStartAuction(current.room, Boolean(current.live), uid)) return;
+
+    const seconds = clampBidTimerSeconds(current.room.settings?.bidTimer, 15);
+    return {
+      ...current,
+      room: {
+        ...current.room,
+        status: "active",
+        playerOrder,
+        lastActivityAt: now,
+        winnerAnalysisStatus: null
+      },
+      playerOrder,
+      playerOrderIds,
+      live: {
+        playerId: firstPlayerId,
+        currentBid: 0,
+        highBidderId: "",
+        highBidderName: "No Bids",
+        highBidderTeamId: "",
+        timerEndsAt: now + seconds * 1000,
+        status: "bidding"
+      }
+    };
+  }, undefined, false);
+
+  if (!result.committed) reject(failureReason);
   try { await database.ref(`publicRooms/${roomId}`).update({ status: "active" }); } catch {}
   return { ok: true, startedAt: now };
 });
