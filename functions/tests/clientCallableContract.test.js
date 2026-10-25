@@ -23,3 +23,11 @@ test("every callable export uses a unique name", () => {
   const names = [...backendSource.matchAll(/export const (\w+) = onCall/g)].map((match) => match[1]);
   assert.equal(new Set(names).size, names.length, "duplicate callable export name detected");
 });
+
+test("protected room, team and chat state is not written directly by the client", () => {
+  assert.doesNotMatch(clientSource, /\\bupdateRtdb\\b/);
+  assert.doesNotMatch(clientSource, /update\\(ref\\(rtdb,\\s*`auctions\\/\\$\\{[^}]+\\}\\/room`/);
+  assert.doesNotMatch(clientSource, /update\\(ref\\(rtdb,\\s*`auctions\\/\\$\\{[^}]+\\}\\/teams`/);
+  assert.match(clientSource, /httpsCallable\\(getFunctions\\(app\\),\\s*['"]endAuction['"]\\)/);
+  assert.match(clientSource, /httpsCallable\\(getFunctions\\(app\\),\\s*['"]sendAuctionChatMessage['"]\\)/);
+});
