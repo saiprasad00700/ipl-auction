@@ -150,7 +150,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
         timerEndsAt: transactionNow + seconds * 1000,
         lastActivityAt: transactionNow
       },
-      room: { ...room, lastActivityAt: now }
+      room: { ...room, lastActivityAt: transactionNow }
     };
   }, undefined, false);
 
@@ -225,7 +225,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
       }
     }
 
-    const decidedAt = Math.min(now, Number(offer.expiresAt));
+    const decidedAt = Math.min(transactionNow, Number(offer.expiresAt));
     const nextOffer = {
       ...offer,
       decision,
@@ -241,7 +241,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
     return {
       ...current,
       room: { ...room, lastActivityAt: transactionNow },
-      live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }
+      live: { ...live, retentionOffer: nextOffer, lastActivityAt: transactionNow }
     };
   }, undefined, false);
 
@@ -315,7 +315,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
         ...live,
         currentBid: counterBid,
         retentionOffer: nextOffer,
-        lastActivityAt: now
+        lastActivityAt: transactionNow
       }
     };
   }, undefined, false);
