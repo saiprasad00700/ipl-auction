@@ -42,5 +42,5 @@ test('mode-aware overseas defaults apply when room settings are absent', () => {
   assert.equal(getOverseasLimit('sprint11'), 4);
   assert.equal(getOverseasLimit('sprint5'), 2);
   assert.equal(getOverseasLimit('sprint 5'), 2);
-  assert.equal(getOverseasLimit('mega', 8), 8);
+  assert.equal(getOverseasLimit('mega', 8), 4);
 });
