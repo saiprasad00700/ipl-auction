@@ -55,6 +55,6 @@ test("invalid timer transitions are rejected and fallback resume never has zero 
   assert.equal(transitionBiddingTimer({ status: "paused" }, "pause", 15, 1).ok, false);
   assert.equal(transitionBiddingTimer({ status: "bidding" }, "resume", 15, 1).ok, false);
   const resumed = transitionBiddingTimer({ status: "paused", pausedRemainingMs: 0 }, "resume", 15, 100);
-  assert.equal(resumed.live.timerEndsAt, 1100);
+  assert.equal(resumed.live.timerEndsAt, 15100);
   assert.equal(transitionBiddingTimer(null, "pause", 15, 1).ok, false);
 });
