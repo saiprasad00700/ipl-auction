@@ -8,12 +8,15 @@ export const SPRINT5_OVERSEAS_LIMIT = 2;
 export const BID_INCREMENT_CRORE = 0.5;
 
 export function getOverseasLimit(mode, configuredLimit) {
-  const configured = Number(configuredLimit);
-  if (Number.isFinite(configured) && configured > 0) return configured;
   const normalized = String(mode || 'mega').toLowerCase();
-  if (normalized.includes('sprint5') || normalized.includes('sprint 5')) return SPRINT5_OVERSEAS_LIMIT;
-  if (normalized.includes('sprint11') || normalized.includes('sprint 11')) return SPRINT11_OVERSEAS_LIMIT;
-  return MEGA_OVERSEAS_LIMIT;
+  const modeMaximum = normalized.includes('sprint5') || normalized.includes('sprint 5')
+    ? SPRINT5_OVERSEAS_LIMIT
+    : normalized.includes('sprint11') || normalized.includes('sprint 11')
+      ? SPRINT11_OVERSEAS_LIMIT
+      : MEGA_OVERSEAS_LIMIT;
+  const configured = Number(configuredLimit);
+  if (!Number.isFinite(configured) || configured <= 0) return modeMaximum;
+  return Math.min(modeMaximum, Math.max(0, Math.floor(configured)));
 }
 
 export function getNextBidAmount(currentBid, basePrice = 0) {
