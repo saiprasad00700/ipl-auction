@@ -116,3 +116,67 @@ test('clients cannot directly mutate live auction state', async () => {
   await assertFails(set(ref(memberDb, `auctions/${roomId}/live/status`), 'sold'));
   await assertFails(set(ref(hostDb, `auctions/${roomId}/live/status`), 'awaiting_xi'));
 });
+
+
+test('only authenticated users can read a private auction room by its known code', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  const anonDb = env.unauthenticatedContext().database();
+  await assertSucceeds(set(ref(memberDb, `auctions/${roomId}/presence/member-1`), { online: true }));
+  await assertFails(set(ref(anonDb, `auctions/${roomId}/presence/anonymous`), { online: true }));
+});
+
+test('users can write their own history but cannot write another user history', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  const entry = {
+    roomId,
+    userId: 'member-1',
+    mode: 'mega',
+    status: 'active',
+    joinedAt: Date.now()
+  };
+  await assertSucceeds(set(ref(memberDb, `userAuctionHistory/member-1/${roomId}`), entry));
+  await assertFails(set(ref(memberDb, `userAuctionHistory/host-1/${roomId}`), {
+    ...entry,
+    userId: 'host-1'
+  }));
+});
+
+test('presence is restricted to the authenticated user identity', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertSucceeds(set(ref(memberDb, `auctions/${roomId}/presence/member-1`), {
+    online: true,
+    lastSeen: Date.now()
+  }));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/presence/host-1`), {
+    online: false,
+    lastSeen: Date.now()
+  }));
+});
+
+test('chat payloads reject oversized names and messages', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/long-name`), {
+    userId: 'member-1',
+    userName: 'M'.repeat(81),
+    text: 'Hello',
+    type: 'text',
+    timestamp: Date.now()
+  }));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/long-text`), {
+    userId: 'member-1',
+    userName: 'Member',
+    text: 'x'.repeat(2001),
+    type: 'text',
+    timestamp: Date.now()
+  }));
+});
+
+test('history rejects an invalid auction mode', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(set(ref(memberDb, `userAuctionHistory/member-1/${roomId}`), {
+    roomId,
+    userId: 'member-1',
+    mode: 'admin',
+    status: 'active'
+  }));
+});
