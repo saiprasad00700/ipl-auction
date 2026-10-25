@@ -11,6 +11,7 @@ import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction } from "./roomAuthorizationRules.js";
+import { systemEventReceiptKey } from "./systemEventRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -372,10 +373,23 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
     type = offer.status === "accepted" ? "retention_accepted" : "log";
   }
   const now = Date.now();
+  const receiptKey = systemEventReceiptKey(event, room, live, uid);
+  const receiptRef = root.child("systemEventReceipts").child(receiptKey);
+  const receipt = await receiptRef.transaction((current) => {
+    if (current) return;
+    return { event, createdAt: now };
+  }, undefined, false);
+  if (!receipt.committed) return { ok: true, duplicate: true };
+
   const messageRef = root.child("messages").push();
-  await messageRef.set({ userId: "system", userName: "System", text, type, timestamp: now });
-  await root.child("room/lastActivityAt").set(now);
-  return { ok: true, messageId: messageRef.key };
+  try {
+    await messageRef.set({ userId: "system", userName: "System", text, type, timestamp: now });
+    await root.child("room/lastActivityAt").set(now);
+  } catch (error) {
+    await receiptRef.remove().catch(() => {});
+    throw error;
+  }
+  return { ok: true, messageId: messageRef.key, duplicate: false };
 });
 
 
