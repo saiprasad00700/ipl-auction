@@ -396,19 +396,26 @@ const AuctionRoom = () => {
    // Visual prototype only: briefly introduce each new player. The actual shared
    // bidding clock remains owned by AuctionContext and is not modified here.
    const [cameraCutActive, setCameraCutActive] = useState(false);
-   const previousFocusTeamRef = useRef(undefined);
+   const previousShotSignatureRef = useRef(undefined);
    useEffect(() => {
-      const nextFocusTeam = displayAuctionState?.highBidderTeamId || 'auctioneer';
-      if (previousFocusTeamRef.current === undefined) {
-         previousFocusTeamRef.current = nextFocusTeam;
+      // Re-cut on a new player, accepted bid, bidder change, or auction outcome.
+      // This only changes presentation; AuctionContext remains the source of truth.
+      const nextShotSignature = [
+         displayAuctionState?.playerId || 'no-player',
+         displayAuctionState?.highBidderTeamId || 'auctioneer',
+         Number(displayAuctionState?.currentBid) || 0,
+         displayAuctionState?.status || 'ready'
+      ].join(':');
+      if (previousShotSignatureRef.current === undefined) {
+         previousShotSignatureRef.current = nextShotSignature;
          return undefined;
       }
-      if (previousFocusTeamRef.current === nextFocusTeam) return undefined;
-      previousFocusTeamRef.current = nextFocusTeam;
+      if (previousShotSignatureRef.current === nextShotSignature) return undefined;
+      previousShotSignatureRef.current = nextShotSignature;
       setCameraCutActive(true);
       const cutTimer = window.setTimeout(() => setCameraCutActive(false), 650);
       return () => window.clearTimeout(cutTimer);
-   }, [displayAuctionState?.highBidderTeamId]);
+   }, [displayAuctionState?.playerId, displayAuctionState?.highBidderTeamId, displayAuctionState?.currentBid, displayAuctionState?.status]);
 
    const [showRoleIntro, setShowRoleIntro] = useState(false);
    useEffect(() => {
