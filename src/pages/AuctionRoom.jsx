@@ -1475,6 +1475,11 @@ const AuctionRoom = () => {
                                  <div className="ss-cinematic-bid-hud" aria-live="polite">
                                     <span className="ss-cinematic-bid-hud-label">CURRENT BID</span>
                                     <strong>₹{(Number(displayAuctionState?.currentBid) || 0).toFixed(2)} Cr</strong>
+                                    <span className="ss-cinematic-bid-leader">
+                                       {displayAuctionState?.highBidderTeamId
+                                          ? `LEADING · ${TEAMS.find((t) => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId}`
+                                          : 'WAITING FOR FIRST BID'}
+                                    </span>
                                  </div>
                                  <div className="ss-arena-shot-label" aria-live="polite">{displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
                                  <div className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
