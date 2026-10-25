@@ -37,9 +37,9 @@ test("bid validation, live-state mutation and room activity use one root transac
   const end = backendSource.indexOf("export const decideRetention = onCall(", start);
   assert.ok(start >= 0 && end > start, "placeBid callable should exist");
   const source = backendSource.slice(start, end);
-  assert.match(source, /rootRef\\.transaction\\(/);
-  assert.match(source, /current\\.teams\\?\\.\\[/);
-  assert.match(source, /room: \\{ \\.\\.\\.room, lastActivityAt: now \\}/);
-  assert.doesNotMatch(source, /liveRef\\.transaction\\(/);
-  assert.doesNotMatch(source, /room\\/lastActivityAt/);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("current.teams?.["));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(!source.includes("liveRef.transaction("));
+  assert.ok(!source.includes('room/lastActivityAt').includes('set('));
 });
