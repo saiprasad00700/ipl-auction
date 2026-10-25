@@ -580,6 +580,14 @@ const AuctionRoom = () => {
             const chosenPhrase = bidPhrases[Math.floor(Math.random() * bidPhrases.length)];
             speak(chosenPhrase);
          }
+      } else if (status === 'processing_sale' && lastSpokenStatusRef.current !== 'processing_sale') {
+         lastSpokenStatusRef.current = 'processing_sale';
+         const playerName = currentPlayer?.name || "The player";
+         const retentionTeamId = displayAuctionState?.retentionOffer?.originalTeamId;
+         const retentionTeamName = TEAMS.find(t => t.id === retentionTeamId)?.name;
+         speak(retentionTeamName
+            ? `Retention card decision. ${retentionTeamName} has the option to retain ${playerName}. Please watch the screen for the decision.`
+            : `Retention card decision in progress for ${playerName}. Please watch the screen.`);
       } else if (status === 'sold' && lastSpokenStatusRef.current !== 'sold') {
          lastSpokenStatusRef.current = 'sold';
          const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.name || highBidderTeamId || "a franchise";
