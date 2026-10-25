@@ -9,6 +9,23 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const INACTIVE_MS = 30 * 60 * 1000;
 
+// Include timestamps written by different versions of the client. In particular,
+// messages and presence often change more frequently than room.lastActivityAt.
+const ACTIVITY_TIMESTAMP_KEYS = new Set([
+  'lastActivityAt',
+  'activityAt',
+  'lastSeen',
+  'joinedAt',
+  'leftAt',
+  'lastMessageAt',
+  'lastChatAt',
+  'lastBidAt',
+  'bidAt',
+  'timestamp',
+  'createdAt',
+  'updatedAt',
+]);
+
 if (!serviceAccountRaw || !databaseURL) {
   throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON or VITE_FIREBASE_DATABASE_URL secret.');
 }
@@ -29,13 +46,34 @@ function timestampMs(value) {
   return 0;
 }
 
+function latestTimestampInTree(value, key = '') {
+  if (value === null || value === undefined) return 0;
+  let latest = ACTIVITY_TIMESTAMP_KEYS.has(key) ? timestampMs(value) : 0;
+
+  if (Array.isArray(value)) {
+    for (const child of value) latest = Math.max(latest, latestTimestampInTree(child));
+  } else if (typeof value === 'object') {
+    for (const [childKey, childValue] of Object.entries(value)) {
+      latest = Math.max(latest, latestTimestampInTree(childValue, childKey));
+    }
+  }
+  return latest;
+}
+
 function latestActivityAt(value) {
+  // Scan timestamp-bearing descendants too: room-level lastActivityAt was not
+  // consistently refreshed for chat, presence, bids, and older client versions.
   return Math.max(
     timestampMs(value?.room?.lastActivityAt),
     timestampMs(value?.live?.lastActivityAt),
     timestampMs(value?.room?.createdAt),
     timestampMs(value?.createdAt),
-    timestampMs(value?.lastActivityAt)
+    timestampMs(value?.lastActivityAt),
+    latestTimestampInTree(value?.messages),
+    latestTimestampInTree(value?.presence),
+    latestTimestampInTree(value?.live),
+    latestTimestampInTree(value?.room?.players),
+    latestTimestampInTree(value?.teams)
   );
 }
 
@@ -51,6 +89,8 @@ async function main() {
   let retained = 0;
   let missingActivity = 0;
   let recentActivity = 0;
+  let skippedChanged = 0;
+  let publicDirectoryErrors = 0;
 
   for (const [roomId, value] of Object.entries(auctionsSnap.val())) {
     if (!value?.room) {
@@ -59,8 +99,6 @@ async function main() {
       continue;
     }
 
-    // All room states, including started/completed auctions, follow the same
-    // inactivity rule. Do not exempt completed/analyzing/awaiting_xi rooms.
     const lastActivity = latestActivityAt(value);
     if (!lastActivity) {
       console.log(`Retained ${roomId}: no usable activity/creation timestamp`);
@@ -69,7 +107,7 @@ async function main() {
       continue;
     }
     if (now - lastActivity < INACTIVE_MS) {
-      console.log(`Retained ${roomId}: last activity is less than 30 minutes ago`);
+      console.log(`Retained ${roomId}: latest activity ${new Date(lastActivity).toISOString()} is less than 30 minutes ago`);
       retained++;
       recentActivity++;
       continue;
@@ -80,6 +118,7 @@ async function main() {
     const latest = latestSnap.val();
     if (!latest?.room) {
       console.log(`Skipped ${roomId}: room metadata disappeared before deletion`);
+      skippedChanged++;
       continue;
     }
 
@@ -87,29 +126,40 @@ async function main() {
     if (!latestActivity || now - latestActivity < INACTIVE_MS) {
       console.log(`Retained ${roomId}: activity changed during cleanup`);
       retained++;
+      skippedChanged++;
       continue;
     }
 
     await db.ref(`auctions/${roomId}`).remove();
-    await db.ref(`publicRooms/${roomId}`).remove();
+    try {
+      await db.ref(`publicRooms/${roomId}`).remove();
+    } catch (error) {
+      publicDirectoryErrors++;
+      console.error(`Public room directory cleanup failed for ${roomId}:`, error?.message || error);
+    }
+
     if (supabase) {
       const teamsResult = await supabase.from('teams').delete().eq('auction_id', roomId);
       const auctionsResult = await supabase.from('auctions').delete().eq('id', roomId);
       if (teamsResult.error) console.error(`Supabase teams cleanup failed for ${roomId}:`, teamsResult.error.message);
       if (auctionsResult.error) console.error(`Supabase auction cleanup failed for ${roomId}:`, auctionsResult.error.message);
     }
-    console.log(`Terminated inactive room ${roomId}`);
+    console.log(`Terminated inactive room ${roomId}; last activity ${new Date(latestActivity).toISOString()}`);
     terminated++;
   }
 
-  console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}; missing timestamps: ${missingActivity}; recent activity: ${recentActivity}`);
+  console.log(
+    `Cleanup complete. Terminated: ${terminated}; retained: ${retained}; ` +
+    `missing timestamps: ${missingActivity}; recent activity: ${recentActivity}; ` +
+    `skipped/changed: ${skippedChanged}; public directory errors: ${publicDirectoryErrors}; ` +
+    `Supabase cleanup: ${supabase ? 'enabled' : 'disabled (secrets not configured)'}`
+  );
 }
 main()
   .catch(error => {
-    console.error(error);
+    console.error('Inactive-room cleanup failed:', error);
     process.exitCode = 1;
   })
   .finally(async () => {
-    // Close Firebase Admin's persistent connections so GitHub Actions can exit.
     await Promise.all(getApps().map(app => deleteApp(app)));
   });
