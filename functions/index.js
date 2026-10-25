@@ -1216,7 +1216,8 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     };
   }, undefined, false);
   if (!result.committed) reject(failureReason);
-  return { ok: true, action };;
+  return { ok: true, action };
+});
 
 
 export const endAuction = onCall({ enforceAppCheck: false }, async (request) => {
