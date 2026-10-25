@@ -9,6 +9,8 @@ export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
+export const MIN_ALL_ROUNDERS_IN_XI = 2;
+export const MIN_BOWLERS_IN_XI = 5;
 
 const normalizeRole = (player) => {
   const role = String(player?.role || player?.playingRole || '').toLowerCase();
@@ -20,6 +22,17 @@ const normalizeRole = (player) => {
 };
 
 const playerId = (player) => typeof player === 'string' ? player : player?.id;
+
+// The player dataset uses country="IND" for Indian players and "OS" for
+// overseas players. Support readable labels too, while treating missing
+// nationality as unknown rather than incorrectly counting it as overseas.
+const isOverseasPlayer = (player) => {
+  const country = String(player?.country || '').trim().toUpperCase();
+  const type = String(player?.type || '').trim().toUpperCase();
+  if (type === 'OVERSEAS' || type === 'OS') return true;
+  if (!country) return false;
+  return !['IND', 'IN', 'INDIA', 'INDIAN'].includes(country);
+};
 
 const toPlayer = (squadItem, playerCatalog) => {
   const id = playerId(squadItem);
@@ -38,13 +51,20 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     .filter(Boolean);
   const unique = [...new Map(players.map((p) => [p.id, p])).values()];
   const selected = [];
+  const overseasCount = (playersToCheck) => playersToCheck.filter(isOverseasPlayer).length;
   const addBest = (predicate, categoryLimit) => {
     const alreadySelected = selected.filter(predicate).length;
-    const needed = Math.max(0, categoryLimit - alreadySelected);
+    let needed = Math.max(0, categoryLimit - alreadySelected);
     const candidates = unique
       .filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
       .sort((a, b) => unique.indexOf(a) - unique.indexOf(b));
-    selected.push(...candidates.slice(0, needed));
+    for (const candidate of candidates) {
+      if (needed <= 0 || selected.length >= PLAYING_XI_SIZE) break;
+      if (isOverseasPlayer(candidate)
+        && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
+      selected.push(candidate);
+      needed -= 1;
+    }
   };
 
   addBest((p) => normalizeRole(p) === 'wk', 1);
@@ -69,11 +89,17 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
     || !selectedIds.every((id) => squadIds.has(id))) return false;
 
   // IPL's four-overseas-player restriction applies to the starting XI, not the full squad.
-  const overseasInXI = startingXI.reduce((count, item) => {
-    const player = toPlayer(item, playerCatalog);
-    return count + (player && player.country !== 'IND' ? 1 : 0);
-  }, 0);
-  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI;
+  const resolvedXI = startingXI.map((item) => toPlayer(item, playerCatalog)).filter(Boolean);
+  const overseasInXI = resolvedXI.filter(isOverseasPlayer).length;
+  const allRoundersInXI = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
+  // All-rounders count toward the five-player bowling group, as required by the game rules.
+  const bowlingOptionsInXI = resolvedXI.filter((player) =>
+    ['ar', 'bowl'].includes(normalizeRole(player))
+  ).length;
+
+  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI
+    && allRoundersInXI >= MIN_ALL_ROUNDERS_IN_XI
+    && bowlingOptionsInXI >= MIN_BOWLERS_IN_XI;
 }
 
 /** Deterministic validation of the no-ties 1..N ranking contract. */
