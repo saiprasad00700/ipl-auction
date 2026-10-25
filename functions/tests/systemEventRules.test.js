@@ -57,3 +57,29 @@ test("system events reject non-members, banned members, and premature results", 
   assert.equal(canPostSystemEvent({ event: "auction_completed", uid: "host", room: roomFixture({ status: "analyzing" }) }), false);
   assert.equal(canPostSystemEvent({ event: "auction_completed", uid: "host", room: roomFixture({ status: "completed" }) }), true);
 });
+
+test("pause and resume announcement keys survive heartbeat updates", () => {
+  const pausedLive = { status: "paused", pausedAt: 1234, timerEndsAt: 9000 };
+  const firstPauseRoom = { status: "active", lastActivityAt: 1000 };
+  const afterPauseAnnouncementRoom = { ...firstPauseRoom, lastActivityAt: 1500 };
+  assert.equal(
+    systemEventReceiptKey("auction_paused", firstPauseRoom, pausedLive),
+    systemEventReceiptKey("auction_paused", afterPauseAnnouncementRoom, pausedLive)
+  );
+
+  const resumedLive = { status: "bidding", timerEndsAt: 5000, pausedAt: null };
+  assert.equal(
+    systemEventReceiptKey("auction_resumed", firstPauseRoom, resumedLive),
+    systemEventReceiptKey("auction_resumed", afterPauseAnnouncementRoom, resumedLive)
+  );
+});
+
+test("player-removal announcement key uses the ban roster rather than heartbeat", () => {
+  const before = { status: "lobby", bannedPlayers: ["managerA"], lastActivityAt: 1000 };
+  const after = { ...before, lastActivityAt: 2000 };
+  assert.equal(systemEventReceiptKey("player_removed", before), systemEventReceiptKey("player_removed", after));
+  assert.notEqual(
+    systemEventReceiptKey("player_removed", before),
+    systemEventReceiptKey("player_removed", { ...after, bannedPlayers: ["managerA", "managerB"] })
+  );
+});
