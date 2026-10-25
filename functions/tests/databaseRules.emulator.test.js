@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { test, after } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { ref, set, update } from 'firebase/database';
+import { get, ref, set, update } from 'firebase/database';
 
 const projectId = 'demo-ss-auction-security';
 const env = await initializeTestEnvironment({
@@ -118,7 +118,7 @@ test('clients cannot directly mutate live auction state', async () => {
 });
 
 
-test('only authenticated users can read a private auction room by its known code', async () => {
+test('only authenticated users can write their own presence under a private room', async () => {
   const memberDb = env.authenticatedContext('member-1').database();
   const anonDb = env.unauthenticatedContext().database();
   await assertSucceeds(set(ref(memberDb, `auctions/${roomId}/presence/member-1`), { online: true }));
@@ -179,4 +179,26 @@ test('history rejects an invalid auction mode', async () => {
     mode: 'admin',
     status: 'active'
   }));
+});
+
+
+test('authenticated room members can read a room while anonymous users cannot', async () => {
+  const memberDb = env.authenticatedContext('member-1').database();
+  const anonDb = env.unauthenticatedContext().database();
+  await assertSucceeds(get(ref(memberDb, `auctions/${roomId}/room`)));
+  await assertFails(get(ref(anonDb, `auctions/${roomId}/room`)));
+});
+
+test('users can read their own auction history but not another user history', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await set(ref(ctx.database(), `userAuctionHistory/host-1/${roomId}`), {
+      roomId,
+      userId: 'host-1',
+      mode: 'mega',
+      status: 'active'
+    });
+  });
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertSucceeds(get(ref(memberDb, `userAuctionHistory/member-1`)));
+  await assertFails(get(ref(memberDb, `userAuctionHistory/host-1`)));
 });
