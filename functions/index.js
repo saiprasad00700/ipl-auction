@@ -3,6 +3,7 @@ import { getDatabase } from "firebase-admin/database";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { applySaleToTeam } from "./saleSettlementHelpers.js";
 import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
+import { validatePlayingXIComposition } from "./playingXIRules.js";
 
 initializeApp();
 const database = getDatabase();
