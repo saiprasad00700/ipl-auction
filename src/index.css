@@ -1187,3 +1187,51 @@
     animation: none;
   }
 }
+
+
+/* Cinematic arena atmosphere: slow broadcast-light sweeps, subtle depth and
+   a restrained live-edge glow. Decorative only; no auction state is changed. */
+.ss-cinematic-player-stage {
+  isolation: isolate;
+  background-image:
+    radial-gradient(ellipse at 12% 18%, rgba(16,185,129,.13), transparent 32%),
+    radial-gradient(ellipse at 88% 12%, rgba(59,130,246,.12), transparent 34%),
+    linear-gradient(180deg, rgba(2,6,23,.04), rgba(2,6,23,.22));
+  background-size: 140% 140%, 150% 150%, 100% 100%;
+  background-position: 0% 0%, 100% 0%, center;
+}
+.ss-cinematic-player-stage[data-focus-team]:not([data-focus-team="auctioneer"]) {
+  box-shadow:
+    inset 0 0 0 1px rgba(110,231,183,.16),
+    inset 0 -3rem 5rem rgba(2,6,23,.25),
+    0 1.25rem 3.5rem rgba(0,0,0,.24);
+}
+.ss-cinematic-player-stage[data-auction-status="bidding"] {
+  animation: ss-arena-light-sweep 8s ease-in-out infinite alternate;
+}
+.ss-cinematic-player-stage[data-auction-status="processing_sale"] {
+  box-shadow: inset 0 0 4rem rgba(139,92,246,.1), 0 1.25rem 3.5rem rgba(0,0,0,.24);
+}
+.ss-cinematic-player-stage[data-auction-status="sold"] {
+  box-shadow: inset 0 0 4rem rgba(16,185,129,.1), 0 1.25rem 3.5rem rgba(0,0,0,.24);
+}
+.ss-cinematic-player-stage[data-auction-status="unsold"] {
+  box-shadow: inset 0 0 4rem rgba(239,68,68,.08), 0 1.25rem 3.5rem rgba(0,0,0,.24);
+}
+@keyframes ss-arena-light-sweep {
+  0% { background-position: 0% 0%, 100% 0%, center; }
+  50% { background-position: 35% 12%, 65% 8%, center; }
+  100% { background-position: 70% 0%, 30% 10%, center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-player-stage[data-auction-status="bidding"] {
+    animation: none;
+  }
+}
+
+/* Keep the player reveal legible above decorative lighting on compact screens. */
+@media (max-width: 640px) {
+  .ss-cinematic-player-stage {
+    background-size: 180% 160%, 180% 160%, 100% 100%;
+  }
+}
