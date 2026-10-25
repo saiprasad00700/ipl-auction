@@ -2,6 +2,7 @@
 import { initializeApp, cert, getApps, deleteApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { createClient } from '@supabase/supabase-js';
+import { latestActivityAt } from './room-activity.js';
 
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 const databaseURL = process.env.VITE_FIREBASE_DATABASE_URL;
@@ -17,28 +18,6 @@ initializeApp({ credential: cert(serviceAccount), databaseURL });
 const db = getDatabase();
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-function timestampMs(value) {
-  if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const numeric = Number(value);
-    if (value.trim() !== '' && Number.isFinite(numeric)) return numeric;
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-function latestActivityAt(value) {
-  return Math.max(
-    timestampMs(value?.room?.lastActivityAt),
-    timestampMs(value?.live?.lastActivityAt),
-    timestampMs(value?.room?.createdAt),
-    timestampMs(value?.createdAt),
-    timestampMs(value?.lastActivityAt)
-  );
-}
-
 async function main() {
   const now = Date.now();
   const auctionsSnap = await db.ref('auctions').get();
@@ -51,6 +30,8 @@ async function main() {
   let retained = 0;
   let missingActivity = 0;
   let recentActivity = 0;
+  let skippedChanged = 0;
+  let publicDirectoryErrors = 0;
 
   for (const [roomId, value] of Object.entries(auctionsSnap.val())) {
     if (!value?.room) {
@@ -59,8 +40,6 @@ async function main() {
       continue;
     }
 
-    // All room states, including started/completed auctions, follow the same
-    // inactivity rule. Do not exempt completed/analyzing/awaiting_xi rooms.
     const lastActivity = latestActivityAt(value);
     if (!lastActivity) {
       console.log(`Retained ${roomId}: no usable activity/creation timestamp`);
@@ -69,7 +48,7 @@ async function main() {
       continue;
     }
     if (now - lastActivity < INACTIVE_MS) {
-      console.log(`Retained ${roomId}: last activity is less than 30 minutes ago`);
+      console.log(`Retained ${roomId}: latest activity ${new Date(lastActivity).toISOString()} is less than 30 minutes ago`);
       retained++;
       recentActivity++;
       continue;
@@ -80,6 +59,7 @@ async function main() {
     const latest = latestSnap.val();
     if (!latest?.room) {
       console.log(`Skipped ${roomId}: room metadata disappeared before deletion`);
+      skippedChanged++;
       continue;
     }
 
@@ -87,29 +67,40 @@ async function main() {
     if (!latestActivity || now - latestActivity < INACTIVE_MS) {
       console.log(`Retained ${roomId}: activity changed during cleanup`);
       retained++;
+      skippedChanged++;
       continue;
     }
 
     await db.ref(`auctions/${roomId}`).remove();
-    await db.ref(`publicRooms/${roomId}`).remove();
+    try {
+      await db.ref(`publicRooms/${roomId}`).remove();
+    } catch (error) {
+      publicDirectoryErrors++;
+      console.error(`Public room directory cleanup failed for ${roomId}:`, error?.message || error);
+    }
+
     if (supabase) {
       const teamsResult = await supabase.from('teams').delete().eq('auction_id', roomId);
       const auctionsResult = await supabase.from('auctions').delete().eq('id', roomId);
       if (teamsResult.error) console.error(`Supabase teams cleanup failed for ${roomId}:`, teamsResult.error.message);
       if (auctionsResult.error) console.error(`Supabase auction cleanup failed for ${roomId}:`, auctionsResult.error.message);
     }
-    console.log(`Terminated inactive room ${roomId}`);
+    console.log(`Terminated inactive room ${roomId}; last activity ${new Date(latestActivity).toISOString()}`);
     terminated++;
   }
 
-  console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}; missing timestamps: ${missingActivity}; recent activity: ${recentActivity}`);
+  console.log(
+    `Cleanup complete. Terminated: ${terminated}; retained: ${retained}; ` +
+    `missing timestamps: ${missingActivity}; recent activity: ${recentActivity}; ` +
+    `skipped/changed: ${skippedChanged}; public directory errors: ${publicDirectoryErrors}; ` +
+    `Supabase cleanup: ${supabase ? 'enabled' : 'disabled (secrets not configured)'}`
+  );
 }
 main()
   .catch(error => {
-    console.error(error);
+    console.error('Inactive-room cleanup failed:', error);
     process.exitCode = 1;
   })
   .finally(async () => {
-    // Close Firebase Admin's persistent connections so GitHub Actions can exit.
     await Promise.all(getApps().map(app => deleteApp(app)));
   });
