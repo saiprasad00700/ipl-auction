@@ -21,6 +21,17 @@ const normalizeRole = (player) => {
 
 const playerId = (player) => typeof player === 'string' ? player : player?.id;
 
+// The player dataset uses country="IND" for Indian players and "OS" for
+// overseas players. Support readable labels too, while treating missing
+// nationality as unknown rather than incorrectly counting it as overseas.
+const isOverseasPlayer = (player) => {
+  const country = String(player?.country || '').trim().toUpperCase();
+  const type = String(player?.type || '').trim().toUpperCase();
+  if (type === 'OVERSEAS' || type === 'OS') return true;
+  if (!country) return false;
+  return !['IND', 'IN', 'INDIA', 'INDIAN'].includes(country);
+};
+
 const toPlayer = (squadItem, playerCatalog) => {
   const id = playerId(squadItem);
   const catalogPlayer = playerCatalog.find((player) => player.id === id);
@@ -38,13 +49,20 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     .filter(Boolean);
   const unique = [...new Map(players.map((p) => [p.id, p])).values()];
   const selected = [];
+  const overseasCount = (playersToCheck) => playersToCheck.filter(isOverseasPlayer).length;
   const addBest = (predicate, categoryLimit) => {
     const alreadySelected = selected.filter(predicate).length;
-    const needed = Math.max(0, categoryLimit - alreadySelected);
+    let needed = Math.max(0, categoryLimit - alreadySelected);
     const candidates = unique
       .filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
       .sort((a, b) => unique.indexOf(a) - unique.indexOf(b));
-    selected.push(...candidates.slice(0, needed));
+    for (const candidate of candidates) {
+      if (needed <= 0 || selected.length >= PLAYING_XI_SIZE) break;
+      if (isOverseasPlayer(candidate)
+        && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
+      selected.push(candidate);
+      needed -= 1;
+    }
   };
 
   addBest((p) => normalizeRole(p) === 'wk', 1);
@@ -71,7 +89,7 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
   // IPL's four-overseas-player restriction applies to the starting XI, not the full squad.
   const overseasInXI = startingXI.reduce((count, item) => {
     const player = toPlayer(item, playerCatalog);
-    return count + (player && player.country !== 'IND' ? 1 : 0);
+    return count + (player && isOverseasPlayer(player) ? 1 : 0);
   }, 0);
   return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI;
 }
