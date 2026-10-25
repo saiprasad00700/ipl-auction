@@ -50,8 +50,7 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { ref, update } from 'firebase/database';
-import { rtdb } from '../lib/firebase';
+import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount, getOverseasLimit } from '../lib/auctionRules';
 
 const AuctionRoom = () => {
    const { id } = useParams();
@@ -103,7 +102,7 @@ const AuctionRoom = () => {
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
-   const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || 10);
+   const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS);
    const [optimisticState, setOptimisticState] = useState(null);
    const [joiningTeam, setJoiningTeam] = useState(null);
    const [banError, setBanError] = useState(null);
@@ -562,8 +561,7 @@ const AuctionRoom = () => {
 
    const isAdmin = currentAuction?.hostId === user?.uid;
    const currentBid = displayAuctionState?.currentBid || 0;
-   const increment = currentBid < 5 ? 0.20 : 0.25;
-   const nextBidAmount = currentBid === 0 ? (currentPlayer?.basePrice || 0) : currentBid + increment;
+   const nextBidAmount = getNextBidAmount(currentBid, currentPlayer?.basePrice || 0);
    const playerCategories = useMemo(() => {
       const soldIds = new Set();
       const soldWithBids = {};
@@ -866,8 +864,8 @@ const AuctionRoom = () => {
       }
 
       // Overseas Limit Check
-      const isOverseas = currentPlayer?.country !== 'IND';
-      const overseasLimit = currentAuction?.overseasLimit || 8;
+      const isOverseas = currentPlayer?.country !== 'IND' && currentPlayer?.country !== 'IN';
+      const overseasLimit = getOverseasLimit(currentAuction?.mode, currentAuction?.overseasLimit);
       if (isOverseas) {
          const overseasCount = team?.squad?.filter(s => {
             const pid = typeof s === 'string' ? s : s.id;
@@ -893,7 +891,7 @@ const AuctionRoom = () => {
          highBidderId: user?.uid,
          highBidderName: user?.displayName || 'Manager',
          highBidderTeamId: team?.teamId,
-         timerEndsAt: getSyncedTime() + (currentAuction?.settings?.bidTimer || 10) * 1000
+         timerEndsAt: getSyncedTime() + (currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000
       });
 
       try {
@@ -1213,7 +1211,7 @@ const AuctionRoom = () => {
                                           <span>Overseas: <span className="text-white">{(teamDoc?.squad?.filter(s => {
                                              const pid = typeof s === 'string' ? s : s.id;
                                              return IPL_PLAYERS.find(pl => pl.id === pid)?.country !== 'IND';
-                                          }).length || 0)}/{currentAuction?.overseasLimit || 8}</span></span>
+                                          }).length || 0)}/{getOverseasLimit(currentAuction?.mode, currentAuction?.overseasLimit)}</span></span>
                                        </div>
 
                                        {teamDoc?.squad?.length > 0 ? (
@@ -1411,7 +1409,7 @@ const AuctionRoom = () => {
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
                               <div className="bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]">
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
-                                    <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
+                                    <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
                                     <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.22),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
@@ -1963,7 +1961,7 @@ const AuctionRoom = () => {
                               </div>
                               <span className="text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">{newTimerValue} Seconds</span>
                            </div>
-                           <input type="range" min="5" max="60" value={newTimerValue} onChange={(e) => setNewTimerValue(parseInt(e.target.value))} className="w-full accent-blue-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
+                           <input type="range" min="3" max="15" value={newTimerValue} onChange={(e) => setNewTimerValue(parseInt(e.target.value))} className="w-full accent-blue-500 bg-white/10 h-1.5 rounded-lg cursor-pointer" />
                            <button onClick={async () => { await updateRoomSettings(id, { ...currentAuction.settings, bidTimer: newTimerValue }); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all mt-3 shadow-lg shadow-blue-500/20 active:scale-95 cursor-pointer">
                               Apply Timer Settings
                            </button>
