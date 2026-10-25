@@ -499,54 +499,74 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
     throw new HttpsError("invalid-argument", "Choose a valid franchise.");
   }
 
-  const roomRef = database.ref(`auctions/${roomId}`);
-  const roomSnap = await roomRef.child("room").get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (!canChangeFranchise(room.status)) reject("Franchises can only be changed before the auction starts.");
-  if (uid !== userId && room.hostId !== uid) reject("You cannot change another manager's franchise.");
-
-  const members = Array.isArray(room.players) ? room.players : [];
-  const member = members.find((p) => p?.id === userId);
-  if (!member || room.bannedPlayers?.includes(userId)) reject("This manager is not an active member of the room.");
-  if (!isFranchiseAvailable(members, userId, teamId)) reject("That franchise has already been selected in this room.");
-
-  const teamRef = roomRef.child("teams").child(`${roomId}_${userId}`);
-  const teamSnap = await teamRef.get();
-  const existingTeam = teamSnap.val();
-  if (hasPurchasedPlayers(existingTeam)) {
-    reject("A franchise cannot be changed after players have been purchased.");
+  if (uid !== userId) {
+    const initialRoomSnap = await database.ref(`auctions/${roomId}/room`).get();
+    const initialRoom = initialRoomSnap.val();
+    if (!initialRoom || initialRoom.hostId !== uid) {
+      reject("You cannot change another manager's franchise.");
+    }
   }
 
-  const teamName = FRANCHISES[teamId];
-  const teamRecord = buildTeamAssignmentRecord(
-    existingTeam, roomId, userId, teamId, teamName, Number(room.settings?.budget ?? 120)
-  );
-
-  // Transaction the whole room object so the status and exclusive franchise
-  // reservation are rechecked together if the auction starts during this request.
-  const roomNodeRef = roomRef.child("room");
+  // Commit the roster reservation and authoritative team record in ONE root
+  // transaction. Separate room and team writes could previously leave a
+  // franchise reserved in the lobby while its purse/squad record stayed stale.
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
-  const memberUpdate = await roomNodeRef.transaction((current) => {
-    if (!current || !canChangeFranchise(current.status)) return;
-    if (Array.isArray(current.bannedPlayers) && current.bannedPlayers.includes(userId)) return;
-    const currentPlayers = Array.isArray(current.players) ? current.players : [];
-    if (!currentPlayers.some((p) => p?.id === userId)) return;
-    if (!isFranchiseAvailable(currentPlayers, userId, teamId)) return;
+  let failureReason = "The auction may have started or that franchise was just selected. Refresh the room and choose again.";
+  const result = await rootRef.transaction((current) => {
+    if (!current || !current.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const room = current.room;
+    if (!canChangeFranchise(room.status)) {
+      failureReason = "Franchises can only be changed before the auction starts.";
+      return;
+    }
+    if (uid !== userId && room.hostId !== uid) {
+      failureReason = "You cannot change another manager's franchise.";
+      return;
+    }
+    if (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(userId)) {
+      failureReason = "This manager is not an active member of the room.";
+      return;
+    }
+    const members = Array.isArray(room.players) ? room.players : [];
+    if (!members.some((p) => p?.id === userId)) {
+      failureReason = "This manager is not an active member of the room.";
+      return;
+    }
+    if (!isFranchiseAvailable(members, userId, teamId)) {
+      failureReason = "That franchise has already been selected in this room.";
+      return;
+    }
+
+    const teamKey = `${roomId}_${userId}`;
+    const existingTeam = current.teams?.[teamKey] || null;
+    if (hasPurchasedPlayers(existingTeam)) {
+      failureReason = "A franchise cannot be changed after players have been purchased.";
+      return;
+    }
+    const teamRecord = buildTeamAssignmentRecord(
+      existingTeam, roomId, userId, teamId, FRANCHISES[teamId],
+      Number(room.settings?.budget ?? 120)
+    );
     return {
       ...current,
-      players: currentPlayers.map((p) => p?.id === userId ? { ...p, team: teamId, teamName } : p),
-      lastActivityAt: now
+      room: {
+        ...room,
+        players: members.map((p) => p?.id === userId
+          ? { ...p, team: teamId, teamName: FRANCHISES[teamId] }
+          : p),
+        lastActivityAt: now
+      },
+      teams: { ...(current.teams || {}), [teamKey]: teamRecord }
     };
   }, undefined, false);
-  if (!memberUpdate.committed) {
-    reject("The auction may have started or that franchise was just selected. Refresh the room and choose again.");
-  }
-  await teamRef.set(teamRecord);
-  return { ok: true, teamId, teamName };
+
+  if (!result.committed) reject(failureReason);
+  return { ok: true, teamId, teamName: FRANCHISES[teamId] };
 });
-
-
 
 
 
