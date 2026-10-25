@@ -467,3 +467,66 @@
 @media (prefers-reduced-motion: reduce) {
   .ss-auctioneer-stage[data-auction-status="bidding"] .ss-auctioneer-live-dot { animation: none; }
 }
+
+
+/* Compact broadcast HUD: auction mode and live bid are read-only presentation. */
+.ss-cinematic-mode-chip,
+.ss-cinematic-bid-hud {
+  position:absolute;
+  z-index:42;
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  border:1px solid rgba(110,231,183,.28);
+  border-radius:.55rem;
+  background:linear-gradient(135deg,rgba(2,6,23,.88),rgba(15,23,42,.78));
+  color:#ecfdf5;
+  box-shadow:0 .5rem 1.5rem rgba(0,0,0,.24);
+  backdrop-filter:blur(10px);
+}
+.ss-cinematic-mode-chip {
+  top:.9rem;
+  left:.9rem;
+  padding:.45rem .65rem;
+  font-size:.56rem;
+  font-weight:950;
+  letter-spacing:.14em;
+}
+.ss-cinematic-mode-live-dot {
+  width:.42rem;
+  height:.42rem;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#34d399;
+  box-shadow:0 0 .65rem rgba(52,211,153,.85);
+}
+.ss-cinematic-bid-hud {
+  top:.9rem;
+  right:.9rem;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:.16rem;
+  padding:.45rem .65rem;
+  border-color:rgba(251,191,36,.3);
+}
+.ss-cinematic-bid-hud-label {
+  color:#cbd5e1;
+  font-size:.43rem;
+  font-weight:900;
+  letter-spacing:.14em;
+}
+.ss-cinematic-bid-hud strong {
+  color:#fde68a;
+  font-size:clamp(.85rem,2vw,1.2rem);
+  font-variant-numeric:tabular-nums;
+  line-height:1.1;
+}
+@media (max-width:640px) {
+  .ss-cinematic-mode-chip { top:.55rem; left:.55rem; padding:.35rem .45rem; font-size:.43rem; letter-spacing:.08em; }
+  .ss-cinematic-bid-hud { top:.55rem; right:.55rem; padding:.32rem .45rem; }
+  .ss-cinematic-bid-hud-label { font-size:.34rem; }
+  .ss-cinematic-bid-hud strong { font-size:.78rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-cinematic-mode-live-dot { box-shadow:none; }
+}
