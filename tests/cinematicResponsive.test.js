@@ -21,6 +21,14 @@ test('cinematic controls expose accessible expanded and pressed states', () => {
   assert.match(room, /auction-room-settings-panel/);
 });
 
+test('Escape closes open settings and activity/chat header panels', () => {
+  assert.match(room, /if \(!showSettings && !showHeaderPanel\) return undefined/);
+  assert.match(room, /event\.key !== 'Escape'/);
+  assert.match(room, /setShowSettings\(false\)/);
+  assert.match(room, /setShowHeaderPanel\(false\)/);
+  assert.match(room, /removeEventListener\('keydown', handlePanelKeyDown\)/);
+});
+
 test('live auction updates are announced without relying on camera cue text', () => {
   assert.match(room, /aria-live="polite"/);
   assert.match(room, /aria-atomic="true"/);
