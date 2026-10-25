@@ -991,6 +991,19 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
       throw new HttpsError("invalid-argument", "Invalid auction settings.");
     }
+    const coreSettings = ["budget", "squadLimit", "overseasLimit", "auctionType"];
+    const changingCoreSettings = coreSettings.some((key) => Object.hasOwn(settings, key));
+    if (changingCoreSettings && !["waiting", "lobby"].includes(room.status || "waiting")) {
+      reject("Budget, squad limits, overseas limits, and auction mode can only be changed before the auction starts.");
+    }
+    if (changingCoreSettings) {
+      const teamsSnapshot = await database.ref("auctions/" + roomId + "/teams").get();
+      const teams = teamsSnapshot.val() || {};
+      const hasPurchases = Object.values(teams).some((team) =>
+        (Array.isArray(team?.squad) && team.squad.length > 0) || Number(team?.spent || 0) > 0
+      );
+      if (hasPurchases) reject("Auction rules cannot be changed after a franchise has purchased players.");
+    }
     const safeSettings = {};
     const allowed = new Set(["bidTimer", "budget", "squadLimit", "overseasLimit", "auctionType"]);
     for (const [key, value] of Object.entries(settings)) {
@@ -1015,8 +1028,15 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
       safeSettings[key] = key === "auctionType" ? value : Number(value);
     }
     if (!Object.keys(safeSettings).length) throw new HttpsError("invalid-argument", "No valid settings were supplied.");
-    if (safeSettings.auctionType && safeSettings.overseasLimit === undefined) {
-      safeSettings.overseasLimit = safeSettings.auctionType === "sprint5" ? 2 : 4;
+    if (safeSettings.auctionType) {
+      const defaults = safeSettings.auctionType === "sprint5"
+        ? { budget: 60, squadLimit: 5, overseasLimit: 2 }
+        : safeSettings.auctionType === "sprint11"
+          ? { budget: 90, squadLimit: 11, overseasLimit: 4 }
+          : { budget: 120, squadLimit: 25, overseasLimit: 4 };
+      for (const [key, value] of Object.entries(defaults)) {
+        if (safeSettings[key] === undefined) safeSettings[key] = value;
+      }
     }
     await roomRef.child("settings").update(safeSettings);
     if (safeSettings.auctionType !== undefined) {
@@ -1027,6 +1047,15 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     }
     if (safeSettings.squadLimit !== undefined) {
       await roomRef.child("squadLimit").set(safeSettings.squadLimit);
+    }
+    if (safeSettings.budget !== undefined) {
+      const teamsSnapshot = await database.ref("auctions/" + roomId + "/teams").get();
+      const teams = teamsSnapshot.val() || {};
+      const teamUpdates = {};
+      for (const [teamKey, team] of Object.entries(teams)) {
+        teamUpdates[teamKey + "/budgetRemaining"] = Number(safeSettings.budget);
+      }
+      if (Object.keys(teamUpdates).length) await database.ref("auctions/" + roomId + "/teams").update(teamUpdates);
     }
     await roomRef.child("lastActivityAt").set(Date.now());
     return { ok: true, settings: safeSettings };
