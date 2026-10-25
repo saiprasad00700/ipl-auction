@@ -17,9 +17,30 @@ initializeApp({ credential: cert(serviceAccount), databaseURL });
 const db = getDatabase();
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
+function timestampMs(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (value.trim() !== '' && Number.isFinite(numeric)) return numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function latestActivityAt(value) {
+  return Math.max(
+    timestampMs(value?.room?.lastActivityAt),
+    timestampMs(value?.live?.lastActivityAt),
+    timestampMs(value?.room?.createdAt),
+    timestampMs(value?.createdAt),
+    timestampMs(value?.lastActivityAt)
+  );
+}
+
 async function main() {
   const now = Date.now();
-  const root = db.ref('/');
   const auctionsSnap = await db.ref('auctions').get();
   if (!auctionsSnap.exists()) {
     console.log('No RTDB auction rooms found.');
@@ -28,35 +49,43 @@ async function main() {
 
   let terminated = 0;
   let retained = 0;
+  let missingActivity = 0;
+  let recentActivity = 0;
+
   for (const [roomId, value] of Object.entries(auctionsSnap.val())) {
-    const room = value?.room;
-    if (!room) continue;
-    // Never delete rooms already in their completed-summary lifecycle here.
-    if (room.status === 'completed' || room.status === 'analyzing' || room.status === 'awaiting_xi') {
+    if (!value?.room) {
+      console.log(`Retained ${roomId}: missing room metadata`);
       retained++;
       continue;
     }
-    const activityTimes = [
-      Number(room.lastActivityAt || 0),
-      Number(value?.live?.lastActivityAt || 0),
-      Number(room.createdAt || 0)
-    ].filter(Number.isFinite);
-    const lastActivity = Math.max(0, ...activityTimes);
-    if (!lastActivity || now - lastActivity < INACTIVE_MS) {
+
+    // All room states, including started/completed auctions, follow the same
+    // inactivity rule. Do not exempt completed/analyzing/awaiting_xi rooms.
+    const lastActivity = latestActivityAt(value);
+    if (!lastActivity) {
+      console.log(`Retained ${roomId}: no usable activity/creation timestamp`);
       retained++;
+      missingActivity++;
+      continue;
+    }
+    if (now - lastActivity < INACTIVE_MS) {
+      console.log(`Retained ${roomId}: last activity is less than 30 minutes ago`);
+      retained++;
+      recentActivity++;
       continue;
     }
 
     // Re-read immediately before deletion to avoid deleting a room that became active.
     const latestSnap = await db.ref(`auctions/${roomId}`).get();
     const latest = latestSnap.val();
-    if (!latest?.room) continue;
-    const latestActivity = Math.max(
-      Number(latest.room.lastActivityAt || 0),
-      Number(latest.live?.lastActivityAt || 0),
-      Number(latest.room.createdAt || 0)
-    );
-    if (now - latestActivity < INACTIVE_MS) {
+    if (!latest?.room) {
+      console.log(`Skipped ${roomId}: room metadata disappeared before deletion`);
+      continue;
+    }
+
+    const latestActivity = latestActivityAt(latest);
+    if (!latestActivity || now - latestActivity < INACTIVE_MS) {
+      console.log(`Retained ${roomId}: activity changed during cleanup`);
       retained++;
       continue;
     }
@@ -64,13 +93,16 @@ async function main() {
     await db.ref(`auctions/${roomId}`).remove();
     await db.ref(`publicRooms/${roomId}`).remove();
     if (supabase) {
-      await supabase.from('teams').delete().eq('auction_id', roomId);
-      await supabase.from('auctions').delete().eq('id', roomId);
+      const teamsResult = await supabase.from('teams').delete().eq('auction_id', roomId);
+      const auctionsResult = await supabase.from('auctions').delete().eq('id', roomId);
+      if (teamsResult.error) console.error(`Supabase teams cleanup failed for ${roomId}:`, teamsResult.error.message);
+      if (auctionsResult.error) console.error(`Supabase auction cleanup failed for ${roomId}:`, auctionsResult.error.message);
     }
     console.log(`Terminated inactive room ${roomId}`);
     terminated++;
   }
-  console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}`);
+
+  console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}; missing timestamps: ${missingActivity}; recent activity: ${recentActivity}`);
 }
 main()
   .catch(error => {
