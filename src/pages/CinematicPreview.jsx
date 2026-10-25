@@ -30,7 +30,7 @@ function makeLabel(text, color, width = 3.2) {
   return mesh;
 }
 
-function buildCharacter(group, palette, kind = 'player') {
+function buildCharacter(group, palette, kind = 'player', role = 'Wicket-keeper') {
   const jersey = new THREE.MeshStandardMaterial({ color: palette, roughness: 0.48, metalness: 0.12 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x101a2c, roughness: 0.65 });
   const skin = new THREE.MeshStandardMaterial({ color: 0xb97853, roughness: 0.7 });
@@ -57,6 +57,21 @@ function buildCharacter(group, palette, kind = 'player') {
     add(new THREE.CylinderGeometry(0.19, 0.22, 0.7, 10), dark, [-0.28, 0.25, 0], [1,1,1]);
     add(new THREE.CylinderGeometry(0.19, 0.22, 0.7, 10), dark, [0.28, 0.25, 0], [1,1,1]);
     const number = makeLabel('SS', '#ffffff', 0.95); number.position.set(0, 1.23, 0.52); group.add(number);
+    if (role === 'Batter' || role === 'Wicket-keeper' || role === 'All-rounder') {
+      const bat = new THREE.Group(); bat.position.set(-0.78, 0.9, 0.22); bat.rotation.z = -0.18; group.add(bat);
+      const wood = new THREE.MeshStandardMaterial({ color: 0xc99b5b, roughness: 0.6 });
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.36, 8), dark); handle.position.y = 0.28; bat.add(handle);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.88, 0.09), wood); blade.position.y = -0.2; bat.add(blade);
+      group.userData.bat = bat;
+    }
+    if (role === 'Bowler' || role === 'All-rounder') {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshStandardMaterial({ color: 0xb91c32, roughness: 0.45 }));
+      ball.position.set(0.78, 1.3, 0.25); group.add(ball); group.userData.ball = ball;
+    }
+    if (role === 'Wicket-keeper') {
+      const gloveMat = new THREE.MeshStandardMaterial({ color: 0xf2c66d, roughness: 0.6 });
+      [-0.67, 0.67].forEach((x) => { const glove = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), gloveMat); glove.scale.set(1, 0.78, 0.55); glove.position.set(x, 0.95, 0.3); group.add(glove); });
+    }
   }
 }
 
@@ -123,6 +138,9 @@ export default function CinematicPreview() {
   const [sound, setSound] = useState(false);
   const [rtm, setRtm] = useState(false);
   const [webglError, setWebglError] = useState('');
+  const [role, setRole] = useState('Wicket-keeper');
+  const [intro, setIntro] = useState(true);
+  const [introCount, setIntroCount] = useState(3);
   const shotRef = useRef(shot);
   const leaderRef = useRef(leader);
   shotRef.current = shot;
@@ -157,6 +175,9 @@ export default function CinematicPreview() {
         const a = arena.userData;
         a.daisRing.rotation.z += 0.002;
         a.player.position.y = 0.52 + Math.sin(frame * 1.8) * 0.045;
+        a.player.rotation.y = Math.sin(frame * 0.6) * 0.11;
+        if (a.player.userData.bat) a.player.userData.bat.rotation.z = -0.18 + Math.sin(frame * 1.25) * 0.08;
+        if (a.player.userData.ball) a.player.userData.ball.position.y = 1.3 + Math.sin(frame * 2.4) * 0.12;
         a.auctioneer.userData.gavel.rotation.z = Math.sin(frame * 1.5) * 0.28 - 0.18;
         a.tables.forEach((t, i) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); });
         const targetShot = shotRef.current % 4;
@@ -195,9 +216,10 @@ export default function CinematicPreview() {
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = 'en-US'; utterance.rate = 0.92; window.speechSynthesis.speak(utterance);
   };
-  const nextBid = () => { const next = +(bid + 0.5).toFixed(2); setBid(next); setOutcome('BID ACCEPTED'); announce('New bid. ' + next.toFixed(2) + ' crore.'); };
+  const nextBid = () => { if (intro) return; const next = +(bid + 0.5).toFixed(2); setBid(next); setOutcome('BID ACCEPTED'); announce('New bid. ' + next.toFixed(2) + ' crore.'); };
   const sell = () => { setOutcome('SOLD'); announce('Sold! Sold for ' + bid.toFixed(2) + ' crore.'); };
-  const useRtm = () => { setRtm(v => !v); setOutcome(rtm ? 'LIVE LOT' : 'RTM REVIEW'); announce(rtm ? 'Back to live bidding.' : 'Retention card review.'); };
+  const useRtm = () => { if (intro) return; setRtm(v => !v); setOutcome(rtm ? 'LIVE LOT' : 'RTM REVIEW'); announce(rtm ? 'Back to live bidding.' : 'Retention card review.'); };
+  useEffect(() => { if (!intro) return undefined; setIntroCount(3); const start = Date.now(); const id = window.setInterval(() => { const left = 3 - Math.floor((Date.now() - start) / 1000); if (left <= 0) { setIntroCount(0); setIntro(false); window.clearInterval(id); } else setIntroCount(left); }, 100); return () => window.clearInterval(id); }, [intro]);
 
   return (
     <main className="ss3d-preview">
@@ -215,6 +237,7 @@ export default function CinematicPreview() {
           <div className="ss3d-cam-label"><Camera size={14}/> {['WIDE BROADCAST','PLAYER CLOSE-UP','AUCTIONEER CAM','OVERHEAD ARENA'][shot % 4]}</div>
           <div className="ss3d-lot-label"><span>MARQUEE SET 01</span><small>BASE PRICE</small><strong>₹2.00 <i>Cr</i></strong></div>
           <div className="ss3d-bid-hud"><small>CURRENT BID</small><strong>₹{bid.toFixed(2)} <i>Cr</i></strong><span>LEADING · {leader}</span></div>
+          {intro && <div className="ss3d-intro-overlay"><small>PLAYER INTRODUCTION</small><strong>{introCount || 'BID'}</strong><span>BIDDING OPENS AFTER INTRO</span></div>}
           <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : '')}>{outcome}</div>
           <div className="ss3d-player-caption"><span>LOT 001 / WICKET-KEEPER</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
           <div className="ss3d-scene-controls"><button onClick={() => setShot(v => (v + 1) % 4)}><Camera size={15}/> Change camera</button><button onClick={() => {setShot(0); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false);}}><RotateCcw size={15}/> Reset scene</button></div>
@@ -223,7 +246,7 @@ export default function CinematicPreview() {
       <section className="ss3d-console">
         <div className="ss3d-console-head"><div><span className="ss3d-eyebrow">LIVE AUCTION CONTROL</span><h2>Every bid changes the room.</h2></div><span className="ss3d-status-chip"><i/> {outcome}</span></div>
         <div className="ss3d-console-grid">
-          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">WK</div><div><strong>Marquee Player</strong><small>Wicket-keeper · Overseas demo</small></div><b>LOT 001</b></div><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><div className="ss3d-action-row"><button className="ss3d-bid-button" onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" onClick={sell}>SOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
+          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro} onClick={sell}>SOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
           <div className="ss3d-franchise-panel"><div className="ss3d-panel-kicker"><Users size={14}/> FRANCHISE TABLES <span>10 ACTIVE</span></div><div className="ss3d-franchise-grid">{FRANCHISES.map(([name, color]) => <button key={name} className={leader === name ? 'leading' : ''} onClick={() => {setLeader(name); setOutcome('LIVE LOT'); announce(name + ' is now leading.');}} style={{'--team-accent':color}}><i/><strong>{name}</strong><small>{leader === name ? 'LEADING' : '₹120 Cr'}</small></button>)}</div><div className="ss3d-feature-foot"><span><Mic size={14}/> VOICE CHAT READY</span><span><Sparkles size={14}/> 3D CAMERA CUTS</span></div></div>
         </div>
       </section>
