@@ -44,6 +44,7 @@ import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
+import { DEFAULT_BID_TIMER_SECONDS, getOverseasLimit } from '../lib/auctionRules';
 import { autoSelectBestXI, validatePlayingXI } from '../lib/auctionWinnerRules';
 
 
@@ -962,7 +963,7 @@ export const AuctionProvider = ({ children }) => {
                   status: sData.status,
                   auctionType: sData.auction_type || 'mega',
                   squadLimit: sData.squad_limit || 25,
-                  overseasLimit: sData.overseas_limit || 8,
+                  overseasLimit: sData.overseas_limit || 4,
                   players: sData.players || [],
                   bannedPlayers: sData.banned_players || [],
                   settings: sData.settings || { bidTimer: 15, budget: 120 }
@@ -1391,7 +1392,7 @@ export const AuctionProvider = ({ children }) => {
       const squad = Array.isArray(botTeam.squad) ? botTeam.squad : [];
       const budget = Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120);
       const squadLimit = Number(roomData.squadLimit || 25);
-      const overseasLimit = Number(roomData.overseasLimit || 8);
+      const overseasLimit = getOverseasLimit(roomData.auctionType, roomData.overseasLimit);
       const slotsLeft = squadLimit - squad.length;
       const isOverseas = player.country && player.country !== 'IND';
       const overseasCount = squad.reduce((count, item) => {
@@ -1466,7 +1467,7 @@ export const AuctionProvider = ({ children }) => {
     lastBotBidCycleRef.current = cycleKey;
 
     const now = getSyncedTime();
-    const timerSec = currentAuction.settings?.bidTimer || 10;
+    const timerSec = currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS;
     const timerMs = timerSec * 1000;
     const remainingMs = Math.max(0, (live.timerEndsAt || 0) - now);
     const cBid = live.currentBid || 0;
@@ -1521,7 +1522,7 @@ export const AuctionProvider = ({ children }) => {
           highBidderId: live.highBidderId,
           botTeam,
           squadLimit: currentAuction.squadLimit || 25,
-          overseasLimit: currentAuction.overseasLimit || 8,
+          overseasLimit: getOverseasLimit(currentAuction.auctionType, currentAuction.overseasLimit),
           initialBudget,
         });
 
