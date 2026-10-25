@@ -186,57 +186,92 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   const botUserId = suppliedBotId.startsWith("bot_") ? suppliedBotId : "bot_" + suppliedBotId;
   requireRoomId(roomId);
   const counterBid = Number(Number(amount).toFixed(2));
-  if (!Number.isFinite(counterBid) || counterBid <= 0) throw new HttpsError("invalid-argument", "Enter a valid counter-bid.");
-
-  const roomRef = database.ref(`auctions/${roomId}`);
-  const [roomSnapshot, teamSnapshot] = await Promise.all([
-    roomRef.child("room").get(),
-    roomRef.child("teams").child(roomId + "_" + (botAction ? botUserId : uid)).get()
-  ]);
-  const room = roomSnapshot.val();
-  const team = teamSnapshot.val();
-  if (!room) reject("Auction room could not be found.");
-  if (!team || !canSubmitRtmCounterBid({
-    uid,
-    room,
-    offer: (await roomRef.child("live/retentionOffer").get()).val(),
-    team,
-    botAction,
-    botIds: [...BOT_IDS]
-  })) {
-    reject("Only the active eligible buyer, or the host acting for a bot buyer, can submit this counter-bid.");
+  if (!Number.isFinite(counterBid) || counterBid <= 0) {
+    throw new HttpsError("invalid-argument", "Enter a valid counter-bid.");
   }
-  const liveRef = roomRef.child("live");
+
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
-  const result = await liveRef.transaction((live) => {
-    if (!live || live.status !== "processing_sale") return;
+  let failureReason = "Counter-bid is no longer valid, or you are not authorized to submit it.";
+  const result = await rootRef.transaction((current) => {
+    if (!current?.room || !current.live) {
+      failureReason = "Auction room or live offer could not be found.";
+      return;
+    }
+    const room = current.room;
+    const live = current.live;
     const offer = live.retentionOffer;
-    if (!offer || offer.status !== "pending" || offer.phase !== "counter_bid") return;
+    if (room.status !== "active") {
+      failureReason = "The auction is not active.";
+      return;
+    }
+    if (live.status !== "processing_sale" || !offer || offer.status !== "pending" || offer.phase !== "counter_bid") {
+      failureReason = "There is no open RTM counter-bid window.";
+      return;
+    }
+    const teamUserId = botAction ? botUserId : uid;
+    const team = current.teams?.[`${roomId}_${teamUserId}`];
+    if (!team || team.userId !== teamUserId || team.teamId !== offer.buyerTeamId) {
+      failureReason = "The counter-bidder franchise record is invalid.";
+      return;
+    }
     if (botAction) {
-      if (offer.buyerId !== botUserId || room.hostId !== uid || !BOT_IDS.has(offer.buyerId)) return;
-    } else if (offer.buyerId !== uid) return;
-    if (team.teamId !== offer.buyerTeamId) return;
-    if (now > Number(offer.expiresAt || 0)) return;
-    if (counterBid <= Number(offer.bid || 0)) return;
-    const purse = Number(team?.budgetRemaining ?? room.settings?.budget ?? 120);
-    if (counterBid > purse || counterBid > purse + Number(team?.spent || 0)) return;
-    offer.counterBid = counterBid;
-    offer.phase = "match_decision";
-    offer.decision = null;
-    offer.decidedBy = null;
-    offer.decidedAt = null;
-    offer.expiresAt = now + 10000;
-    live.currentBid = counterBid;
-    live.retentionOffer = offer;
-    live.lastActivityAt = now;
-    return live;
+      const hostIsActive = room.hostId === uid
+        && Array.isArray(room.players)
+        && room.players.some((player) => player?.id === uid)
+        && !room.bannedPlayers?.includes(uid);
+      if (!hostIsActive || !BOT_IDS.has(botUserId) || offer.buyerId !== botUserId) {
+        failureReason = "Only the active room host can submit a counter-bid for the matching bot buyer.";
+        return;
+      }
+    } else {
+      const isActiveBuyer = Array.isArray(room.players)
+        && room.players.some((player) => player?.id === uid)
+        && !room.bannedPlayers?.includes(uid)
+        && offer.buyerId === uid;
+      if (!isActiveBuyer) {
+        failureReason = "Only the active eligible buyer can submit this counter-bid.";
+        return;
+      }
+    }
+    if (now > Number(offer.expiresAt || 0)) {
+      failureReason = "The counter-bid window has expired.";
+      return;
+    }
+    if (counterBid <= Number(offer.bid || 0)) {
+      failureReason = "Your counter-bid must exceed the current price.";
+      return;
+    }
+    const purse = Number(team.budgetRemaining ?? room.settings?.budget ?? 120);
+    if (counterBid > purse) {
+      failureReason = "Your franchise does not have enough remaining purse for this counter-bid.";
+      return;
+    }
+
+    const nextOffer = {
+      ...offer,
+      counterBid,
+      phase: "match_decision",
+      decision: null,
+      decidedBy: null,
+      decidedAt: null,
+      expiresAt: now + 10000
+    };
+    return {
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      live: {
+        ...live,
+        currentBid: counterBid,
+        retentionOffer: nextOffer,
+        lastActivityAt: now
+      }
+    };
   }, undefined, false);
 
-  if (!result.committed) reject("Counter-bid must be higher than the current price and within your remaining budget, and the RTM window must still be open.");
-  await roomRef.child("room/lastActivityAt").set(now);
-  return { ok: true, counterBid };
+  if (!result.committed) reject(failureReason);
+  return { ok: true, counterBid, expiresAt: result.snapshot.val()?.live?.retentionOffer?.expiresAt };
 });
-
 
 export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
