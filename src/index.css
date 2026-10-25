@@ -743,3 +743,85 @@
   .ss-arena-camera-focus { animation: none; }
 }
 
+/* Final mobile broadcast layout: reserve clear zones for the bid HUD, camera
+   labels and live status so the overlays remain readable on narrow screens. */
+@media (max-width: 640px) {
+  .ss-cinematic-player-stage {
+    min-height: 31rem;
+    border-radius: 1.25rem;
+  }
+  .ss-cinematic-mode-chip {
+    top: .6rem;
+    left: .6rem;
+    max-width: 44%;
+    padding: .36rem .48rem;
+    font-size: .46rem;
+    letter-spacing: .08em;
+  }
+  .ss-cinematic-bid-hud {
+    top: 2.9rem;
+    right: .6rem;
+    max-width: 56%;
+    padding: .38rem .48rem;
+  }
+  .ss-cinematic-bid-hud-label {
+    font-size: .43rem;
+    letter-spacing: .1em;
+  }
+  .ss-cinematic-bid-value {
+    font-size: clamp(1rem, 5vw, 1.45rem);
+  }
+  .ss-cinematic-bid-leader {
+    max-width: 100%;
+    font-size: .43rem;
+    letter-spacing: .045em;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+  .ss-arena-shot-label {
+    top: 5.85rem;
+    right: .6rem;
+    max-width: 58%;
+    font-size: .4rem;
+    letter-spacing: .07em;
+    text-align: right;
+  }
+  .ss-arena-camera-focus {
+    top: 7.35rem;
+    right: .6rem;
+    max-width: 62%;
+    font-size: .43rem;
+    letter-spacing: .055em;
+    white-space: normal;
+    line-height: 1.35;
+    justify-content: flex-end;
+    text-align: right;
+  }
+  .ss-auctioneer-overlay {
+    left: .35rem;
+    bottom: 2.8rem;
+    width: min(9rem, 36%);
+  }
+  .ss-auctioneer-overlay .ss-auctioneer-stage {
+    min-height: 9rem;
+  }
+  .ss-auctioneer-overlay .ss-auctioneer-figure {
+    transform: translateX(-50%) scale(.55);
+    bottom: 2.2rem;
+  }
+  .ss-auctioneer-overlay .ss-auctioneer-caption {
+    font-size: .34rem;
+    letter-spacing: .06em;
+  }
+  .ss-cinematic-live-status {
+    bottom: .6rem;
+    max-width: calc(100% - 1.1rem);
+  }
+}
+@media (max-width: 380px) {
+  .ss-cinematic-player-stage { min-height: 29rem; }
+  .ss-cinematic-bid-hud { max-width: 54%; }
+  .ss-arena-camera-focus { max-width: 58%; }
+  .ss-auctioneer-overlay { width: 33%; }
+}
+
