@@ -846,3 +846,20 @@
   border-color: rgba(252,165,165,.85);
 }
 
+/* Keep outcome lighting smooth while preserving the status colors. */
+.ss-cinematic-player-stage::after {
+  transition: background .28s ease, box-shadow .28s ease;
+}
+.ss-cinematic-player-stage[data-auction-status="processing_sale"] .ss-cinematic-bid-hud {
+  border-color: rgba(196,181,253,.45);
+}
+.ss-cinematic-player-stage[data-auction-status="sold"] .ss-cinematic-bid-hud {
+  border-color: rgba(110,231,183,.42);
+}
+.ss-cinematic-player-stage[data-auction-status="unsold"] .ss-cinematic-bid-hud {
+  border-color: rgba(252,165,165,.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-player-stage::after { transition: none; }
+}
+
