@@ -211,28 +211,9 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
     }
     const teamUserId = botAction ? botUserId : uid;
     const team = current.teams?.[`${roomId}_${teamUserId}`];
-    if (!team || team.userId !== teamUserId || team.teamId !== offer.buyerTeamId) {
-      failureReason = "The counter-bidder franchise record is invalid.";
+    if (!canSubmitRtmCounterBid({ uid, room, offer, team, botAction, botIds: [...BOT_IDS] })) {
+      failureReason = "Only the active eligible buyer, or the active host acting for the matching bot buyer, can submit this counter-bid.";
       return;
-    }
-    if (botAction) {
-      const hostIsActive = room.hostId === uid
-        && Array.isArray(room.players)
-        && room.players.some((player) => player?.id === uid)
-        && !room.bannedPlayers?.includes(uid);
-      if (!hostIsActive || !BOT_IDS.has(botUserId) || offer.buyerId !== botUserId) {
-        failureReason = "Only the active room host can submit a counter-bid for the matching bot buyer.";
-        return;
-      }
-    } else {
-      const isActiveBuyer = Array.isArray(room.players)
-        && room.players.some((player) => player?.id === uid)
-        && !room.bannedPlayers?.includes(uid)
-        && offer.buyerId === uid;
-      if (!isActiveBuyer) {
-        failureReason = "Only the active eligible buyer can submit this counter-bid.";
-        return;
-      }
     }
     if (now > Number(offer.expiresAt || 0)) {
       failureReason = "The counter-bid window has expired.";
