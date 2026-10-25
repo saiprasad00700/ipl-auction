@@ -121,6 +121,18 @@ const AuctionRoom = () => {
       return params.get('spectate') === 'true';
    });
 
+   // Escape closes the lightweight header panels without affecting auction state.
+   useEffect(() => {
+      if (!showSettings && !showHeaderPanel) return undefined;
+      const handlePanelKeyDown = (event) => {
+         if (event.key !== 'Escape') return;
+         setShowSettings(false);
+         setShowHeaderPanel(false);
+      };
+      window.addEventListener('keydown', handlePanelKeyDown);
+      return () => window.removeEventListener('keydown', handlePanelKeyDown);
+   }, [showSettings, showHeaderPanel]);
+
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
    // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
    const lastInteractionHeartbeatRef = useRef(0);
