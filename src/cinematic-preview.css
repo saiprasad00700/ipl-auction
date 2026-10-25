@@ -42,3 +42,20 @@
 .ss3d-action-row .ss3d-bid-button{flex:2 1 220px}
 .ss3d-action-row .ss3d-rtm-button,.ss3d-action-row .ss3d-sold-button,.ss3d-action-row .ss3d-unsold-button{flex:1 1 78px}
 @media(max-width:440px){.ss3d-action-row .ss3d-bid-button{flex-basis:100%}.ss3d-action-row .ss3d-rtm-button,.ss3d-action-row .ss3d-sold-button,.ss3d-action-row .ss3d-unsold-button{flex:1 1 38%}}
+
+
+.ss3d-extra-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 18px}
+.ss3d-extra-panel{min-width:0;padding:16px;border:1px solid rgba(127,157,189,.2);border-radius:14px;background:linear-gradient(145deg,rgba(17,29,47,.94),rgba(7,13,24,.96))}
+.ss3d-extra-panel .ss3d-panel-kicker{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.ss3d-extra-panel .ss3d-panel-kicker button{border:0;background:transparent;color:#83f2c8;font-size:9px;font-weight:900;cursor:pointer}
+.ss3d-activity-item{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid rgba(127,157,189,.13);font-size:11px;color:#dbe6f2}
+.ss3d-activity-item i{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:#5bf0b6;box-shadow:0 0 10px rgba(91,240,182,.5)}
+.ss3d-activity-item span{flex:1;min-width:0;overflow-wrap:anywhere}.ss3d-activity-item small{color:#7288a1;font-size:8px;font-weight:900}
+.ss3d-empty-state{color:#8094aa;font-size:11px}
+.ss3d-audio-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid rgba(127,157,189,.13);color:#dbe6f2;font-size:11px}
+.ss3d-audio-row button{min-width:70px;padding:7px 10px;border:1px solid #34465d;border-radius:8px;background:#111d2e;color:#9eb0c5;font-size:9px;font-weight:950;cursor:pointer}
+.ss3d-audio-row button.enabled{border-color:rgba(91,240,182,.45);background:rgba(21,128,88,.18);color:#6af3c2}
+.ss3d-step-select{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:13px 0;color:#8195ad;font-size:9px;font-weight:900;letter-spacing:.1em}
+.ss3d-step-select select{padding:8px 10px;border:1px solid #35455c;border-radius:8px;background:#0b1422;color:#f2f6fc;font-size:11px}
+.ss3d-action-row button:disabled{opacity:.35;cursor:not-allowed}
+@media(max-width:700px){.ss3d-extra-panels{grid-template-columns:1fr}.ss3d-extra-panel{padding:13px}.ss3d-step-select{align-items:flex-start;flex-direction:column;gap:7px}.ss3d-step-select select{width:100%}}
