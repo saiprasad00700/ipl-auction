@@ -8,8 +8,10 @@ test("accepts supported timer settings and valid custom Mega budget", () => {
   });
 });
 
-test("rejects unsupported timer and invalid purse values", () => {
-  assert.equal(normalizeAuctionSettings({ bidTimer: 4 }).valid, false);
+test("accepts slider timer values from 3 to 15 and rejects out-of-range values", () => {
+  assert.equal(normalizeAuctionSettings({ bidTimer: 4 }).valid, true);
+  assert.equal(normalizeAuctionSettings({ bidTimer: 2 }).valid, false);
+  assert.equal(normalizeAuctionSettings({ bidTimer: 16 }).valid, false);
   assert.equal(normalizeAuctionSettings({ budget: -1 }).valid, false);
   assert.equal(normalizeAuctionSettings({ budget: 1001 }).valid, false);
 });
