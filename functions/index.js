@@ -1047,41 +1047,66 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
       throw new HttpsError("invalid-argument", "Invalid auction settings.");
     }
-    const coreSettings = ["budget", "squadLimit", "overseasLimit", "auctionType"];
-    const changingCoreSettings = coreSettings.some((key) => Object.hasOwn(settings, key));
-    if (changingCoreSettings && !["waiting", "lobby"].includes(room.status || "waiting")) {
-      reject("Budget, squad limits, overseas limits, and auction mode can only be changed before the auction starts.");
-    }
-    if (changingCoreSettings) {
-      const teamsSnapshot = await database.ref("auctions/" + roomId + "/teams").get();
-      const teams = teamsSnapshot.val() || {};
-      const hasPurchases = Object.values(teams).some((team) =>
-        (Array.isArray(team?.squad) && team.squad.length > 0) || Number(team?.spent || 0) > 0
-      );
-      if (hasPurchases) reject("Auction rules cannot be changed after a franchise has purchased players.");
-    }
-    const currentMode = room.settings?.auctionType || room.auctionType || "mega";
-    const normalized = normalizeAuctionSettings(settings, currentMode);
-    if (!normalized.valid) throw new HttpsError("invalid-argument", normalized.error);
-    const safeSettings = normalized.settings;
-    const updates = {};
-    for (const [key, value] of Object.entries(safeSettings)) {
-      updates["room/settings/" + key] = value;
-    }
-    if (safeSettings.auctionType !== undefined) updates["room/auctionType"] = safeSettings.auctionType;
-    if (safeSettings.overseasLimit !== undefined) updates["room/overseasLimit"] = safeSettings.overseasLimit;
-    if (safeSettings.squadLimit !== undefined) updates["room/squadLimit"] = safeSettings.squadLimit;
-    if (safeSettings.budget !== undefined) {
-      const teamsSnapshot = await database.ref("auctions/" + roomId + "/teams").get();
-      const teams = teamsSnapshot.val() || {};
-      for (const [teamKey] of Object.entries(teams)) {
-        updates["teams/" + teamKey + "/budgetRemaining"] = Number(safeSettings.budget);
+    const rootRef = database.ref("auctions/" + roomId);
+    let failureReason = "Could not update auction settings. Refresh and try again.";
+    let appliedSettings = null;
+    const now = Date.now();
+    const result = await rootRef.transaction((current) => {
+      if (!current?.room) {
+        failureReason = "Auction room could not be found.";
+        return;
       }
+      const currentRoom = current.room;
+      if (currentRoom.hostId !== uid) {
+        failureReason = "Only the room host can change auction controls.";
+        return;
+      }
+      const coreSettings = ["budget", "squadLimit", "overseasLimit", "auctionType"];
+      const changingCoreSettings = coreSettings.some((key) => Object.hasOwn(settings, key));
+      if (changingCoreSettings && !["waiting", "lobby"].includes(currentRoom.status || "waiting")) {
+        failureReason = "Budget, squad limits, overseas limits, and auction mode can only be changed before the auction starts.";
+        return;
+      }
+      const teams = current.teams || {};
+      if (changingCoreSettings) {
+        const hasPurchases = Object.values(teams).some((team) =>
+          (Array.isArray(team?.squad) && team.squad.length > 0) || Number(team?.spent || 0) > 0
+        );
+        if (hasPurchases) {
+          failureReason = "Auction rules cannot be changed after a franchise has purchased players.";
+          return;
+        }
+      }
+      const currentMode = currentRoom.settings?.auctionType || currentRoom.auctionType || "mega";
+      const normalized = normalizeAuctionSettings(settings, currentMode);
+      if (!normalized.valid) {
+        failureReason = normalized.error;
+        return;
+      }
+      appliedSettings = normalized.settings;
+      const nextRoom = {
+        ...currentRoom,
+        settings: { ...(currentRoom.settings || {}), ...normalized.settings },
+        lastActivityAt: now
+      };
+      if (normalized.settings.auctionType !== undefined) nextRoom.auctionType = normalized.settings.auctionType;
+      if (normalized.settings.overseasLimit !== undefined) nextRoom.overseasLimit = normalized.settings.overseasLimit;
+      if (normalized.settings.squadLimit !== undefined) nextRoom.squadLimit = normalized.settings.squadLimit;
+      let nextTeams = teams;
+      if (normalized.settings.budget !== undefined) {
+        nextTeams = Object.fromEntries(Object.entries(teams).map(([key, team]) => [
+          key, { ...team, budgetRemaining: Number(normalized.settings.budget) }
+        ]));
+      }
+      return { ...current, room: nextRoom, teams: nextTeams };
+    }, undefined, false);
+    if (!result.committed) {
+      if (failureReason === "Could not update auction settings. Refresh and try again." && appliedSettings) {
+        failureReason = "Auction settings changed concurrently. Refresh and try again.";
+      }
+      reject(failureReason);
     }
-    updates["room/lastActivityAt"] = Date.now();
-    // Commit all mode, settings, purse, and activity updates atomically.
-    await database.ref("auctions/" + roomId).update(updates);
-    return { ok: true, settings: safeSettings };
+    return { ok: true, settings: appliedSettings };
   }
 
   const liveRef = database.ref(`auctions/${roomId}/live`);
