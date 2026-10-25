@@ -27,7 +27,10 @@ export function getNextBidAmount(currentBid, basePrice = 0) {
 }
 
 export function clampBidTimerSeconds(value, fallback = DEFAULT_BID_TIMER_SECONDS) {
+  const allowed = [3, 5, 10, 15];
   const numeric = Number(value);
   const safe = Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
-  return Math.min(MAX_BID_TIMER_SECONDS, Math.max(MIN_BID_TIMER_SECONDS, Math.round(safe)));
+  return allowed.reduce((nearest, option) =>
+    Math.abs(option - safe) < Math.abs(nearest - safe) ? option : nearest,
+  allowed[0]);
 }
