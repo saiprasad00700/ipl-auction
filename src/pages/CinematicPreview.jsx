@@ -153,6 +153,11 @@ export default function CinematicPreview() {
   const [introCount, setIntroCount] = useState(3);
   const outcomeRef = useRef(outcome); outcomeRef.current = outcome;
   const [autoCamera, setAutoCamera] = useState(true);
+  const [activity, setActivity] = useState([{ id: 1, message: 'Auction arena is ready', time: 'NOW' }]);
+  const [activityOpen, setActivityOpen] = useState(true);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [bidStep, setBidStep] = useState(0.5);
   const autoCameraRef = useRef(autoCamera); autoCameraRef.current = autoCamera;
   const roleRef = useRef(role); const rtmRef = useRef(rtm);
   roleRef.current = role; rtmRef.current = rtm;
@@ -232,16 +237,17 @@ export default function CinematicPreview() {
     };
   }, []);
 
+  const logActivity = (message) => setActivity(items => [{ id: Date.now(), message, time: 'NOW' }, ...items].slice(0, 8));
   const announce = (message) => {
-    if (!sound || !('speechSynthesis' in window)) return;
+    if (!sound || muted || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = 'en-US'; utterance.rate = 0.92; window.speechSynthesis.speak(utterance);
   };
-  const nextBid = () => { if (intro) return; const next = +(bid + 0.5).toFixed(2); setBid(next); setOutcome('BID ACCEPTED'); announce('New bid. ' + next.toFixed(2) + ' crore.'); };
-  const sell = () => { if (intro) return; setOutcome('SOLD'); setShot(2); announce('Going once. Going twice. Sold! Sold for ' + bid.toFixed(2) + ' crore to ' + leader + '.'); };
-  const markUnsold = () => { if (intro) return; setOutcome('UNSOLD'); announce('No further bids. Unsold.'); };
-  const useRtm = () => { if (intro) return; setRtm(v => !v); setOutcome(rtm ? 'LIVE LOT' : 'RTM REVIEW'); announce(rtm ? 'Back to live bidding.' : 'Retention card review.'); };
+  const nextBid = () => { if (intro || outcome === 'SOLD' || outcome === 'UNSOLD') return; const next = +(bid + bidStep).toFixed(2); setBid(next); setOutcome('BID ACCEPTED'); logActivity(leader + ' bids ₹' + next.toFixed(2) + ' Cr'); announce('New bid. ' + next.toFixed(2) + ' crore. ' + leader + ' is leading.'); };
+  const sell = () => { if (intro || outcome === 'SOLD' || outcome === 'UNSOLD') return; setOutcome('SOLD'); setShot(2); logActivity('SOLD to ' + leader + ' for ₹' + bid.toFixed(2) + ' Cr'); announce('Going once. Going twice. Sold! Sold for ' + bid.toFixed(2) + ' crore to ' + leader + '.'); };
+  const markUnsold = () => { if (intro || outcome === 'SOLD' || outcome === 'UNSOLD') return; setOutcome('UNSOLD'); logActivity('LOT 001 marked UNSOLD'); announce('No further bids. Unsold.'); };
+  const useRtm = () => { if (intro || outcome === 'SOLD' || outcome === 'UNSOLD') return; setRtm(v => !v); setOutcome(rtm ? 'LIVE LOT' : 'RTM REVIEW'); logActivity(rtm ? 'RTM review ended' : leader + ' opened RTM review'); announce(rtm ? 'Back to live bidding.' : 'Retention card review.'); };
   useEffect(() => { if (!intro) return undefined; setIntroCount(3); const start = Date.now(); const id = window.setInterval(() => { const left = 3 - Math.floor((Date.now() - start) / 1000); if (left <= 0) { setIntroCount(0); setIntro(false); window.clearInterval(id); } else setIntroCount(left); }, 100); return () => window.clearInterval(id); }, [intro]);
 
   return (
@@ -249,7 +255,7 @@ export default function CinematicPreview() {
       <header className="ss3d-topbar">
         <Link to="/" className="ss3d-back"><ArrowLeft size={17}/> <span>SS AUCTION</span></Link>
         <div className="ss3d-live"><span/> CINEMATIC ARENA <b>PREVIEW</b></div>
-        <div className="ss3d-top-actions"><span className="ss3d-room">ROOM DEMO · 10 FRANCHISES</span><button aria-label="Toggle voice announcements" onClick={() => setSound(!sound)}>{sound ? <Volume2 size={17}/> : <VolumeX size={17}/>}</button></div>
+        <div className="ss3d-top-actions"><span className="ss3d-room">ROOM DEMO · 10 FRANCHISES</span><button aria-label="Toggle voice announcements" onClick={() => setSound(!sound)}>{sound ? <Volume2 size={17}/> : <VolumeX size={17}/>}</button><button aria-label="Toggle activity panel" onClick={() => setActivityOpen(v => !v)}><Users size={16}/></button><button aria-label="Toggle voice panel" onClick={() => setVoiceOpen(v => !v)}><Mic size={16}/></button></div>
       </header>
       <section className="ss3d-hero">
         <div className="ss3d-heading"><span className="ss3d-eyebrow"><Sparkles size={13}/> NEXT-GENERATION AUCTION EXPERIENCE</span><h1>THE AUCTION <em>ARENA</em></h1><p>A stadium-scale 3D stage. Live bidding energy. Every decision in the spotlight.</p></div>
@@ -263,14 +269,15 @@ export default function CinematicPreview() {
           {intro && <div className="ss3d-intro-overlay"><small>PLAYER INTRODUCTION</small><strong>{introCount || 'BID'}</strong><span>BIDDING OPENS AFTER INTRO</span></div>}
           <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : outcome === 'UNSOLD' ? 'is-unsold' : '')}>{outcome}</div>
           <div className="ss3d-player-caption"><span>LOT 001 / {role.toUpperCase()}</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
-          <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
+          <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setBidStep(0.5); setActivity([{id:Date.now(),message:'Demo scene reset',time:'NOW'}]); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
         </div>
       </section>
       <section className="ss3d-console">
         <div className="ss3d-console-head"><div><span className="ss3d-eyebrow">LIVE AUCTION CONTROL</span><h2>Every bid changes the room.</h2></div><span className="ss3d-status-chip"><i/> {outcome}</span></div>
+        <div className="ss3d-extra-panels">{activityOpen && <aside className="ss3d-extra-panel"><div className="ss3d-panel-kicker">LIVE ACTIVITY <button onClick={() => setActivity([])}>CLEAR</button></div>{activity.length ? activity.map(item => <div className="ss3d-activity-item" key={item.id}><i/><span>{item.message}</span><small>{item.time}</small></div>) : <p className="ss3d-empty-state">No demo events yet.</p>}</aside>}{voiceOpen && <aside className="ss3d-extra-panel"><div className="ss3d-panel-kicker">VOICE & AUDIO</div><div className="ss3d-audio-row"><span>English announcements</span><button className={sound ? 'enabled' : ''} onClick={() => setSound(v => !v)}>{sound ? 'ON' : 'OFF'}</button></div><div className="ss3d-audio-row"><span>Mute speaker</span><button className={muted ? 'enabled' : ''} onClick={() => {setMuted(v => !v); if (!muted && 'speechSynthesis' in window) window.speechSynthesis.cancel();}}>{muted ? 'MUTED' : 'AUDIBLE'}</button></div><p className="ss3d-demo-note">This preview controls browser voice announcements only; it is not connected to room voice chat.</p></aside>}</div>
         <div className="ss3d-console-grid">
-          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro} onClick={sell}>SOLD</button><button className="ss3d-unsold-button" disabled={intro} onClick={markUnsold}>UNSOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
-          <div className="ss3d-franchise-panel"><div className="ss3d-panel-kicker"><Users size={14}/> FRANCHISE TABLES <span>10 ACTIVE</span></div><div className="ss3d-franchise-grid">{FRANCHISES.map(([name, color]) => <button key={name} className={leader === name ? 'leading' : ''} onClick={() => {setLeader(name); setOutcome('LIVE LOT'); announce(name + ' is now leading.');}} style={{'--team-accent':color}}><i/><strong>{name}</strong><small>{leader === name ? 'LEADING' : '₹120 Cr'}</small></button>)}</div><div className="ss3d-feature-foot"><span><Mic size={14}/> VOICE CHAT READY</span><span><Sparkles size={14}/> 3D CAMERA CUTS</span></div></div>
+          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><label className="ss3d-step-select">BID INCREMENT <select value={bidStep} onChange={e => setBidStep(Number(e.target.value))}><option value={0.25}>₹0.25 Cr</option><option value={0.5}>₹0.50 Cr</option><option value={1}>₹1.00 Cr</option><option value={2}>₹2.00 Cr</option></select></label><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={sell}>SOLD</button><button className="ss3d-unsold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={markUnsold}>UNSOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
+          <div className="ss3d-franchise-panel"><div className="ss3d-panel-kicker"><Users size={14}/> FRANCHISE TABLES <span>10 ACTIVE</span></div><div className="ss3d-franchise-grid">{FRANCHISES.map(([name, color]) => <button key={name} className={leader === name ? 'leading' : ''} onClick={() => {setLeader(name); if (outcome === 'SOLD' || outcome === 'UNSOLD') setOutcome('LIVE LOT'); setRtm(false); logActivity(name + ' selected as leading franchise'); announce(name + ' is now leading.');}} style={{'--team-accent':color}}><i/><strong>{name}</strong><small>{leader === name ? 'LEADING' : '₹120 Cr'}</small></button>)}</div><div className="ss3d-feature-foot"><span><Mic size={14}/> VOICE CHAT READY</span><span><Sparkles size={14}/> 3D CAMERA CUTS</span></div></div>
         </div>
       </section>
       <footer className="ss3d-footer"><span>SS AUCTION · CINEMATIC REBUILD</span><span>PREVIEW BUILD · NOT CONNECTED TO LIVE AUCTIONS</span><Link to="/">Return to current site ↗</Link></footer>
