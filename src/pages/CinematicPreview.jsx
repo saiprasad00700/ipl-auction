@@ -174,7 +174,7 @@ export default function CinematicPreview() {
   useEffect(() => {
     const host = mountRef.current;
     if (!host) return;
-    let renderer, scene, camera, arena, frame = 0, raf = 0, observer;
+    let renderer, scene, camera, arena, frame = 0, raf = 0, observer, appliedQuality = 'auto';
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
       const mobileDevice = window.matchMedia('(max-width: 700px)').matches;
@@ -201,7 +201,7 @@ export default function CinematicPreview() {
         raf = requestAnimationFrame(animate); frame += 0.008;
         const a = arena.userData;
         a.daisRing.rotation.z += fxRef.current ? 0.002 : 0;
-        if (qualityRef.current === 'low') renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 0.85));
+        if (qualityRef.current !== appliedQuality) { appliedQuality = qualityRef.current; const cap = appliedQuality === 'low' ? 0.85 : appliedQuality === 'high' ? 1.7 : (mobileDevice ? 1.15 : 1.5); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap)); renderer.setSize(host.clientWidth, host.clientHeight); }
         a.player.position.y = 0.52 + Math.sin(frame * 1.8) * 0.045;
         a.player.rotation.y = Math.sin(frame * 0.6) * 0.11;
         if (a.player.userData.bat) a.player.userData.bat.rotation.z = -0.18 + Math.sin(frame * 1.25) * 0.08;
