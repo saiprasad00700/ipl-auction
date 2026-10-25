@@ -2,29 +2,13 @@
 import { initializeApp, cert, getApps, deleteApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { createClient } from '@supabase/supabase-js';
+import { latestActivityAt } from './room-activity.js';
 
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 const databaseURL = process.env.VITE_FIREBASE_DATABASE_URL;
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const INACTIVE_MS = 30 * 60 * 1000;
-
-// Include timestamps written by different versions of the client. In particular,
-// messages and presence often change more frequently than room.lastActivityAt.
-const ACTIVITY_TIMESTAMP_KEYS = new Set([
-  'lastActivityAt',
-  'activityAt',
-  'lastSeen',
-  'joinedAt',
-  'leftAt',
-  'lastMessageAt',
-  'lastChatAt',
-  'lastBidAt',
-  'bidAt',
-  'timestamp',
-  'createdAt',
-  'updatedAt',
-]);
 
 if (!serviceAccountRaw || !databaseURL) {
   throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_JSON or VITE_FIREBASE_DATABASE_URL secret.');
