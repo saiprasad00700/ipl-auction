@@ -88,3 +88,5 @@
 .ss3d-preview-settings label select{max-width:160px}
 @media(max-width:800px){.ss3d-bid-hud{min-width:110px}.ss3d-preview-settings label{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.ss3d-countdown-number.urgent{animation:none}}
+
+.ss3d-status.is-complete{color:#8be9ff;border-color:#8be9ff;text-shadow:0 0 28px rgba(91,219,255,.45);font-size:clamp(18px,3vw,38px)}
