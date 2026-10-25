@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applySaleToTeam } from "../saleSettlementHelpers.js";
+import { applySaleToTeam, canAffordRtmMatch } from "../saleSettlementHelpers.js";
 
 const makeTeam = (overrides = {}) => ({
   budgetRemaining: 100,
@@ -60,4 +60,12 @@ test("malformed team purse, spent amount, and squad data are rejected", () => {
   assert.equal(applySaleToTeam(makeTeam({ budgetRemaining: "not-money" }), "p_new", 1), null);
   assert.equal(applySaleToTeam(makeTeam({ spent: -1 }), "p_new", 1), null);
   assert.equal(applySaleToTeam({ budgetRemaining: 10, spent: 0 }, "p_new", 1), null);
+});
+
+test("RTM match is allowed only when the original franchise can afford the counter-price", () => {
+  assert.equal(canAffordRtmMatch({ budgetRemaining: 15 }, 15), true);
+  assert.equal(canAffordRtmMatch({ budgetRemaining: 14.5 }, 15), false);
+  assert.equal(canAffordRtmMatch({ budgetRemaining: 0 }, 0.5), false);
+  assert.equal(canAffordRtmMatch({ budgetRemaining: "invalid" }, 1), false);
+  assert.equal(canAffordRtmMatch(null, 1), false);
 });
