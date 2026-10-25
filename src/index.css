@@ -727,3 +727,19 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-cinematic-bid-value { animation:none; }
 }
+
+/* Broadcast shot labels re-enter cleanly when the focus changes between player,
+   franchise and RTM decision. Decorative only; auction state remains untouched. */
+.ss-arena-shot-label,
+.ss-arena-camera-focus {
+  animation: ss-shot-cue-in .28s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes ss-shot-cue-in {
+  from { opacity: .45; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-arena-shot-label,
+  .ss-arena-camera-focus { animation: none; }
+}
+
