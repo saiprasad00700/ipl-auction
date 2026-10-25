@@ -2121,7 +2121,7 @@ export const AuctionProvider = ({ children }) => {
       }
     });
 
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
     try {
