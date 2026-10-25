@@ -50,7 +50,7 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount, getOverseasLimit } from '../lib/auctionRules';
+import { DEFAULT_BID_TIMER_SECONDS, clampBidTimerSeconds, getNextBidAmount, getOverseasLimit } from '../lib/auctionRules';
 
 const AuctionRoom = () => {
    const { id } = useParams();
@@ -76,6 +76,7 @@ const AuctionRoom = () => {
       sendMessage,
       messages,
       updateRoomSettings,
+      touchRoomActivity,
       kickPlayer,
       getSyncedTime
    } = useAuction();
@@ -102,7 +103,7 @@ const AuctionRoom = () => {
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
-   const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS);
+   const [newTimerValue, setNewTimerValue] = useState(() => clampBidTimerSeconds(currentAuction?.settings?.bidTimer));
    const [optimisticState, setOptimisticState] = useState(null);
    const [joiningTeam, setJoiningTeam] = useState(null);
    const [banError, setBanError] = useState(null);
@@ -124,14 +125,14 @@ const AuctionRoom = () => {
          const now = Date.now();
          if (now - lastInteractionHeartbeatRef.current < 10000) return;
          lastInteractionHeartbeatRef.current = now;
-         void update(ref(rtdb, `auctions/${id}/room`), { lastActivityAt: now }).catch((err) => {
+         void touchRoomActivity(id).catch((err) => {
             console.warn('[AuctionRoom] Could not update room activity:', err?.message || err);
          });
       };
       const events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'input'];
       events.forEach((eventName) => window.addEventListener(eventName, markRoomActivity, { passive: true }));
       return () => events.forEach((eventName) => window.removeEventListener(eventName, markRoomActivity));
-   }, [id, user?.uid]);
+   }, [id, user?.uid, touchRoomActivity]);
 
    // Clear optimistic state when DB catches up
    useEffect(() => {
@@ -1505,7 +1506,7 @@ const AuctionRoom = () => {
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Overseas Players">
                                                 <span className="text-gray-500 uppercase font-black text-[8px] sm:text-[10px]">OS:</span>
-                                                <span className="text-sky-300 font-extrabold">{osCount}/{currentAuction?.overseasLimit || 8}</span>
+                                                <span className="text-sky-300 font-extrabold">{osCount}/{getOverseasLimit(currentAuction?.auctionType, currentAuction?.overseasLimit)}</span>
                                              </div>
                                              <div className="w-px h-3 bg-white/10" />
                                              <div className="flex items-center gap-1" title="Purse Left out of Total Budget">
