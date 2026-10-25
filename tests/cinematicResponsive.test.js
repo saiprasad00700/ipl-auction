@@ -52,7 +52,7 @@ test('franchise arena renders team tables with active bidder and decorative padd
 test('bid and RTM paddle effects have bounded cleanup timers', () => {
   assert.match(arena, /setTimeout\(\(\) => setRaisedBidTeam\(null\), 850\)/);
   assert.match(arena, /setTimeout\(\(\) => setRaisedRtmTeam\(null\), 1100\)/);
-  assert.match(arena, /return \(\) => clearTimeout\(timer\)/);
+  assert.match(arena, /return \(\) => window\.clearTimeout\(timer\)/);
 });
 
 test('reduced-motion preferences are supported by the cinematic styling', () => {
