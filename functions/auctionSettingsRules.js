@@ -35,10 +35,10 @@ export function normalizeAuctionSettings(settings, currentMode = "mega") {
   const modeChanged = result.auctionType !== undefined && result.auctionType !== currentMode;
   const mode = result.auctionType || currentMode;
   const defaults = MODE_DEFAULTS[mode] || MODE_DEFAULTS.mega;
-  if (result.overseasLimit !== undefined && result.overseasLimit > defaults.overseasLimit) {
+  if (!modeChanged && result.overseasLimit !== undefined && result.overseasLimit > defaults.overseasLimit) {
     return { valid: false, error: `Overseas-player limit cannot exceed ${defaults.overseasLimit} for this auction mode.` };
   }
-  if (result.squadLimit !== undefined && result.squadLimit !== defaults.squadLimit) {
+  if (!modeChanged && result.squadLimit !== undefined && result.squadLimit !== defaults.squadLimit) {
     return { valid: false, error: `Squad size is fixed at ${defaults.squadLimit} for this auction mode.` };
   }
   if (modeChanged) {
