@@ -24,6 +24,16 @@ test('cinematic controls expose accessible expanded and pressed states', () => {
   assert.match(room, /aria-label=\{sidebarTab === 'chat' \? 'Voice Chat panel' : 'Live Activity panel'\}/);
 });
 
+test('floating header panels close on outside pointer interaction and clean up listeners', () => {
+  assert.match(room, /handleOutsidePointerDown/);
+  assert.match(room, /document\.addEventListener\('pointerdown', handleOutsidePointerDown\)/);
+  assert.match(room, /document\.removeEventListener\('pointerdown', handleOutsidePointerDown\)/);
+  assert.match(room, /settingsPanelRef\.current\?\.contains\(target\)/);
+  assert.match(room, /headerPanelRef\.current\?\.contains\(target\)/);
+  assert.match(room, /setShowSettings\(false\)/);
+  assert.match(room, /setShowHeaderPanel\(false\)/);
+});
+
 test('opening one header panel closes the other panel', () => {
   assert.match(room, /setShowHeaderPanel\(false\); setShowSettings\(\(open\) => !open\)/);
   assert.match(room, /setShowSettings\(false\); if \(showHeaderPanel && sidebarTab === 'activity'\)/);
