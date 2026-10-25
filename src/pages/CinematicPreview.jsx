@@ -123,6 +123,10 @@ export default function CinematicPreview() {
   const [sound, setSound] = useState(false);
   const [rtm, setRtm] = useState(false);
   const [webglError, setWebglError] = useState('');
+  const shotRef = useRef(shot);
+  const leaderRef = useRef(leader);
+  shotRef.current = shot;
+  leaderRef.current = leader;
 
   useEffect(() => {
     const host = mountRef.current;
@@ -154,8 +158,8 @@ export default function CinematicPreview() {
         a.daisRing.rotation.z += 0.002;
         a.player.position.y = 0.52 + Math.sin(frame * 1.8) * 0.045;
         a.auctioneer.userData.gavel.rotation.z = Math.sin(frame * 1.5) * 0.28 - 0.18;
-        a.tables.forEach((t, i) => { const active = t.name === leader; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); });
-        const targetShot = shot % 4;
+        a.tables.forEach((t, i) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); });
+        const targetShot = shotRef.current % 4;
         const poses = [
           [0, 12.5, 27, 0, 1.1, 0],
           [-10, 7.2, 16, 0, 1.0, 0],
@@ -183,7 +187,7 @@ export default function CinematicPreview() {
       if (renderer?.domElement?.parentNode === host) host.removeChild(renderer.domElement);
       sceneApi.current = null;
     };
-  }, [shot, leader]);
+  }, []);
 
   const announce = (message) => {
     if (!sound || !('speechSynthesis' in window)) return;
