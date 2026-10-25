@@ -1211,7 +1211,7 @@ const AuctionRoom = () => {
                <div className="flex items-center gap-1 border-l border-white/10 pl-1.5 sm:pl-3">
                   <button
                      ref={settingsTriggerRef}
-                     onClick={() => setShowSettings(!showSettings)}
+                     onClick={() => { setShowHeaderPanel(false); setShowSettings((open) => !open); }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Local & Room Settings"
                      aria-label="Local and room settings"
@@ -1222,7 +1222,7 @@ const AuctionRoom = () => {
                   </button>
                   <button
                      ref={activityTriggerRef}
-                     onClick={() => { if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
+                     onClick={() => { setShowSettings(false); if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Live Activity"
                      aria-label="Live Activity"
@@ -1232,7 +1232,7 @@ const AuctionRoom = () => {
                   ><History size={14} /></button>
                   <button
                      ref={voiceChatTriggerRef}
-                     onClick={() => { if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
+                     onClick={() => { setShowSettings(false); if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Voice Chat"
                      aria-label="Voice Chat"
