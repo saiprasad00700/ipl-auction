@@ -7,6 +7,7 @@ import { validatePlayingXIComposition } from "./playingXIRules.js";
 import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./auctionRules.js";
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
+import { upsertRoomMember } from "./roomMemberRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -301,33 +302,18 @@ export const joinAuctionRoom = onCall({ enforceAppCheck: false }, async (request
   }
 
   const roomRef = database.ref(`auctions/${roomId}/room`);
-  const roomSnap = await roomRef.get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (room.status === "completed") reject("This auction has already ended.");
-  if (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid)) {
-    reject("You have been removed from this room and cannot rejoin.");
-  }
-
-  const rosterRef = roomRef.child("players");
   const joinedAt = Date.now();
-  const result = await rosterRef.transaction((current) => {
-    const players = Array.isArray(current) ? current : [];
-    if (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid)) return;
-    const existing = players.find((p) => p?.id === uid || p?.userId === uid);
-    const cleaned = players.filter((p) => p && p.id !== uid && p.userId !== uid);
-    cleaned.push({
-      ...(existing || {}),
-      id: uid,
-      name: userName.trim(),
-      team: existing?.team || "",
-      teamName: existing?.teamName || "Unknown",
-      isHost: uid === room.hostId
-    });
-    return cleaned;
+  const result = await roomRef.transaction((current) => {
+    return upsertRoomMember(current, uid, userName.trim(), joinedAt) || undefined;
   }, undefined, false);
-  if (!result.committed) reject("Could not join the room. Please try again.");
-  await roomRef.child("lastActivityAt").set(joinedAt);
+  if (!result.committed) {
+    const latest = result.snapshot.val();
+    if (latest?.status === "completed") reject("This auction has already ended.");
+    if (Array.isArray(latest?.bannedPlayers) && latest.bannedPlayers.includes(uid)) {
+      reject("You have been removed from this room and cannot rejoin.");
+    }
+    reject("Could not join the room. Please refresh and try again.");
+  }
   return { ok: true, joinedAt };
 });
 
