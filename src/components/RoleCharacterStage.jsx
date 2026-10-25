@@ -1,3 +1,4 @@
+// Modified from the upstream project by saiprasad00700.
 import React from 'react';
 
 /**
@@ -16,7 +17,7 @@ const RoleCharacterStage = ({ player, visible = true }) => {
   const showBall = isBowler || isAllRounder;
 
   return (
-    <div className="ss-role-intro" aria-label={`Animated ${player.role || 'cricket'} character introduction`}>
+    <div className="ss-role-intro" role="group" aria-label={`Animated ${player.role || 'cricket'} character introduction for ${player.name}`}>
       <div className="ss-role-intro-kicker">PLAYER INTRODUCTION</div>
       <div className="ss-role-character" aria-hidden="true">
         <div className="ss-character-shadow" />
