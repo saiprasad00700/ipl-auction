@@ -10,7 +10,7 @@ import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTea
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
-import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid } from "./roomAuthorizationRules.js";
+import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid, canSendRoomChat } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
 import { evaluateEndAuctionTeams } from "./auctionEndRules.js";
 
@@ -420,28 +420,46 @@ export const sendAuctionChatMessage = onCall({ enforceAppCheck: false }, async (
     throw new HttpsError("invalid-argument", "Messages must contain 1 to 500 characters.");
   }
 
-  const roomRef = database.ref(`auctions/${roomId}/room`);
-  const roomSnap = await roomRef.get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  const member = (Array.isArray(room.players) ? room.players : []).find((p) => p?.id === uid);
-  if (!member || room.bannedPlayers?.includes(uid)) {
-    reject("Only an active room member can send messages.");
-  }
-
-  const messageRef = database.ref(`auctions/${roomId}/messages`).push();
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const messageRef = rootRef.child("messages").push();
+  const messageId = messageRef.key;
   const now = Date.now();
-  await messageRef.set({
-    userId: uid,
-    userName: String(member.name || "Manager").slice(0, 80),
-    text: cleanText,
-    type: "text",
-    timestamp: now
-  });
-  await roomRef.child("lastActivityAt").set(now);
-  return { ok: true, messageId: messageRef.key, timestamp: now };
-});
+  let failureReason = "Room changed while sending your message. Please try again.";
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Room changed while sending your message. Please try again.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const room = current.room;
+    if (!canSendRoomChat(room, uid)) {
+      failureReason = "Only an active room member can send messages.";
+      return;
+    }
+    if (current.messages?.[messageId]) {
+      failureReason = "Message identifier collision. Please try again.";
+      return;
+    }
+    const member = room.players.find((player) => player?.id === uid);
+    return {
+      ...current,
+      messages: {
+        ...(current.messages || {}),
+        [messageId]: {
+          userId: uid,
+          userName: String(member.name || "Manager").slice(0, 80),
+          text: cleanText,
+          type: "text",
+          timestamp: now
+        }
+      },
+      room: { ...room, lastActivityAt: now }
+    };
+  }, undefined, false);
 
+  if (!result.committed) reject(failureReason);
+  return { ok: true, messageId, timestamp: now };
+});
 
 export const touchAuctionActivity = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
