@@ -465,18 +465,27 @@ export const touchAuctionActivity = onCall({ enforceAppCheck: false }, async (re
   const uid = requireAuth(request);
   const { roomId } = request.data || {};
   requireRoomId(roomId);
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const roomSnap = await roomRef.get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  const member = (Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid);
-  if (!member || room.bannedPlayers?.includes(uid)) reject("Only an active room member can refresh activity.");
+  const rootRef = database.ref("auctions/" + roomId);
   const now = Date.now();
-  await roomRef.child("lastActivityAt").set(now);
+  let failureReason = "Room changed while refreshing activity. Please try again.";
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Room changed while refreshing activity. Please try again.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    if (!canSendRoomChat(current.room, uid)) {
+      failureReason = "Only an active room member can refresh activity.";
+      return;
+    }
+    return {
+      ...current,
+      room: { ...current.room, lastActivityAt: now }
+    };
+  }, undefined, false);
+  if (!result.committed) reject(failureReason);
   return { ok: true, lastActivityAt: now };
 });
-
 
 export const syncRoomPlayerStats = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
