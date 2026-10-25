@@ -11,9 +11,9 @@ const RoleCharacterStage = ({ player, visible = true }) => {
 
   const role = String(player.role || '').toLowerCase();
   const isKeeper = role.includes('wicket');
-  const roleKey = isKeeper ? 'keeper' : isAllRounder ? 'allrounder' : isBowler ? 'bowler' : 'batter';
   const isBowler = role.includes('bowl') && !role.includes('all');
   const isAllRounder = role.includes('all');
+  const roleKey = isKeeper ? 'keeper' : isAllRounder ? 'allrounder' : isBowler ? 'bowler' : 'batter';
   const showBat = isKeeper || isAllRounder || (!isBowler && !isAllRounder);
   const showBall = isBowler || isAllRounder;
 
