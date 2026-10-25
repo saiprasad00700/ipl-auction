@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canSyncTeamStats, canStartAuction } from "../roomAuthorizationRules.js";
+import { canSyncTeamStats, canStartAuction, canSendRoomChat } from "../roomAuthorizationRules.js";
 
 test("team stats can be synced by the target manager or host only", () => {
   assert.equal(canSyncTeamStats("u1", "u1", "host", true), true);
@@ -54,4 +54,14 @@ test("RTM counter-bids require an active room and active host for bot actions", 
   const team = { userId: "bot_CSK", teamId: "CSK" };
   assert.equal(canSubmitRtmCounterBid({ uid: "host", room: { ...room, status: "completed" }, offer, team, botAction: true, botIds: ["bot_CSK"] }), false);
   assert.equal(canSubmitRtmCounterBid({ uid: "host", room: { ...room, players: [{ id: "buyer" }] }, offer, team, botAction: true, botIds: ["bot_CSK"] }), false);
+});
+
+test("chat authorization requires an active, non-banned room member", () => {
+  const room = { players: [{ id: "member" }, { id: "host" }], bannedPlayers: [] };
+  assert.equal(canSendRoomChat(room, "member"), true);
+  assert.equal(canSendRoomChat(room, "outsider"), false);
+  assert.equal(canSendRoomChat({ ...room, bannedPlayers: ["member"] }, "member"), false);
+  assert.equal(canSendRoomChat({ ...room, players: null }, "member"), false);
+  assert.equal(canSendRoomChat(null, "member"), false);
+  assert.equal(canSendRoomChat(room, ""), false);
 });
