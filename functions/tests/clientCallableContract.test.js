@@ -43,3 +43,18 @@ test("bid validation, live-state mutation and room activity use one root transac
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes('room/lastActivityAt'));
 });
+
+
+test("auction start claims the room and initializes the first lot atomically", () => {
+  const start = backendSource.indexOf("export const startAuction = onCall(");
+  const end = backendSource.indexOf("export const manageAuctionBots = onCall(", start);
+  assert.ok(start >= 0 && end > start, "startAuction callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("Boolean(current.live)"));
+  assert.ok(source.includes('status: "active"'));
+  assert.ok(source.includes("playerOrderIds"));
+  assert.ok(source.includes("timerEndsAt: now + seconds * 1000"));
+  assert.ok(!source.includes("roomRef.transaction("));
+  assert.ok(!source.includes("root.update(updates)"));
+});
