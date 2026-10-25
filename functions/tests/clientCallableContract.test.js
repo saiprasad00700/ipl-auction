@@ -149,3 +149,16 @@ test("Playing XI submission and activity heartbeat are atomic", () => {
   assert.ok(!source.includes("teamRef.child(\"playingXI\").transaction("));
   assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
+
+test("system announcement, idempotency key and activity heartbeat commit atomically", () => {
+  const start = backendSource.indexOf("export const postAuctionSystemEvent = onCall(");
+  const end = backendSource.indexOf("\n\nexport const sendAuctionChatMessage", start);
+  assert.ok(start >= 0 && end > start, "postAuctionSystemEvent callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("systemEventReceiptKey(event, room, live, uid)"));
+  assert.ok(source.includes("messages: { ...(current.messages || {}), [messageId]: message }"));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(!source.includes("messageRef.transaction("));
+  assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
+});
