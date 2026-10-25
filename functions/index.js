@@ -271,7 +271,8 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
       const p = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
       return n + (p && p.country !== "IND" ? 1 : 0);
     }, 0);
-    if (squad.length >= Number(room.squadLimit || 25) || (player.country !== "IND" && overseas >= Number(room.overseasLimit ?? 4))) return;
+    if (squad.length >= Number(room.squadLimit || room.settings?.squadLimit || 25)
+      || (player.country !== "IND" && overseas >= effectiveOverseasLimit(room))) return;
     return applySaleToTeam(current, playerId, price, retained);
   }, undefined, false);
   const finalTeam = result.snapshot.val();
