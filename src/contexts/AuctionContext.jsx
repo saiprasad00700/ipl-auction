@@ -387,7 +387,8 @@ export const AuctionProvider = ({ children }) => {
       currentBid: 0,
       highBidderId: '',
       highBidderName: 'No Bids',
-      timerEndsAt: getSyncedTime() + 15000,
+      introEndsAt: getSyncedTime() + 3000,
+      timerEndsAt: getSyncedTime() + 18000,
       status: 'bidding'
     });
     
@@ -831,7 +832,8 @@ export const AuctionProvider = ({ children }) => {
                 currentBid: 0,
                 highBidderId: '',
                 highBidderName: 'No Bids',
-                timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
+                introEndsAt: getSyncedTime() + 3000,
+                timerEndsAt: getSyncedTime() + 3000 + (settings?.bidTimer || 10) * 1000,
                 status: 'bidding'
               };
             });
@@ -978,7 +980,8 @@ export const AuctionProvider = ({ children }) => {
         currentBid: 0,
         highBidderId: '',
         highBidderName: 'No Bids',
-        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || 10) * 1000,
+        introEndsAt: getSyncedTime() + 3000,
+        timerEndsAt: getSyncedTime() + 3000 + (roomData.settings?.bidTimer || 10) * 1000,
         status: 'bidding'
       };
     });
@@ -1552,6 +1555,7 @@ export const AuctionProvider = ({ children }) => {
       if (currentData.highBidderId === user.uid) return; // abort
 
       const now = getSyncedTime();
+      if (currentData.introEndsAt && now < Number(currentData.introEndsAt)) return; // intro must finish before bidding
       // Server-side guard: Reject late bids if timer has already expired
       if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
         return; // abort transaction
@@ -1571,6 +1575,7 @@ export const AuctionProvider = ({ children }) => {
       currentData.highBidderName = user.displayName || 'Manager';
       currentData.highBidderTeamId = team.teamId;
       currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || 10) * 1000;
+      delete currentData.introEndsAt;
       currentData.lastActivityAt = now;
 
       return currentData;
@@ -2290,6 +2295,7 @@ export const AuctionProvider = ({ children }) => {
     lastBotBidCycleRef.current = cycleKey;
 
     const now = getSyncedTime();
+    const introWaitMs = Math.max(0, Number(live.introEndsAt || 0) - now);
     const timerSec = currentAuction.settings?.bidTimer || 10;
     const timerMs = timerSec * 1000;
     const remainingMs = Math.max(0, (live.timerEndsAt || 0) - now);
@@ -2329,6 +2335,8 @@ export const AuctionProvider = ({ children }) => {
 
     // Bound delay safely: minimum 300ms, maximum (remainingMs - 300ms)
     delayMs = Math.max(300, Math.min(delayMs, Math.max(300, remainingMs - 300)));
+    // Bots must wait until the shared player-intro window has ended.
+    delayMs += introWaitMs;
 
     const initialBudget = currentAuction.settings?.budget || 120.0;
 

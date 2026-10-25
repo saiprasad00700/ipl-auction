@@ -18,6 +18,7 @@ import {
    Share2,
    Copy,
    MessageSquare,
+   Mic,
    Settings as SettingsIcon,
    Home,
    Pause,
@@ -48,6 +49,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '../data/teams';
 import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
+import FranchiseArenaStrip from '../components/FranchiseArenaStrip';
+import RoleCharacterStage from '../components/RoleCharacterStage';
+import AuctioneerStage from '../components/AuctioneerStage';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ref, update } from 'firebase/database';
@@ -90,6 +94,12 @@ const AuctionRoom = () => {
    const [selectedTeamId, setSelectedTeamId] = useState(null);
    const [mobileTab, setMobileTab] = useState('arena'); // arena, squad, activity
    const [showSettings, setShowSettings] = useState(false);
+   const [showHeaderPanel, setShowHeaderPanel] = useState(false);
+   const settingsTriggerRef = useRef(null);
+   const activityTriggerRef = useRef(null);
+   const voiceChatTriggerRef = useRef(null);
+   const settingsPanelRef = useRef(null);
+   const headerPanelRef = useRef(null);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -115,6 +125,47 @@ const AuctionRoom = () => {
       const params = new URLSearchParams(window.location.search);
       return params.get('spectate') === 'true';
    });
+
+   // Escape closes the lightweight header panels without affecting auction state.
+   useEffect(() => {
+      if (!showSettings && !showHeaderPanel) return undefined;
+      const handlePanelKeyDown = (event) => {
+         if (event.key !== 'Escape') return;
+         const focusTarget = showSettings
+            ? settingsTriggerRef.current
+            : (sidebarTab === 'chat' ? voiceChatTriggerRef.current : activityTriggerRef.current);
+         setShowSettings(false);
+         setShowHeaderPanel(false);
+         focusTarget?.focus();
+      };
+      window.addEventListener('keydown', handlePanelKeyDown);
+      return () => window.removeEventListener('keydown', handlePanelKeyDown);
+   }, [showSettings, showHeaderPanel, sidebarTab]);
+
+   // Close floating header panels when a pointer interaction happens outside them.
+   useEffect(() => {
+      if (!showSettings && !showHeaderPanel) return undefined;
+      const handleOutsidePointerDown = (event) => {
+         const target = event.target;
+         if (!(target instanceof Node)) return;
+         if (showSettings
+            && !settingsPanelRef.current?.contains(target)
+            && !settingsTriggerRef.current?.contains(target)) {
+            setShowSettings(false);
+            settingsTriggerRef.current?.focus({ preventScroll: true });
+         }
+         if (showHeaderPanel
+            && !headerPanelRef.current?.contains(target)
+            && !activityTriggerRef.current?.contains(target)
+            && !voiceChatTriggerRef.current?.contains(target)) {
+            setShowHeaderPanel(false);
+            (sidebarTab === 'chat' ? voiceChatTriggerRef.current : activityTriggerRef.current)
+               ?.focus({ preventScroll: true });
+         }
+      };
+      document.addEventListener('pointerdown', handleOutsidePointerDown);
+      return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+   }, [showSettings, showHeaderPanel, sidebarTab]);
 
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
    // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
@@ -377,8 +428,50 @@ const AuctionRoom = () => {
    }, [user]);
 
 
+   const auctionModeLabel = useMemo(() => {
+      const mode = currentAuction?.auctionType || 'mega';
+      if (mode === 'sprint5') return 'SPRINT 5';
+      if (mode === 'sprint11') return 'SPRINT 11';
+      return 'MEGA AUCTION';
+   }, [currentAuction?.auctionType]);
+
    const currentPlayer = useMemo(() => {
       return IPL_PLAYERS.find(p => p.id === displayAuctionState?.playerId) || IPL_PLAYERS[0];
+   }, [displayAuctionState?.playerId]);
+
+   // Visual prototype only: briefly introduce each new player. The actual shared
+   // bidding clock remains owned by AuctionContext and is not modified here.
+   const [cameraCutActive, setCameraCutActive] = useState(false);
+   const previousShotSignatureRef = useRef(undefined);
+   useEffect(() => {
+      // Re-cut on a new player, accepted bid, bidder change, or auction outcome.
+      // This only changes presentation; AuctionContext remains the source of truth.
+      const nextShotSignature = [
+         displayAuctionState?.playerId || 'no-player',
+         displayAuctionState?.highBidderTeamId || 'auctioneer',
+         Number(displayAuctionState?.currentBid) || 0,
+         displayAuctionState?.status || 'ready'
+      ].join(':');
+      if (previousShotSignatureRef.current === undefined) {
+         previousShotSignatureRef.current = nextShotSignature;
+         return undefined;
+      }
+      if (previousShotSignatureRef.current === nextShotSignature) return undefined;
+      previousShotSignatureRef.current = nextShotSignature;
+      setCameraCutActive(true);
+      const cutTimer = window.setTimeout(() => setCameraCutActive(false), 650);
+      return () => window.clearTimeout(cutTimer);
+   }, [displayAuctionState?.playerId, displayAuctionState?.highBidderTeamId, displayAuctionState?.currentBid, displayAuctionState?.status]);
+
+   const [showRoleIntro, setShowRoleIntro] = useState(false);
+   useEffect(() => {
+      if (!displayAuctionState?.playerId) {
+         setShowRoleIntro(false);
+         return undefined;
+      }
+      setShowRoleIntro(true);
+      const introTimer = window.setTimeout(() => setShowRoleIntro(false), 3000);
+      return () => window.clearTimeout(introTimer);
    }, [displayAuctionState?.playerId]);
 
    const [isTtsEnabled, setIsTtsEnabled] = useState(true);
@@ -540,6 +633,14 @@ const AuctionRoom = () => {
             const chosenPhrase = bidPhrases[Math.floor(Math.random() * bidPhrases.length)];
             speak(chosenPhrase);
          }
+      } else if (status === 'processing_sale' && lastSpokenStatusRef.current !== 'processing_sale') {
+         lastSpokenStatusRef.current = 'processing_sale';
+         const playerName = currentPlayer?.name || "The player";
+         const retentionTeamId = displayAuctionState?.retentionOffer?.originalTeamId;
+         const retentionTeamName = TEAMS.find(t => t.id === retentionTeamId)?.name;
+         speak(retentionTeamName
+            ? `Retention card decision. ${retentionTeamName} has the option to retain ${playerName}. Please watch the screen for the decision.`
+            : `Retention card decision in progress for ${playerName}. Please watch the screen.`);
       } else if (status === 'sold' && lastSpokenStatusRef.current !== 'sold') {
          lastSpokenStatusRef.current = 'sold';
          const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.name || highBidderTeamId || "a franchise";
@@ -807,16 +908,21 @@ const AuctionRoom = () => {
 
       const interval = setInterval(() => {
          const rawTimerEndsAt = displayAuctionState.timerEndsAt;
-         const rawMs = rawTimerEndsAt - getSyncedTime();
-         const diff = Math.max(0, Math.ceil(rawMs / 1000));
+         const syncedNow = getSyncedTime();
+         const introEndsAt = Number(displayAuctionState.introEndsAt || 0);
+         const isIntro = introEndsAt > syncedNow;
+         const rawMs = rawTimerEndsAt - syncedNow;
+         const diff = isIntro
+            ? Math.max(0, Math.ceil((introEndsAt - syncedNow) / 1000))
+            : Math.max(0, Math.ceil(rawMs / 1000));
 
-         if (diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
+         if (!isIntro && diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
             lastBeepedSecRef.current = diff;
             playBeep(diff === 1 ? 880 : 440, 0.1);
          }
 
          setTimeLeft(diff);
-         if (diff === 0) {
+         if (!isIntro && diff === 0) {
             // Primary trigger: Admin/Host triggers end immediately when timer expires
             // Fallback trigger: Non-host client triggers end if timer has expired by >1.5s (host tab closed/lagged)
             const shouldTrigger = (isAdmin || rawMs < -1500) && displayAuctionState.status === 'bidding' && !endTriggeredRef.current;
@@ -1131,12 +1237,36 @@ const AuctionRoom = () => {
                )}
                <div className="flex items-center gap-1 border-l border-white/10 pl-1.5 sm:pl-3">
                   <button
-                     onClick={() => setShowSettings(!showSettings)}
+                     ref={settingsTriggerRef}
+                     onClick={() => { setShowHeaderPanel(false); setShowSettings((open) => !open); }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Local & Room Settings"
+                     aria-label="Local and room settings"
+                     aria-expanded={showSettings}
+                     aria-controls="auction-room-settings-panel"
                   >
                      <SettingsIcon size={14} />
                   </button>
+                  <button
+                     ref={activityTriggerRef}
+                     onClick={() => { setShowSettings(false); if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
+                     className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     title="Live Activity"
+                     aria-label="Live Activity"
+                     aria-pressed={showHeaderPanel && sidebarTab === "activity"}
+                     aria-expanded={showHeaderPanel && sidebarTab === "activity"}
+                     aria-controls="auction-room-header-panel"
+                  ><History size={14} /></button>
+                  <button
+                     ref={voiceChatTriggerRef}
+                     onClick={() => { setShowSettings(false); if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
+                     className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     title="Voice Chat"
+                     aria-label="Voice Chat"
+                     aria-pressed={showHeaderPanel && sidebarTab === "chat"}
+                     aria-expanded={showHeaderPanel && sidebarTab === "chat"}
+                     aria-controls="auction-room-header-panel"
+                  ><Mic size={14} /></button>
                   <button onClick={() => navigate('/')} className="p-1 sm:p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer" title="Back to Home"><Home size={14} /></button>
                </div>
             </div>
@@ -1409,13 +1539,66 @@ const AuctionRoom = () => {
                            </motion.div>
                         ) : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className="bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]">
+                              <div className={`ss-cinematic-player-stage ${cameraCutActive ? "ss-camera-cut-active" : ""} bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]`} data-focus-team={displayAuctionState?.highBidderTeamId || "auctioneer"} data-auction-status={displayAuctionState?.status || "ready"} role="region" aria-label={`Live auction stage. ${auctionModeLabel}. Player: ${currentPlayer?.name || "not selected"}. ${displayAuctionState?.status === "sold" ? "Player sold." : displayAuctionState?.status === "unsold" ? "Player unsold." : displayAuctionState?.status === "processing_sale" ? "Retention decision in progress." : displayAuctionState?.highBidderTeamId ? `Current leader: ${TEAMS.find((t) => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId}.` : "Waiting for the first bid."}`}>
+                                 <div className="ss-camera-frame-corners" aria-hidden="true"><i /><i /><i /><i /></div>
+                                 <div className="ss-cinematic-mode-chip" aria-label={`Auction mode: ${auctionModeLabel}`}>
+                                    <span className="ss-cinematic-mode-live-dot" aria-hidden="true" />
+                                    <span>{auctionModeLabel}</span>
+                                 </div>
+                                 <div className="ss-cinematic-bid-hud" aria-live="polite" aria-atomic="true" aria-label="Current bid and leading franchise">
+                                    <span className="ss-cinematic-bid-hud-label">CURRENT BID</span>
+                                    <strong key={`${displayAuctionState?.playerId || "lot"}-${Number(displayAuctionState?.currentBid) || 0}`} className="ss-cinematic-bid-value">₹{(Number(displayAuctionState?.currentBid) || 0).toFixed(2)} Cr</strong>
+                                    <span className="ss-cinematic-bid-leader">
+                                       {displayAuctionState?.highBidderTeamId
+                                          ? `LEADING · ${TEAMS.find((t) => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId}`
+                                          : 'WAITING FOR FIRST BID'}
+                                    </span>
+                                 </div>
+                                 <div className={`ss-cinematic-live-status is-${['bidding','sold','unsold','processing_sale'].includes(displayAuctionState?.status) ? displayAuctionState.status : 'ready'}`} role="status" aria-live="polite" aria-atomic="true">
+                                    <span className="ss-cinematic-live-status-dot" aria-hidden="true" />
+                                    <span>{showRoleIntro ? 'PLAYER INTRO' : displayAuctionState?.status === 'sold' ? 'PLAYER SOLD' : displayAuctionState?.status === 'unsold' ? 'PLAYER UNSOLD' : displayAuctionState?.status === 'processing_sale' ? 'RTM DECISION' : displayAuctionState?.status === 'bidding' ? 'BIDDING LIVE' : 'READY FOR BIDDING'}</span>
+                                 </div>
+                                 <div key={`${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-shot-label" aria-hidden="true">{displayAuctionState?.status === 'processing_sale' ? "CAM 03 · RTM DECISION" : showRoleIntro ? "CAM 01 · PLAYER INTRO" : displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
+                                 <div key={`focus-${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.status === 'processing_sale' ? "LIVE FOCUS · RETENTION DECISION" : showRoleIntro ? "LIVE FOCUS · PLAYER INTRODUCTION" : displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
+                                 <div className={`ss-cinematic-countdown ${showRoleIntro ? 'is-intro' : timeLeft <= 5 ? 'is-urgent' : ''}`} aria-label={showRoleIntro ? 'Bidding timer starts after player introduction' : `Bidding timer: ${timeLeft} seconds remaining`} aria-hidden="true">
+                                    <span className="ss-countdown-label">{showRoleIntro ? 'BIDDING OPENS IN' : 'TIME LEFT'}</span>
+                                    <strong>{showRoleIntro ? '3' : Math.max(0, Number(timeLeft) || 0)}</strong>
+                                    <span className="ss-countdown-unit">{showRoleIntro ? 'SEC INTRO' : 'SECONDS'}</span>
+                                 </div>
+                                 <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{!showRoleIntro && displayAuctionState?.status === 'bidding' && Number(timeLeft) === 5 ? 'Five seconds remaining to bid.' : ''}</span>
+                                 <div className="ss-cinematic-player-lower-third" aria-hidden="true">
+                                    <span className="ss-lower-third-eyebrow">{showRoleIntro ? 'NEXT PLAYER' : displayAuctionState?.status === 'processing_sale' ? 'RETENTION REVIEW' : displayAuctionState?.status === 'sold' ? 'LOT CONFIRMED' : displayAuctionState?.status === 'unsold' ? 'LOT CLOSED' : 'PLAYER ON THE BLOCK'}</span>
+                                    <strong>{currentPlayer?.name || 'Player awaiting selection'}</strong>
+                                    <span className="ss-lower-third-role">{currentPlayer?.role || 'Cricket player'}</span>
+                                 </div>
+                                 <div className="ss-cinematic-spotlight ss-cinematic-spotlight-left" aria-hidden="true" />
+                                 <div className="ss-cinematic-spotlight ss-cinematic-spotlight-right" aria-hidden="true" />
+                                 <div className="ss-cinematic-stage-grid" aria-hidden="true" />
+                                 <div className="ss-auctioneer-overlay" aria-hidden="true"><AuctioneerStage compact status={displayAuctionState?.status || currentAuction?.status || "idle"} playerName={currentPlayer?.name || ""} /></div>
+                                 <FranchiseArenaStrip
+                                    teams={TEAMS}
+                                    activeTeamId={displayAuctionState?.highBidderTeamId || null}
+                                    bidEventKey={displayAuctionState?.playerId + '-' + displayAuctionState?.currentBid + '-' + displayAuctionState?.highBidderTeamId}
+                                    rtmTeamId={displayAuctionState?.retentionOffer?.rtmUsed ? displayAuctionState.retentionOffer.originalFranchiseId : null}
+                                    rtmEventKey={displayAuctionState?.retentionOffer?.rtmUsed ? displayAuctionState?.playerId + '-' + displayAuctionState.retentionOffer.phase + '-' + displayAuctionState.retentionOffer.decision : ''}
+                                 />
+                                 {['sold', 'unsold'].includes(displayAuctionState?.status) && (
+                                    <div className={`ss-auction-result-stamp ${displayAuctionState.status === 'sold' ? 'is-sold' : 'is-unsold'}`} role="status" aria-live="polite">
+                                       <span>{displayAuctionState.status === 'sold' ? 'SOLD' : 'UNSOLD'}</span>
+                                    </div>
+                                 )}
+
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.22),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
-                                       <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
+                                    <div className={`ss-cinematic-player-portrait w-full md:w-60 min-h-[19rem] md:min-h-[20rem] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] shrink-0 ${showRoleIntro ? 'is-player-intro' : ''}`}>
+                                       {showRoleIntro && <span className="ss-player-intro-badge" aria-live="polite"><i aria-hidden="true" />PLAYER INTRO</span>}
+                                       {showRoleIntro ? (
+                                          <RoleCharacterStage player={currentPlayer} />
+                                       ) : (
+                                          <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full min-h-[19rem] md:min-h-[20rem] object-cover" />
+                                       )}
                                     </div>
                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
                                        <div>
@@ -1526,7 +1709,7 @@ const AuctionRoom = () => {
                                     <div className="flex gap-3 md:gap-4">
                                        <button
                                           onClick={handleBid}
-                                          disabled={spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
+                                          disabled={spectateMode || !team || timeLeft === 0 || (displayAuctionState?.introEndsAt && getSyncedTime() < Number(displayAuctionState.introEndsAt)) || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
                                           className={`flex-1 min-h-14 sm:min-h-16 md:min-h-[4.5rem] px-3 font-black text-sm sm:text-base md:text-xl rounded-2xl border border-white/10 flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${spectateMode
                                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                              : displayAuctionState?.highBidderId === user?.uid
@@ -1551,9 +1734,16 @@ const AuctionRoom = () => {
                </main>
             </div>
 
-            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-[#07111d]/80 backdrop-blur-xl border-l border-emerald-300/10 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
+            <aside
+               ref={headerPanelRef}
+               id="auction-room-header-panel"
+               role="region"
+               aria-label={sidebarTab === 'chat' ? 'Voice Chat panel' : 'Live Activity panel'}
+               className={`${showHeaderPanel ? 'flex' : 'hidden'} fixed right-3 top-16 z-[70] w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-5rem)] bg-[#07111d]/95 backdrop-blur-xl border border-emerald-300/15 rounded-2xl shadow-2xl flex-col overflow-hidden`}
+            >
                {/* Premium Tabs Header */}
-               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full">
+               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full pr-10 relative">
+                  <button onClick={() => setShowHeaderPanel(false)} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white" title="Close panel" aria-label="Close panel"><X size={14} /></button>
                   <button
                      onClick={() => setSidebarTab('activity')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'activity'
@@ -1702,7 +1892,7 @@ const AuctionRoom = () => {
                   <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-emerald-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setMobileTab('activity')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+               <button onClick={() => { setSidebarTab('activity'); setShowHeaderPanel(true); }} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${showHeaderPanel && sidebarTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
                      <History size={16} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
                   </div>
@@ -1941,7 +2131,7 @@ const AuctionRoom = () => {
 
          <AnimatePresence>
             {showSettings && (
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
+               <motion.div ref={settingsPanelRef} initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} id="auction-room-settings-panel" role="region" aria-label="Local and room settings" className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                      <div className="flex items-center gap-2.5">
 

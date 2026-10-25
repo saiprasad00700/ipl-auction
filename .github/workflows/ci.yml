@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/winner-calculation-retention-cards
+      - cinematic-auction-foundation
   pull_request:
     branches:
       - main
