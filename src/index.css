@@ -641,3 +641,73 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-player-intro-badge, .ss-player-intro-badge i { animation:none; }
 }
+
+
+/* Always-visible live state indicator keeps the broadcast phase clear at a glance. */
+.ss-cinematic-live-status {
+  position:absolute;
+  z-index:41;
+  left:50%;
+  bottom:1rem;
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  max-width:calc(100% - 2rem);
+  padding:.5rem .8rem;
+  border:1px solid rgba(148,163,184,.28);
+  border-radius:999px;
+  transform:translateX(-50%);
+  background:rgba(2,6,23,.84);
+  color:#e2e8f0;
+  font-size:.56rem;
+  font-weight:950;
+  letter-spacing:.14em;
+  white-space:nowrap;
+  box-shadow:0 .5rem 1.5rem rgba(0,0,0,.3);
+  backdrop-filter:blur(12px);
+}
+.ss-cinematic-live-status-dot {
+  width:.42rem;
+  height:.42rem;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#94a3b8;
+}
+.ss-cinematic-live-status.is-bidding {
+  border-color:rgba(52,211,153,.48);
+  color:#d1fae5;
+}
+.ss-cinematic-live-status.is-bidding .ss-cinematic-live-status-dot {
+  background:#34d399;
+  box-shadow:0 0 .7rem rgba(52,211,153,.8);
+  animation:ss-player-intro-pulse .9s ease-in-out infinite;
+}
+.ss-cinematic-live-status.is-sold {
+  border-color:rgba(52,211,153,.55);
+  color:#a7f3d0;
+}
+.ss-cinematic-live-status.is-sold .ss-cinematic-live-status-dot { background:#34d399; }
+.ss-cinematic-live-status.is-unsold {
+  border-color:rgba(248,113,113,.5);
+  color:#fecaca;
+}
+.ss-cinematic-live-status.is-unsold .ss-cinematic-live-status-dot { background:#f87171; }
+.ss-cinematic-live-status.is-processing_sale {
+  border-color:rgba(167,139,250,.55);
+  color:#ddd6fe;
+}
+.ss-cinematic-live-status.is-processing_sale .ss-cinematic-live-status-dot {
+  background:#a78bfa;
+  box-shadow:0 0 .65rem rgba(167,139,250,.65);
+}
+@media (max-width:640px) {
+  .ss-cinematic-live-status {
+    bottom:.65rem;
+    padding:.38rem .58rem;
+    font-size:.43rem;
+    letter-spacing:.08em;
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-cinematic-live-status.is-bidding .ss-cinematic-live-status-dot { animation:none; }
+}
