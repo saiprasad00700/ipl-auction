@@ -33,3 +33,12 @@
 .ss3d-action-row button:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.5)}
 .ss3d-franchise-grid button:focus-visible,.ss3d-action-row button:focus-visible,.ss3d-scene-controls button:focus-visible,.ss3d-role-select select:focus-visible{outline:2px solid #5af0b8;outline-offset:3px}
 @media(max-width:440px){.ss3d-intro-overlay{min-width:150px;padding:16px 20px}.ss3d-role-select{align-items:flex-start;flex-direction:column;gap:7px}.ss3d-role-select select{width:100%}}
+
+
+.ss3d-unsold-button{border:1px solid rgba(248,113,113,.45)!important;background:rgba(127,29,29,.24)!important;color:#fca5a5!important;border-radius:10px;padding:12px 14px;font-weight:950;letter-spacing:.06em;cursor:pointer;transition:transform .2s,border-color .2s,background .2s}
+.ss3d-unsold-button:hover:not(:disabled){transform:translateY(-2px);border-color:#fb7185!important;background:rgba(190,24,93,.28)!important}
+.ss3d-status.is-unsold{color:#fca5a5;border-color:#fb7185;text-shadow:0 0 22px rgba(251,113,133,.4)}
+.ss3d-action-row{flex-wrap:wrap}
+.ss3d-action-row .ss3d-bid-button{flex:2 1 220px}
+.ss3d-action-row .ss3d-rtm-button,.ss3d-action-row .ss3d-sold-button,.ss3d-action-row .ss3d-unsold-button{flex:1 1 78px}
+@media(max-width:440px){.ss3d-action-row .ss3d-bid-button{flex-basis:100%}.ss3d-action-row .ss3d-rtm-button,.ss3d-action-row .ss3d-sold-button,.ss3d-action-row .ss3d-unsold-button{flex:1 1 38%}}
