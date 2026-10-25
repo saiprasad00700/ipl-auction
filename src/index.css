@@ -1,510 +1,100 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-@import "tailwindcss";
 
-@theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system;
-  --color-ipl-blue: #0b0e1e;
-  --color-ipl-gold: #d4af37;
-  --color-ipl-dark: #0b0e1e;
-}
-
-/* ── Mobile-safe full viewport height ───────────────────────────────────────
-   Uses the dynamic viewport height (dvh) so bottom-fixed chrome such as the
-   auction room's mobile nav bar stays visible when mobile browsers show/hide
-   their URL toolbar. Falls back to 100vh on browsers without dvh support.    */
-@utility h-screen-safe {
-  height: 100vh;
-
-  @supports (height: 100dvh) {
-    height: 100dvh;
-  }
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  background-color: black;
-  color: white;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  /* Prevent horizontal bounce and enable smooth scrolling */
-  overscroll-behavior-y: none;
-  min-height: 100vh;
-  min-height: 100dvh;
-}
-
-/* Global Mobile Touch Responsiveness & Instant Tap Feedback */
-button, 
-a, 
-input, 
-select, 
-textarea, 
-[role="button"] {
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Prevent unwanted selection on rapid action buttons (e.g. Bid button) */
-button, .no-select {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Hide scrollbar for Chrome, Safari and Opera */
-*::-webkit-scrollbar {
-  display: none;
-}
-
-/* Hide scrollbar for IE, Edge and Firefox */
-* {
-  -ms-overflow-style: none;
-  /* IE and Edge */
-  scrollbar-width: none;
-  /* Firefox */
-}
-
-.glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transform: translateZ(0);
-}
-
-/* Pixel display font — matches the loading screen wordmark.
-   Geist Pixel only ships at weight 400, so we pin the weight for crispness. */
-.font-pixel {
-  font-family: "Geist Pixel", Silkscreen, VT323, "Geist Mono", monospace;
-  font-weight: 600;
-}
-
-.ipl-text-gradient {
-  background: linear-gradient(135deg, #fff 0%, #d4af37 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-/* Custom Scrollbar for scrollable sections */
-.custom-scrollbar {
-  -ms-overflow-style: auto !important;
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent !important;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  display: block !important;
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-.text-premium-gradient {
-  background: linear-gradient(135deg,
-      #fff 0%,
-      #fbbf24 25%,
-      #f59e0b 50%,
-      #fbbf24 75%,
-      #fff 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shine 5s linear infinite;
-}
-
-@keyframes shine {
-  to {
-    background-position: 200% center;
-  }
-}
-
-.glass-premium {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 4px 24px -1px rgba(0, 0, 0, 0.2),
-    inset 0 0 20px 0 rgba(255, 255, 255, 0.02);
-  transform: translateZ(0);
-}
-
-.animate-glow {
-  animation: pulse-glow 4s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 8s ease-in-out infinite;
-}
-
-@keyframes pulse-slow {
-  0%,
-  100% {
-    opacity: 0.2;
-    transform: scale(1) translate(-50%, -50%);
-  }
-
-  50% {
-    opacity: 0.4;
-    transform: scale(1.2) translate(-50%, -50%);
-  }
-}
-
-/* Mobile GPU Performance Enhancements (< 768px viewports) */
-@media (max-width: 767px) {
-  .glass {
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    background: rgba(15, 20, 35, 0.85);
-  }
-
-  .glass-premium {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    background: rgba(11, 14, 30, 0.9);
-  }
-
-  /* Disable battery-draining continuous background animations on small mobile screens */
-  .animate-pulse-slow,
-  .animate-glow {
-    animation: none !important;
-  }
-}
-
-/* ── Pure CSS Marquee (replaces JS-driven framer-motion scroll) ─────────────
-   Runs entirely on the GPU compositor thread — zero main thread cost.        */
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-.marquee-track {
-  will-change: transform;
-  animation: marquee 40s linear infinite;
-  /* Pause on hover for desktop UX */
-}
-
-.marquee-track:hover {
-  animation-play-state: paused;
-}
-
-/* Pause marquee on mobile to save battery (user can't hover anyway) */
-@media (max-width: 767px) {
-  .marquee-track:hover {
-    animation-play-state: running;
-  }
-}
-
-/* ── GPU Compositing for animated / fixed elements ──────────────────────────
-   Promotes layers that animate to the GPU so the main thread stays free.     */
-.glass,
-.glass-premium,
-[class*="backdrop-blur"] {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-
-/* ── Scroll container optimizations ─────────────────────────────────────────
-   contain:paint limits repaint scope; touch-action speeds up swipe handling  */
-[class*="overflow-y-auto"],
-[class*="overflow-y-scroll"],
-[class*="overflow-auto"],
-[class*="overflow-scroll"] {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
-/* ── Reduce expensive filter effects on low-power mobile screens ─────────── */
-@media (max-width: 767px) {
-  /* Large blur orbs are GPU-expensive on mobile */
-  [class*="blur-[120px]"],
-  [class*="blur-[100px]"],
-  [class*="blur-[80px]"] {
-    filter: blur(40px) !important;
-  }
-
-  /* Drop shadows trigger compositing — reduce radius on mobile */
-  [class*="drop-shadow"] {
-    filter: none;
-  }
-
-  /* backdrop-blur is one of the most expensive CSS ops on mobile */
-  .glass-premium {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgba(11, 14, 30, 0.95);
-  }
-}
-
-/* ── Prefers reduced motion: strip all transitions globally ─────────────────
-   Respects OS-level "reduce motion" accessibility setting                    */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  .marquee-track {
-    animation: none;
-  }
-}
-
-/* Landing-page-only SSAUCTION brand motion. The LandingPage component owns
-   these elements, so they disappear automatically when navigating away. */
-.ssauction-brand-motion {
+/* Original CSS-built character rig: interim visual foundation for later licensed 3D assets. */
+.ss-role-intro {
   position: relative;
-  isolation: isolate;
-  animation: ssauction-brand-float 3.8s ease-in-out infinite;
-}
-
-.ssauction-brand-shine {
-  background: linear-gradient(110deg, #ffffff 10%, #a7f3d0 35%, #67e8f9 50%, #ffffff 65%, #a7f3d0 85%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: ssauction-brand-sheen 4.5s ease-in-out infinite;
-}
-
-.ssauction-brand-motion::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  border-radius: inherit;
-  background: linear-gradient(115deg, rgba(52, 211, 153, .22), transparent 42%, rgba(103, 232, 249, .22));
-  opacity: .7;
-  filter: blur(12px);
-  animation: ssauction-brand-glow 3.8s ease-in-out infinite;
-}
-
-@keyframes ssauction-brand-float {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-4px) scale(1.025); }
-}
-
-@keyframes ssauction-brand-sheen {
-  0%, 100% { background-position: 100% 50%; }
-  50% { background-position: 0% 50%; }
-}
-
-@keyframes ssauction-brand-glow {
-  0%, 100% { opacity: .35; }
-  50% { opacity: .9; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ssauction-brand-motion,
-  .ssauction-brand-motion::before,
-  .ssauction-brand-shine {
-    animation: none !important;
-  }
-}
-
-
-/* SS AUCTION cinematic stage foundation — presentation only; auction state remains authoritative. */
-.ss-cinematic-player-stage {
-  isolation: isolate;
-  transform-style: preserve-3d;
-  background-color: #050a13;
-}
-.ss-cinematic-player-stage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% -12%, rgba(59, 130, 246, .22), transparent 48%),
-    radial-gradient(ellipse at 6% 55%, rgba(14, 165, 233, .10), transparent 34%),
-    radial-gradient(ellipse at 94% 55%, rgba(168, 85, 247, .10), transparent 34%);
-}
-.ss-cinematic-spotlight {
-  position: absolute;
-  z-index: 0;
-  top: -18%;
-  width: 24%;
-  height: 75%;
-  pointer-events: none;
-  opacity: .42;
-  filter: blur(16px);
-  transform-origin: top center;
-  background: linear-gradient(180deg, rgba(96, 165, 250, .30), rgba(96, 165, 250, 0));
-  animation: ss-cinematic-light-sweep 8s ease-in-out infinite alternate;
-}
-.ss-cinematic-spotlight-left { left: 8%; transform: rotate(16deg); }
-.ss-cinematic-spotlight-right {
-  right: 8%;
-  background: linear-gradient(180deg, rgba(192, 132, 252, .26), rgba(192, 132, 252, 0));
-  transform: rotate(-16deg);
-  animation-delay: -3s;
-}
-.ss-cinematic-stage-grid {
-  position: absolute;
-  z-index: 0;
-  inset: auto 0 0;
-  height: 34%;
-  pointer-events: none;
-  opacity: .16;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, .22) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, .22) 1px, transparent 1px);
-  background-size: 42px 28px;
-  mask-image: linear-gradient(transparent, #000);
-  transform: perspective(260px) rotateX(58deg) scale(1.35);
-  transform-origin: bottom center;
-}
-.ss-cinematic-player-stage > :not(.ss-cinematic-spotlight):not(.ss-cinematic-stage-grid) {
-  position: relative;
-  z-index: 1;
-}
-.ss-cinematic-player-portrait {
-  box-shadow: 0 0 0 1px rgba(191, 219, 254, .08), 0 18px 60px rgba(2, 6, 23, .5), 0 0 42px rgba(59, 130, 246, .12);
-}
-@keyframes ss-cinematic-light-sweep {
-  from { opacity: .24; }
-  to { opacity: .58; }
-}
-@media (max-width: 767px) {
-  .ss-cinematic-spotlight { opacity: .20; filter: blur(22px); }
-  .ss-cinematic-stage-grid { opacity: .08; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ss-cinematic-spotlight { animation: none; }
-}
-
-
-/* Compact franchise desks around the cinematic player stage. */
-.ss-franchise-arena-strip {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: .45rem;
-  padding: .85rem 1rem .35rem;
-}
-.ss-franchise-table {
-  position: relative;
-  min-width: 0;
-  min-height: 3.3rem;
-  display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr);
-  grid-template-rows: 1fr auto;
+  display: flex;
+  min-height: 19rem;
+  flex-direction: column;
   align-items: center;
-  column-gap: .4rem;
-  padding: .45rem .55rem;
-  border: 1px solid rgba(148, 163, 184, .17);
-  border-radius: .65rem;
-  background: linear-gradient(145deg, rgba(15, 23, 42, .92), rgba(8, 13, 24, .86));
-  transition: border-color .22s ease, background .22s ease, transform .22s ease, box-shadow .22s ease;
+  justify-content: center;
   overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 1.25rem;
+  background: radial-gradient(ellipse at 50% 72%, rgba(59, 130, 246, .22), transparent 44%), linear-gradient(160deg, #101c2b, #050913);
+  perspective: 900px;
 }
-.ss-franchise-table img {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  width: 1.55rem;
-  height: 1.55rem;
-  object-fit: contain;
-}
-.ss-franchise-table-name {
-  grid-column: 2;
-  grid-row: 1;
-  color: #dbeafe;
-  font-size: .72rem;
-  font-weight: 900;
-  letter-spacing: .06em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ss-franchise-table-state {
-  grid-column: 2;
-  grid-row: 2;
-  color: #64748b;
-  font-size: .5rem;
-  font-weight: 800;
-  letter-spacing: .09em;
-}
-.ss-franchise-table.is-active {
-  transform: translateY(-2px) scale(1.025);
-  border-color: rgba(52, 211, 153, .9);
-  background: linear-gradient(145deg, rgba(6, 78, 59, .72), rgba(8, 13, 24, .96));
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, .12), 0 0 24px rgba(16, 185, 129, .18);
-}
-.ss-franchise-table.is-active .ss-franchise-table-state {
-  color: #6ee7b7;
-}
-.ss-franchise-table-light {
+.ss-role-intro-kicker {
   position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(96, 165, 250, .7), transparent);
-  opacity: .6;
+  top: 1rem;
+  z-index: 4;
+  color: #a7f3d0;
+  font-size: .65rem;
+  font-weight: 900;
+  letter-spacing: .2em;
 }
-.ss-franchise-table.is-active .ss-franchise-table-light {
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #6ee7b7, transparent);
-  opacity: 1;
+.ss-role-character {
+  position: relative;
+  width: 10rem;
+  height: 12rem;
+  transform-style: preserve-3d;
+  animation: ss-character-entrance .9s cubic-bezier(.2,.8,.2,1) both, ss-character-idle 3s ease-in-out .9s infinite;
 }
-@media (max-width: 767px) {
-  .ss-franchise-arena-strip {
-    display: flex;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
-    padding: .7rem .75rem .3rem;
-    gap: .4rem;
-  }
-  .ss-franchise-table {
-    flex: 0 0 6.4rem;
-    min-height: 3rem;
-    padding: .4rem;
-  }
+.ss-character-shadow {
+  position: absolute;
+  left: 18%;
+  bottom: 0;
+  width: 64%;
+  height: 1rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .6);
+  filter: blur(9px);
 }
+.ss-character-head {
+  position: absolute;
+  top: .8rem;
+  left: 3.7rem;
+  width: 2.6rem;
+  height: 2.9rem;
+  border-radius: 48% 48% 45% 45%;
+  background: linear-gradient(110deg, #f6c6a0, #c98762);
+  box-shadow: inset -.35rem -.15rem .2rem rgba(79, 37, 24, .18), 0 0 0 2px rgba(255,255,255,.04);
+}
+.ss-character-hair {
+  position: absolute;
+  top: -.2rem;
+  left: .05rem;
+  width: 2.5rem;
+  height: 1rem;
+  border-radius: 70% 70% 15% 15%;
+  background: #202a37;
+}
+.ss-character-face { position: absolute; inset: 1rem .45rem auto; display:flex; justify-content:space-between; }
+.ss-character-face i { width: .28rem; height: .2rem; border-radius: 50%; background: #172033; }
+.ss-character-face span { position:absolute; top:.75rem; left:.48rem; width:.7rem; height:.22rem; border-bottom:2px solid rgba(103,45,35,.7); border-radius:50%; }
+.ss-character-neck { position:absolute; top:3.35rem; left:4.45rem; width:1.15rem; height:1rem; background:#c98762; }
+.ss-character-body {
+  position:absolute; top:3.8rem; left:2.6rem; width:4.9rem; height:4.5rem;
+  border-radius:1.2rem .95rem .6rem .6rem;
+  background:linear-gradient(115deg,#f8fafc 0%,#cbd5e1 48%,#64748b 100%);
+  clip-path:polygon(20% 0,80% 0,100% 22%,88% 100%,12% 100%,0 22%);
+  box-shadow:inset -1rem 0 1.2rem rgba(15,23,42,.3);
+}
+.ss-character-shirt-mark { position:absolute; top:1.2rem; left:1.8rem; font-size:.65rem; font-weight:1000; color:#1d4ed8; }
+.ss-character-arm { position:absolute; top:4.1rem; width:1.25rem; height:4.1rem; border-radius:1rem; background:linear-gradient(90deg,#c98762,#f6c6a0); transform-origin:top center; }
+.ss-character-arm-left { left:2.4rem; transform:rotate(22deg); }
+.ss-character-arm-right { right:2.35rem; transform:rotate(-25deg); }
+.ss-character-leg { position:absolute; top:7.7rem; width:1.55rem; height:3.4rem; border-radius:.45rem .45rem .3rem .3rem; background:linear-gradient(90deg,#26364b,#0f172a); transform-origin:top center; }
+.ss-character-leg-left { left:3.2rem; transform:rotate(4deg); }
+.ss-character-leg-right { right:3.05rem; transform:rotate(-4deg); }
+.ss-character-bat {
+  position:absolute; z-index:3; right:.35rem; top:3.1rem; width:.65rem; height:7.2rem;
+  border-radius:.25rem .25rem .12rem .12rem; transform:rotate(-27deg);
+  background:linear-gradient(90deg,#d6a56b,#f8dfaa 45%,#98633d);
+  box-shadow:0 0 1rem rgba(251,191,36,.14);
+}
+.ss-character-bat span { position:absolute; top:-.8rem; left:.13rem; width:.38rem; height:1.1rem; border-radius:.15rem; background:#334155; }
+.ss-character-ball {
+  position:absolute; z-index:4; left:.8rem; top:5.5rem; width:1.2rem; height:1.2rem; border-radius:50%;
+  background:radial-gradient(circle at 30% 25%,#fb7185,#b91c1c 72%);
+  box-shadow:0 0 .9rem rgba(239,68,68,.3);
+  animation:ss-ball-float 1.3s ease-in-out infinite alternate;
+}
+.ss-character-ball span { position:absolute; left:.45rem; top:.1rem; width:.2rem; height:1rem; border-left:1px dashed rgba(255,255,255,.75); transform:rotate(25deg); }
+.ss-role-intro-name { z-index:4; color:#f8fafc; font-size:1.15rem; font-weight:950; text-align:center; }
+.ss-role-intro-role { z-index:4; margin-top:.15rem; color:#93c5fd; font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.14em; }
+@keyframes ss-character-entrance { from { opacity:0; transform:translateY(1.5rem) rotateY(-18deg) scale(.88); } to { opacity:1; transform:translateY(0) rotateY(0) scale(1); } }
+@keyframes ss-character-idle { 0%,100% { translate:0 0; } 50% { translate:0 -.35rem; } }
+@keyframes ss-ball-float { from { transform:translateY(0) rotate(-8deg); } to { transform:translateY(-.35rem) rotate(10deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .ss-franchise-table { transition: none; }
+  .ss-character-entrance, .ss-character-idle, .ss-character-ball { animation:none; }
 }
