@@ -1235,3 +1235,21 @@
     background-size: 180% 160%, 180% 160%, 100% 100%;
   }
 }
+
+
+/* Broadcast focus cue for the currently leading franchise table. */
+.ss-franchise-table.is-active {
+  animation: ss-leading-franchise-focus 1.6s ease-in-out 1;
+}
+.ss-franchise-table.is-active .ss-franchise-table-state {
+  color: #d1fae5;
+  text-shadow: 0 0 .7rem rgba(52,211,153,.22);
+}
+@keyframes ss-leading-franchise-focus {
+  0% { outline-color: rgba(110,231,183,.2); box-shadow: 0 0 0 rgba(16,185,129,0); }
+  48% { outline-color: rgba(167,243,208,1); box-shadow: 0 0 0 3px rgba(16,185,129,.12), 0 0 2.4rem rgba(16,185,129,.42); }
+  100% { outline-color: rgba(110,231,183,.78); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-franchise-table.is-active { animation: none; }
+}
