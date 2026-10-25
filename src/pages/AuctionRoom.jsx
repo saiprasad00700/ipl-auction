@@ -388,6 +388,21 @@ const AuctionRoom = () => {
 
    // Visual prototype only: briefly introduce each new player. The actual shared
    // bidding clock remains owned by AuctionContext and is not modified here.
+   const [cameraCutActive, setCameraCutActive] = useState(false);
+   const previousFocusTeamRef = useRef(undefined);
+   useEffect(() => {
+      const nextFocusTeam = displayAuctionState?.highBidderTeamId || 'auctioneer';
+      if (previousFocusTeamRef.current === undefined) {
+         previousFocusTeamRef.current = nextFocusTeam;
+         return undefined;
+      }
+      if (previousFocusTeamRef.current === nextFocusTeam) return undefined;
+      previousFocusTeamRef.current = nextFocusTeam;
+      setCameraCutActive(true);
+      const cutTimer = window.setTimeout(() => setCameraCutActive(false), 650);
+      return () => window.clearTimeout(cutTimer);
+   }, [displayAuctionState?.highBidderTeamId]);
+
    const [showRoleIntro, setShowRoleIntro] = useState(false);
    useEffect(() => {
       if (!displayAuctionState?.playerId) {
@@ -1444,7 +1459,7 @@ const AuctionRoom = () => {
                            </motion.div>
                         ) : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className="ss-cinematic-player-stage bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]" data-focus-team={displayAuctionState?.highBidderTeamId || "auctioneer"}>
+                              <div className={`ss-cinematic-player-stage ${cameraCutActive ? "ss-camera-cut-active" : ""} bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]`} data-focus-team={displayAuctionState?.highBidderTeamId || "auctioneer"}>
                                  <div className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-left" aria-hidden="true" />
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-right" aria-hidden="true" />
