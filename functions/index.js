@@ -372,23 +372,24 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
       : "RTM not matched. " + String(live.playerId) + " goes to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr.";
     type = offer.status === "accepted" ? "retention_accepted" : "log";
   }
+  if (event === "xi_submitted") {
+    const xiSnap = await root.child("teams").child(`${roomId}_${uid}`).child("playingXI").get();
+    if (!xiSnap.exists()) reject("Submit your Playing XI before announcing it.");
+  }
+
   const now = Date.now();
   const receiptKey = systemEventReceiptKey(event, room, live, uid);
-  const receiptRef = root.child("systemEventReceipts").child(receiptKey);
-  const receipt = await receiptRef.transaction((current) => {
+  // Use a deterministic message key as the idempotency boundary. This avoids
+  // orphaned receipts if a process crashes after claiming a receipt but before
+  // writing its message. Concurrent clients race on one transaction instead.
+  const messageRef = root.child("messages").child(`system_${receiptKey}`);
+  const message = { userId: "system", userName: "System", text, type, timestamp: now };
+  const posted = await messageRef.transaction((current) => {
     if (current) return;
-    return { event, createdAt: now };
+    return message;
   }, undefined, false);
-  if (!receipt.committed) return { ok: true, duplicate: true };
-
-  const messageRef = root.child("messages").push();
-  try {
-    await messageRef.set({ userId: "system", userName: "System", text, type, timestamp: now });
-    await root.child("room/lastActivityAt").set(now);
-  } catch (error) {
-    await receiptRef.remove().catch(() => {});
-    throw error;
-  }
+  if (!posted.committed) return { ok: true, messageId: messageRef.key, duplicate: true };
+  await root.child("room/lastActivityAt").set(now);
   return { ok: true, messageId: messageRef.key, duplicate: false };
 });
 
