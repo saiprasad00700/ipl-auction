@@ -10,8 +10,15 @@ export function systemEventReceiptKey(event, room = {}, live = {}, uid = "") {
     return safe(event);
   }
   if (event === "xi_submitted") return safe(`${event}_${uid}`);
-  if (event === "player_removed" || event === "auction_paused" || event === "auction_resumed") {
-    return safe(`${event}_${room?.lastActivityAt ?? room?.status}`);
+  if (event === "auction_paused") {
+    return safe(`${event}_${live?.pausedAt ?? live?.timerEndsAt ?? live?.status}`);
+  }
+  if (event === "auction_resumed") {
+    return safe(`${event}_${live?.timerEndsAt ?? live?.status}`);
+  }
+  if (event === "player_removed") {
+    const banned = Array.isArray(room?.bannedPlayers) ? room.bannedPlayers : [];
+    return safe(`${event}_${banned.join("_") || room?.status}`);
   }
   return safe(`${event}_${room?.lastActivityAt ?? "once"}`);
 }
