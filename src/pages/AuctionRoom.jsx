@@ -51,6 +51,7 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import FranchiseArenaStrip from '../components/FranchiseArenaStrip';
 import RoleCharacterStage from '../components/RoleCharacterStage';
+import AuctioneerStage from '../components/AuctioneerStage';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ref, update } from 'firebase/database';
