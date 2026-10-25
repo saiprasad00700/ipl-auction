@@ -115,58 +115,45 @@ export const AuctionProvider = ({ children }) => {
 
   // Create a new room in DB (RTDB + Supabase index, zero Firestore load)
   const createRoom = useCallback(async (roomId, userId, playerDetails, auctionType = 'mega', isPublic = true) => {
-    // Explicitly connect RTDB WebSocket for room creation
+    if (!user?.uid || user.uid !== userId) {
+      throw new Error('Sign in before creating an auction room.');
+    }
     try { goOnline(rtdb); } catch (e) {}
 
-    const teamDetails = TEAMS.find(t => t.id === playerDetails.team);
-    
-    // Mode-specific configurations
-    const isSprint5 = auctionType === 'sprint5';
-    const isSprint11 = auctionType === 'sprint11';
-    
-    const budget = isSprint5 ? 60.0 : isSprint11 ? 90.0 : 120.0;
-    const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
-    const overseasLimit = isSprint5 ? 2 : 4;
+    const teamDetails = TEAMS.find((team) => team.id === playerDetails.team);
+    const defaults = auctionType === 'sprint5'
+      ? { budget: 60, squadLimit: 5, overseasLimit: 2 }
+      : auctionType === 'sprint11'
+        ? { budget: 90, squadLimit: 11, overseasLimit: 4 }
+        : { budget: 120, squadLimit: 25, overseasLimit: 4 };
 
-    // The trusted callable creates room metadata and the initial team record
-    // atomically. Client-side writes to protected auction state are denied by rules.
-    if (!userId || !playerDetails?.name) throw new Error('Sign in and enter a display name before creating a room.');
-    const createRoomCall = httpsCallable(getFunctions(app), 'createAuctionRoom');
-    const creationResponse = await createRoomCall({
+    // The trusted callable creates the room, host membership and initial team
+    // record atomically. Client-side writes to protected auction state are denied.
+    const createCall = httpsCallable(getFunctions(app), 'createAuctionRoom');
+    await createCall({
       roomId,
       userId,
       userName: playerDetails.name,
       auctionType,
-      isPublic: !!isPublic,
+      isPublic: Boolean(isPublic),
       teamId: playerDetails.team || ''
     });
-    const createdAt = Number(creationResponse.data?.createdAt || Date.now());
 
-    // Presence is separate from protected room state and is best-effort.
-    try {
-      await set(ref(rtdb, `auctions/${roomId}/presence/${userId}`), {
-        online: true,
-        lastSeen: serverTimestampRtdb()
-      });
-    } catch (presenceError) {
-      console.warn('Could not set host presence:', presenceError?.message || presenceError);
-    }
-
-    // Record history without blocking room creation if rules are not deployed yet.
     try {
       await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
         roomId, userId, hostId: userId,
         hostName: playerDetails.name || 'Manager',
         teamId: playerDetails.team || '',
         teamName: teamDetails?.name || 'Unknown',
-        mode: auctionType, status: 'waiting', createdAt,
-        spent: 0, budgetRemaining: budget, squad: []
+        mode: auctionType, status: 'waiting', createdAt: Date.now(),
+        spent: 0, budgetRemaining: defaults.budget, squad: []
       });
     } catch (historyError) {
       console.warn('Could not save room history entry:', historyError?.message || historyError);
     }
 
-    // Write to Supabase (primary database index, 0 Firestore cost)
+    // Supabase is only a secondary lobby index; RTDB/Cloud Functions remain
+    // authoritative for auction state and room creation.
     try {
       if (supabase) {
         await supabase.from('auctions').upsert({
@@ -174,38 +161,31 @@ export const AuctionProvider = ({ children }) => {
           host_id: userId,
           host_name: playerDetails.name,
           host_online: true,
-          is_public: !!isPublic,
+          is_public: Boolean(isPublic),
           status: 'waiting',
           auction_type: auctionType,
-          squad_limit: squadLimit,
-          overseas_limit: overseasLimit,
+          squad_limit: defaults.squadLimit,
+          overseas_limit: defaults.overseasLimit,
           players: [{
             id: userId,
             name: playerDetails.name,
-            team: playerDetails.team,
+            team: playerDetails.team || '',
             teamName: teamDetails?.name || 'Unknown',
             isHost: true
           }],
-          settings: { bidTimer: 15, budget }
+          settings: {
+            bidTimer: 15,
+            budget: defaults.budget,
+            squadLimit: defaults.squadLimit,
+            overseasLimit: defaults.overseasLimit,
+            auctionType
+          }
         });
-
-        if (playerDetails.team) {
-          await supabase.from('teams').upsert({
-            id: `${roomId}_${userId}`,
-            auction_id: roomId,
-            user_id: userId,
-            team_id: playerDetails.team,
-            team_name: teamDetails?.name || 'Unknown',
-            budget_remaining: budget,
-            spent: 0,
-            squad: []
-          });
-        }
       }
-    } catch (sErr) {
-      // Non-blocking Supabase fallback
+    } catch (syncError) {
+      console.warn('Room created, but Supabase lobby indexing failed:', syncError?.message || syncError);
     }
-  }, []);
+  }, [user]);
   
   // Helper to flush complete room & teams data from RTDB to Supabase in single batch call
   const flushAuctionToFirestore = useCallback(async (roomId) => {
