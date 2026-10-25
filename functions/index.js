@@ -8,7 +8,7 @@ import { validatePlayingXIComposition } from "./playingXIRules.js";
 import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./auctionRules.js";
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
-import { upsertRoomMember } from "./roomMemberRules.js";
+import { upsertRoomMember, removeRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid, canSendRoomChat } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
@@ -1044,30 +1044,38 @@ export const kickAuctionPlayer = onCall({ enforceAppCheck: false }, async (reque
   if (typeof playerId !== "string" || playerId.length < 1 || playerId.length > 128) {
     throw new HttpsError("invalid-argument", "Invalid player.");
   }
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const roomSnap = await roomRef.get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (room.hostId !== uid) reject("Only the room host can remove a player.");
-  if (room.status && !["waiting", "lobby"].includes(room.status)) {
-    reject("Players can only be removed before the auction starts.");
-  }
 
-  const members = Array.isArray(room.players) ? room.players : [];
-  const target = members.find((player) => player?.id === playerId);
-  if (!target) reject("That player is no longer in this room.");
-  const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
-  const updates = {
-    "room/players": members.filter((player) => player?.id !== playerId),
-    "room/bannedPlayers": [...new Set([...banned, playerId])],
-    "room/lastActivityAt": Date.now(),
-  };
-  updates[`teams/${roomId}_${playerId}`] = null;
-  await root.update(updates);
-  return { ok: true, playerName: String(target.name || "Player").slice(0, 80) };
+  const rootRef = database.ref("auctions/" + roomId);
+  const now = Date.now();
+  let failureReason = "Could not remove the player. Refresh and try again.";
+  let playerName = null;
+  const result = await rootRef.transaction((current) => {
+    playerName = null;
+    failureReason = "Could not remove the player. Refresh and try again.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const transition = removeRoomMember(current.room, uid, playerId, now);
+    if (!transition) {
+      failureReason = current.room.hostId !== uid
+        ? "Only the room host can remove a player."
+        : current.room.status && !["waiting", "lobby"].includes(current.room.status)
+          ? "Players can only be removed before the auction starts."
+          : playerId === current.room.hostId
+            ? "The host cannot remove themselves from the room."
+            : "That player is no longer in this room.";
+      return;
+    }
+    playerName = String(transition.target.name || "Player").slice(0, 80);
+    const teams = { ...(current.teams || {}) };
+    delete teams[`${roomId}_${playerId}`];
+    return { ...current, room: transition.room, teams };
+  }, undefined, false);
+
+  if (!result.committed) reject(failureReason);
+  return { ok: true, playerName };
 });
-
 
 export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
