@@ -1131,9 +1131,10 @@ export const AuctionProvider = ({ children }) => {
       const updatedBanned = [...(data.bannedPlayers || []), playerObj.id];
 
       // 2. Update RTDB
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { 
+      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
         players: updatedPlayers,
-        bannedPlayers: updatedBanned 
+        bannedPlayers: updatedBanned,
+        lastActivityAt: Date.now()
       });
 
       // Sync player removal to Supabase
@@ -1686,7 +1687,7 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = (data.players || []).map(p => 
       p.id === userId ? { ...p, team: newTeamId, teamName: teamDetails?.name || 'Unknown' } : p
     );
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
     try {
@@ -1719,7 +1720,7 @@ export const AuctionProvider = ({ children }) => {
   }, []);
   
   const updateRoomSettings = useCallback(async (roomId, settings) => {
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings, lastActivityAt: Date.now() });
   }, []);
 
   const pauseAuction = useCallback(async (roomId) => {
@@ -2038,7 +2039,7 @@ export const AuctionProvider = ({ children }) => {
       isBot: true
     }];
 
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
     try {
@@ -2066,7 +2067,7 @@ export const AuctionProvider = ({ children }) => {
     const data = rtdbRoomSnap.val();
 
     const updatedPlayers = (data.players || []).filter(p => p.id !== botUserId);
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
     try {
@@ -2114,7 +2115,7 @@ export const AuctionProvider = ({ children }) => {
       }
     });
 
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers });
+    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
     try {
