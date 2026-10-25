@@ -1504,7 +1504,8 @@ const AuctionRoom = () => {
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="ss-cinematic-player-portrait w-full md:w-60 min-h-[19rem] md:min-h-[20rem] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] shrink-0">
+                                    <div className={`ss-cinematic-player-portrait w-full md:w-60 min-h-[19rem] md:min-h-[20rem] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] shrink-0 ${showRoleIntro ? 'is-player-intro' : ''}`}>
+                                       {showRoleIntro && <span className="ss-player-intro-badge" aria-live="polite"><i aria-hidden="true" />PLAYER INTRO</span>}
                                        {showRoleIntro ? (
                                           <RoleCharacterStage player={currentPlayer} />
                                        ) : (
