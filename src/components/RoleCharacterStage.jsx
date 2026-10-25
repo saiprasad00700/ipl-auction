@@ -11,13 +11,14 @@ const RoleCharacterStage = ({ player, visible = true }) => {
 
   const role = String(player.role || '').toLowerCase();
   const isKeeper = role.includes('wicket');
+  const roleKey = isKeeper ? 'keeper' : isAllRounder ? 'allrounder' : isBowler ? 'bowler' : 'batter';
   const isBowler = role.includes('bowl') && !role.includes('all');
   const isAllRounder = role.includes('all');
   const showBat = isKeeper || isAllRounder || (!isBowler && !isAllRounder);
   const showBall = isBowler || isAllRounder;
 
   return (
-    <div className="ss-role-intro" role="group" aria-label={`Animated ${player.role || 'cricket'} character introduction for ${player.name}`}>
+    <div className="ss-role-intro" data-player-role={roleKey} role="group" aria-label={`Animated ${player.role || 'cricket'} character introduction for ${player.name}`}>
       <div className="ss-role-intro-kicker">PLAYER INTRODUCTION</div>
       <div className="ss-role-character" aria-hidden="true">
         <div className="ss-character-shadow" />
