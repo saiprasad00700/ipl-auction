@@ -7,7 +7,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "test": "node --check index.js && node --test tests/saleSettlementHelpers.test.js tests/playingXIRules.test.js",
+    "test": "node --check index.js && node --test tests/*.test.js",
     "test:rules": "node --test tests/databaseRules.emulator.test.js"
   },
   "dependencies": {
