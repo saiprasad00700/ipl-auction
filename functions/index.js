@@ -26,88 +26,137 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, botAction = false, botUserId, botTeamId, botName, maxValuation, botBudget, timerSeconds } = request.data || {};
   requireRoomId(roomId);
-  const roomRef = database.ref(`auctions/${roomId}`);
-  const roomSnapshot = await roomRef.child("room").get();
-  const room = roomSnapshot.val();
-  if (!room) reject("Auction room not found.");
-  if (room.status !== "active") reject("Bidding is not open for this auction.");
 
-  let bidderId = uid;
-  let bidderTeamId;
-  let bidderName;
-  let maxBid = Number.POSITIVE_INFINITY;
-  if (botAction) {
-    if (room.hostId !== uid || typeof botUserId !== "string" || !BOT_IDS.has(botUserId)
-      || botUserId !== `bot_${String(botTeamId || "").replace(/^bot_/, "")}`) {
-      reject("Only the host may submit a bot bid.");
-    }
-    bidderId = botUserId;
-    bidderTeamId = String(botTeamId).replace(/^bot_/, "");
-    bidderName = typeof botName === "string" ? botName.slice(0, 80) : "Manager Bot";
-    maxBid = Math.min(Number.isFinite(Number(maxValuation)) ? Number(maxValuation) : 0,
-      Number.isFinite(Number(botBudget)) ? Number(botBudget) : 0);
-  } else {
-    const players = Array.isArray(room.players) ? room.players : [];
-    const member = players.find((p) => p?.id === uid);
-    if (!member || room.bannedPlayers?.includes(uid)) reject("You are not allowed to bid in this room.");
-    bidderTeamId = member.team;
-    bidderName = typeof member.name === "string" ? member.name.slice(0, 80) : "Manager";
-  }
-  if (!bidderTeamId || bidderTeamId === "NONE") reject("Select a franchise before bidding.");
-  const teamSnapshot = await roomRef.child("teams").child(`${roomId}_${bidderId}`).get();
-  const team = teamSnapshot.val();
-  if (!team || team.userId !== bidderId || team.teamId !== bidderTeamId) reject("Your franchise record is not valid.");
-
-  const liveRef = roomRef.child("live");
+  const rootRef = database.ref(`auctions/${roomId}`);
   const now = Date.now();
-  const result = await liveRef.transaction((live) => {
-    if (!live || live.status !== "bidding") return;
-    if (live.highBidderId === bidderId) return;
-    if (live.timerEndsAt && now >= Number(live.timerEndsAt)) return;
+  let failureReason = "Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.";
+  let acceptedBid = null;
+
+  // Commit bid, bidder eligibility, team affordability, and room activity from
+  // one current snapshot. This closes the race where a user was removed or a
+  // team budget changed after pre-validation but before the bid committed.
+  const result = await rootRef.transaction((current) => {
+    acceptedBid = null;
+    failureReason = "Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.";
+    if (!current?.room || !current?.live) {
+      failureReason = "Auction room or current player lot could not be found.";
+      return;
+    }
+    const room = current.room;
+    const live = current.live;
+    if (room.status !== "active" || live.status !== "bidding") {
+      failureReason = "Bidding is not open for this auction.";
+      return;
+    }
+    if (live.timerEndsAt && now >= Number(live.timerEndsAt)) {
+      failureReason = "The bidding timer has expired.";
+      return;
+    }
+
+    let bidderId = uid;
+    let bidderTeamId;
+    let bidderName;
+    let maxBid = Number.POSITIVE_INFINITY;
+    const players = Array.isArray(room.players) ? room.players : [];
+    const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
+
+    if (botAction) {
+      if (room.hostId !== uid || typeof botUserId !== "string" || !BOT_IDS.has(botUserId)
+        || botUserId !== `bot_${String(botTeamId || "").replace(/^bot_/, "")}`) {
+        failureReason = "Only the host may submit a bot bid.";
+        return;
+      }
+      if (!players.some((player) => player?.id === botUserId) || banned.includes(botUserId)) {
+        failureReason = "That bot is not an active member of this room.";
+        return;
+      }
+      bidderId = botUserId;
+      bidderTeamId = String(botTeamId).replace(/^bot_/, "");
+      bidderName = typeof botName === "string" ? botName.slice(0, 80) : "Manager Bot";
+      maxBid = Math.min(
+        Number.isFinite(Number(maxValuation)) ? Number(maxValuation) : 0,
+        Number.isFinite(Number(botBudget)) ? Number(botBudget) : 0
+      );
+    } else {
+      const member = players.find((player) => player?.id === uid);
+      if (!member || banned.includes(uid)) {
+        failureReason = "You are not allowed to bid in this room.";
+        return;
+      }
+      bidderTeamId = member.team;
+      bidderName = typeof member.name === "string" ? member.name.slice(0, 80) : "Manager";
+    }
+
+    if (!bidderTeamId || bidderTeamId === "NONE") {
+      failureReason = "Select a franchise before bidding.";
+      return;
+    }
+    if (live.highBidderId === bidderId) {
+      failureReason = "Your franchise already holds the highest bid.";
+      return;
+    }
+
+    const team = current.teams?.[`${roomId}_${bidderId}`];
+    if (!team || team.userId !== bidderId || team.teamId !== bidderTeamId) {
+      failureReason = "Your franchise record is not valid.";
+      return;
+    }
     const player = PLAYER_CATALOG[live.playerId];
-    if (!player) return;
+    if (!player) {
+      failureReason = "The current player is not in the auction catalog.";
+      return;
+    }
+
     const squad = Array.isArray(team.squad) ? team.squad : [];
-    if (squad.some((p) => (typeof p === "string" ? p : p?.id) === live.playerId)) return;
+    if (squad.some((item) => (typeof item === "string" ? item : item?.id) === live.playerId)) {
+      failureReason = "This player is already in your squad.";
+      return;
+    }
     const squadLimit = Number(room.squadLimit || 25);
-    if (squad.length >= squadLimit) return;
+    if (squad.length >= squadLimit) {
+      failureReason = "Your squad has reached its player limit.";
+      return;
+    }
     const overseasLimit = effectiveOverseasLimit(room);
-    const overseasCount = squad.reduce((n, item) => {
+    const overseasCount = squad.reduce((count, item) => {
       const entry = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
-      return n + (entry && entry.country !== "IND" ? 1 : 0);
+      return count + (entry && entry.country !== "IND" ? 1 : 0);
     }, 0);
-    if (player.country !== "IND" && overseasCount >= overseasLimit) return;
-    const currentBid = Number(live.currentBid || 0);
-    const nextBid = nextBidAmount(currentBid, player.basePrice);
-    if (nextBid > Number(team.budgetRemaining || 0) || nextBid > maxBid) return;
-    live.currentBid = nextBid;
-    live.highBidderId = bidderId;
-    live.highBidderName = bidderName;
-    live.highBidderTeamId = bidderTeamId;
+    if (player.country !== "IND" && overseasCount >= overseasLimit) {
+      failureReason = "Your franchise has reached its overseas-player limit.";
+      return;
+    }
+
+    const nextBid = nextBidAmount(Number(live.currentBid || 0), player.basePrice);
+    if (nextBid > Number(team.budgetRemaining || 0) || nextBid > maxBid) {
+      failureReason = "Your franchise cannot afford the next bid.";
+      return;
+    }
+
     const requestedSeconds = botAction
       ? (Number(timerSeconds) || Number(room.settings?.bidTimer) || 15)
       : (Number(room.settings?.bidTimer) || 15);
     const seconds = clampBidTimerSeconds(requestedSeconds);
-    live.timerEndsAt = now + seconds * 1000;
-    live.lastActivityAt = now;
-    return live;
+    acceptedBid = nextBid;
+    return {
+      ...current,
+      live: {
+        ...live,
+        currentBid: nextBid,
+        highBidderId: bidderId,
+        highBidderName: bidderName,
+        highBidderTeamId: bidderTeamId,
+        timerEndsAt: now + seconds * 1000,
+        lastActivityAt: now
+      },
+      room: { ...room, lastActivityAt: now }
+    };
   }, undefined, false);
 
-  if (!result.committed) reject("Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.");
-  await roomRef.child("room/lastActivityAt").set(now);
-  return { ok: true, amount: result.snapshot.val()?.currentBid };
+  if (!result.committed) reject(failureReason);
+  return { ok: true, amount: acceptedBid };
 });
 
-
-function requireAuth(request) {
-  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in before making an RTM decision.");
-  return request.auth.uid;
-}
-function requireRoomId(roomId) {
-  if (typeof roomId !== "string" || !/^[A-Za-z0-9_-]{3,100}$/.test(roomId)) {
-    throw new HttpsError("invalid-argument", "Invalid auction room.");
-  }
-}
-function reject(message) { throw new HttpsError("failed-precondition", message); }
 
 export const decideRetention = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
