@@ -1,6 +1,9 @@
 # Modified from the upstream project by saiprasad00700.
 name: Auction app checks
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -14,6 +17,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -43,6 +47,8 @@ jobs:
         run: npm run build
 
   render-health-check:
+    permissions:
+      contents: read
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-and-test
     runs-on: ubuntu-latest
