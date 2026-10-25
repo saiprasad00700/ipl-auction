@@ -6,6 +6,7 @@ import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 import { validatePlayingXIComposition } from "./playingXIRules.js";
 import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./auctionRules.js";
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
+import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -1010,40 +1011,10 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
       );
       if (hasPurchases) reject("Auction rules cannot be changed after a franchise has purchased players.");
     }
-    const safeSettings = {};
-    const allowed = new Set(["bidTimer", "budget", "squadLimit", "overseasLimit", "auctionType"]);
-    for (const [key, value] of Object.entries(settings)) {
-      if (!allowed.has(key)) continue;
-      if (key === "bidTimer" && ![3, 5, 10, 15].includes(Number(value))) {
-        throw new HttpsError("invalid-argument", "Bid timer must be 3, 5, 10, or 15 seconds.");
-      }
-      if (key === "budget" && (!Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > 1000)) {
-        throw new HttpsError("invalid-argument", "Invalid team budget.");
-      }
-      if (key === "squadLimit" && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 40)) {
-        throw new HttpsError("invalid-argument", "Invalid squad limit.");
-      }
-      const modeForLimit = settings.auctionType || room.settings?.auctionType || room.auctionType || "mega";
-      const maximumOverseas = modeForLimit === "sprint5" ? 2 : 4;
-      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > maximumOverseas)) {
-        throw new HttpsError("invalid-argument", `Overseas-player limit cannot exceed ${maximumOverseas} for this auction mode.`);
-      }
-      if (key === "auctionType" && !["mega", "sprint11", "sprint5"].includes(value)) {
-        throw new HttpsError("invalid-argument", "Invalid auction mode.");
-      }
-      safeSettings[key] = key === "auctionType" ? value : Number(value);
-    }
-    if (!Object.keys(safeSettings).length) throw new HttpsError("invalid-argument", "No valid settings were supplied.");
-    if (safeSettings.auctionType) {
-      const defaults = safeSettings.auctionType === "sprint5"
-        ? { budget: 60, squadLimit: 5, overseasLimit: 2 }
-        : safeSettings.auctionType === "sprint11"
-          ? { budget: 90, squadLimit: 11, overseasLimit: 4 }
-          : { budget: 120, squadLimit: 25, overseasLimit: 4 };
-      for (const [key, value] of Object.entries(defaults)) {
-        if (safeSettings[key] === undefined) safeSettings[key] = value;
-      }
-    }
+    const currentMode = room.settings?.auctionType || room.auctionType || "mega";
+    const normalized = normalizeAuctionSettings(settings, currentMode);
+    if (!normalized.valid) throw new HttpsError("invalid-argument", normalized.error);
+    const safeSettings = normalized.settings;
     const updates = {};
     for (const [key, value] of Object.entries(safeSettings)) {
       updates["room/settings/" + key] = value;
