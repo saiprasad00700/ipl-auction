@@ -107,3 +107,15 @@ test('keyboard users receive a visible focus indicator', () => {
   assert.match(css, /:focus-visible/);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
 });
+
+
+test('cinematic player lower-third reflects player and live auction phase', () => {
+  assert.match(room, /ss-cinematic-player-lower-third/);
+  assert.match(room, /currentPlayer\?\.name/);
+  assert.match(room, /currentPlayer\?\.role/);
+  assert.match(room, /RETENTION REVIEW/);
+  assert.match(css, /\.ss-cinematic-player-lower-third\s*\{/);
+  assert.match(css, /@keyframes ss-lower-third-enter/);
+  assert.match(css, /@media \(max-width: 640px\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
