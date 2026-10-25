@@ -199,8 +199,9 @@ export function evaluateBotBid({
 
   // 5. Calculate the next incremental bid amount
   const cBid = currentBid || 0;
-  const increment = cBid < 5 ? 0.20 : 0.25;
-  const nextBid = cBid === 0 ? (player.basePrice || 0.30) : parseFloat((cBid + increment).toFixed(2));
+  const nextBid = cBid <= 0
+    ? Number(Number(player.basePrice || 0.30).toFixed(2))
+    : Number((cBid + 0.5).toFixed(2));
 
   // 6. Budget check
   const budgetRemaining = botTeam.budgetRemaining ?? initialBudget;
