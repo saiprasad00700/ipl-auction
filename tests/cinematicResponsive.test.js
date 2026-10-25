@@ -126,7 +126,7 @@ test('cinematic countdown reflects intro and urgent bidding states', () => {
   assert.match(room, /BIDDING OPENS IN/);
   assert.match(room, /Bidding timer: /);
   assert.match(room, /timeLeft <= 5/);
-  assert.match(css, /\\.ss-cinematic-countdown\\.is-urgent/);
+  assert.match(css, /\.ss-cinematic-countdown\.is-urgent/);
   assert.match(css, /@keyframes ss-countdown-urgent/);
   assert.match(css, /@media \\(max-width: 640px\\)/);
   assert.match(css, /@media \\(prefers-reduced-motion: reduce\\)/);
