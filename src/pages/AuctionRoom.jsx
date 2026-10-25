@@ -1474,7 +1474,7 @@ const AuctionRoom = () => {
                                  </div>
                                  <div className="ss-cinematic-bid-hud" aria-live="polite">
                                     <span className="ss-cinematic-bid-hud-label">CURRENT BID</span>
-                                    <strong>₹{(Number(displayAuctionState?.currentBid) || 0).toFixed(2)} Cr</strong>
+                                    <strong key={`${displayAuctionState?.playerId || "lot"}-${Number(displayAuctionState?.currentBid) || 0}`} className="ss-cinematic-bid-value">₹{(Number(displayAuctionState?.currentBid) || 0).toFixed(2)} Cr</strong>
                                     <span className="ss-cinematic-bid-leader">
                                        {displayAuctionState?.highBidderTeamId
                                           ? `LEADING · ${TEAMS.find((t) => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId}`
