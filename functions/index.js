@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { applySaleToTeam } from "./saleSettlementHelpers.js";
+import { applySaleToTeam, canAffordRtmMatch } from "./saleSettlementHelpers.js";
 import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 import { validatePlayingXIComposition } from "./playingXIRules.js";
 
@@ -110,6 +110,26 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
   const room = roomSnapshot.val();
   if (!room) reject("Auction room not found.");
   const liveRef = roomRef.child("live");
+  if (decision === "match") {
+    const liveBefore = (await liveRef.get()).val();
+    const offerBefore = liveBefore?.retentionOffer;
+    if (!offerBefore || offerBefore.status !== "pending" || offerBefore.phase !== "match_decision") {
+      reject("There is no active counter-price to match.");
+    }
+    if (botAction) {
+      if (room.hostId !== uid || !BOT_IDS.has(offerBefore.eligibleUserId)) {
+        reject("Only the host can decide for an auction bot.");
+      }
+    } else if (offerBefore.eligibleUserId !== uid
+      || room.bannedPlayers?.includes(uid)
+      || !(Array.isArray(room.players) ? room.players : []).some((player) => player?.id === uid)) {
+      reject("You are not eligible to match this RTM counter-price.");
+    }
+    const originalTeamSnapshot = await roomRef.child("teams").child(roomId + "_" + offerBefore.eligibleUserId).get();
+    if (!canAffordRtmMatch(originalTeamSnapshot.val(), offerBefore.counterBid)) {
+      reject("Your franchise does not have enough remaining purse to match this counter-price.");
+    }
+  }
   const clickedAt = Date.now();
   const result = await liveRef.transaction((live) => {
     if (!live || live.status !== "processing_sale") return;
@@ -125,7 +145,9 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
 
     if (botAction) {
       if (room.hostId !== uid || !BOT_IDS.has(offer.eligibleUserId)) return;
-    } else if (offer.eligibleUserId !== uid) {
+    } else if (offer.eligibleUserId !== uid
+      || room.bannedPlayers?.includes(uid)
+      || !(Array.isArray(room.players) ? room.players : []).some((player) => player?.id === uid)) {
       return;
     }
 
