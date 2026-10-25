@@ -1140,13 +1140,13 @@ const AuctionRoom = () => {
                      <SettingsIcon size={14} />
                   </button>
                   <button
-                     onClick={() => { setSidebarTab('activity'); setShowHeaderPanel(true); }}
+                     onClick={() => { if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Live Activity"
                      aria-label="Open Live Activity"
                   ><History size={14} /></button>
                   <button
-                     onClick={() => { setSidebarTab('chat'); setShowHeaderPanel(true); }}
+                     onClick={() => { if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Voice Chat"
                      aria-label="Open Voice Chat"
@@ -1567,8 +1567,8 @@ const AuctionRoom = () => {
 
             <aside className={`${showHeaderPanel ? 'flex' : 'hidden'} fixed right-3 top-16 z-[70] w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-5rem)] bg-[#07111d]/95 backdrop-blur-xl border border-emerald-300/15 rounded-2xl shadow-2xl flex-col overflow-hidden`}>
                {/* Premium Tabs Header */}
-               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full">
-                  <button onClick={() => setShowHeaderPanel(false)} className="absolute right-2 top-2 z-10 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white" title="Close panel" aria-label="Close panel"><X size={14} /></button>
+               <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full pr-10 relative">
+                  <button onClick={() => setShowHeaderPanel(false)} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white" title="Close panel" aria-label="Close panel"><X size={14} /></button>
                   <button
                      onClick={() => setSidebarTab('activity')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'activity'
