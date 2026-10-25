@@ -2,6 +2,7 @@
 import { initializeApp, cert, getApps, deleteApp } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { createClient } from '@supabase/supabase-js';
+import { isInactive, latestActivityAt } from './room-activity.js';
 
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 const databaseURL = process.env.VITE_FIREBASE_DATABASE_URL;
@@ -18,8 +19,6 @@ const db = getDatabase();
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 async function main() {
-  const now = Date.now();
-  const root = db.ref('/');
   const auctionsSnap = await db.ref('auctions').get();
   if (!auctionsSnap.exists()) {
     console.log('No RTDB auction rooms found.');
@@ -28,49 +27,47 @@ async function main() {
 
   let terminated = 0;
   let retained = 0;
+  let missingActivity = 0;
+
   for (const [roomId, value] of Object.entries(auctionsSnap.val())) {
-    const room = value?.room;
-    if (!room) continue;
-    // Never delete rooms already in their completed-summary lifecycle here.
-    if (room.status === 'completed' || room.status === 'analyzing' || room.status === 'awaiting_xi') {
+    if (!value?.room) continue;
+    const initialNow = Date.now();
+    const initialActivity = latestActivityAt(value);
+    if (!initialActivity) {
+      missingActivity++;
       retained++;
+      console.log(`Retained room ${roomId}: no reliable activity timestamp; refusing unsafe deletion.`);
       continue;
     }
-    const activityTimes = [
-      Number(room.lastActivityAt || 0),
-      Number(value?.live?.lastActivityAt || 0),
-      Number(room.createdAt || 0)
-    ].filter(Number.isFinite);
-    const lastActivity = Math.max(0, ...activityTimes);
-    if (!lastActivity || now - lastActivity < INACTIVE_MS) {
+    if (!isInactive(value, initialNow, INACTIVE_MS)) {
       retained++;
       continue;
     }
 
-    // Re-read immediately before deletion to avoid deleting a room that became active.
-    const latestSnap = await db.ref(`auctions/${roomId}`).get();
-    const latest = latestSnap.val();
-    if (!latest?.room) continue;
-    const latestActivity = Math.max(
-      Number(latest.room.lastActivityAt || 0),
-      Number(latest.live?.lastActivityAt || 0),
-      Number(latest.room.createdAt || 0)
-    );
-    if (now - latestActivity < INACTIVE_MS) {
+    // Recheck inside a transaction, not with a read followed by remove: a join,
+    // bid, chat, RTM action or other write must win against the cleanup race.
+    const roomRef = db.ref(`auctions/${roomId}`);
+    const result = await roomRef.transaction((current) => {
+      if (!current?.room || !isInactive(current, Date.now(), INACTIVE_MS)) return;
+      return null;
+    }, undefined, false);
+
+    if (!result.committed || result.snapshot.val() !== null) {
       retained++;
       continue;
     }
 
-    await db.ref(`auctions/${roomId}`).remove();
     await db.ref(`publicRooms/${roomId}`).remove();
     if (supabase) {
-      await supabase.from('teams').delete().eq('auction_id', roomId);
-      await supabase.from('auctions').delete().eq('id', roomId);
+      const teamsResult = await supabase.from('teams').delete().eq('auction_id', roomId);
+      if (teamsResult.error) console.error(`Supabase team cleanup failed for ${roomId}:`, teamsResult.error.message);
+      const auctionResult = await supabase.from('auctions').delete().eq('id', roomId);
+      if (auctionResult.error) console.error(`Supabase auction cleanup failed for ${roomId}:`, auctionResult.error.message);
     }
-    console.log(`Terminated inactive room ${roomId}`);
+    console.log(`Deleted inactive room ${roomId}; last activity was ${new Date(initialActivity).toISOString()}.`);
     terminated++;
   }
-  console.log(`Cleanup complete. Terminated: ${terminated}; retained: ${retained}`);
+  console.log(`Cleanup complete. Deleted: ${terminated}; retained: ${retained}; missing activity timestamps: ${missingActivity}; Supabase cleanup configured: ${Boolean(supabase)}`);
 }
 main()
   .catch(error => {
