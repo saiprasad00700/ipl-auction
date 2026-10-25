@@ -29,7 +29,6 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
   requireRoomId(roomId);
 
   const rootRef = database.ref(`auctions/${roomId}`);
-  const now = Date.now();
   let failureReason = "Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.";
   let acceptedBid = null;
 
@@ -43,13 +42,14 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
       failureReason = "Auction room or current player lot could not be found.";
       return;
     }
+    const transactionNow = Date.now();
     const room = current.room;
     const live = current.live;
     if (room.status !== "active" || live.status !== "bidding") {
       failureReason = "Bidding is not open for this auction.";
       return;
     }
-    if (live.timerEndsAt && now >= Number(live.timerEndsAt)) {
+    if (live.timerEndsAt && transactionNow >= Number(live.timerEndsAt)) {
       failureReason = "The bidding timer has expired.";
       return;
     }
@@ -147,8 +147,8 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
         highBidderId: bidderId,
         highBidderName: bidderName,
         highBidderTeamId: bidderTeamId,
-        timerEndsAt: now + seconds * 1000,
-        lastActivityAt: now
+        timerEndsAt: transactionNow + seconds * 1000,
+        lastActivityAt: transactionNow
       },
       room: { ...room, lastActivityAt: now }
     };
@@ -168,7 +168,6 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
   // Validate the RTM phase, caller, expiry and matching purse against the same
   // root snapshot that records the decision and activity heartbeat.
   const rootRef = database.ref(`auctions/${roomId}`);
-  const now = Date.now();
   let failureReason = "This RTM offer is no longer available or you are not authorized to decide it.";
   let resultingPhase = null;
   const result = await rootRef.transaction((current) => {
@@ -178,6 +177,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
       failureReason = "Auction room or live offer could not be found.";
       return;
     }
+    const transactionNow = Date.now();
     const room = current.room;
     const live = current.live;
     const offer = live.retentionOffer;
@@ -185,7 +185,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
       failureReason = "There is no active RTM offer.";
       return;
     }
-    if (now > Number(offer.expiresAt || 0) + 1500) {
+    if (transactionNow > Number(offer.expiresAt || 0) + 1500) {
       failureReason = "The RTM decision window has expired.";
       return;
     }
@@ -240,7 +240,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
     resultingPhase = nextOffer.phase;
     return {
       ...current,
-      room: { ...room, lastActivityAt: now },
+      room: { ...room, lastActivityAt: transactionNow },
       live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }
     };
   }, undefined, false);
@@ -261,13 +261,13 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   }
 
   const rootRef = database.ref(`auctions/${roomId}`);
-  const now = Date.now();
   let failureReason = "Counter-bid is no longer valid, or you are not authorized to submit it.";
   const result = await rootRef.transaction((current) => {
     if (!current?.room || !current.live) {
       failureReason = "Auction room or live offer could not be found.";
       return;
     }
+    const transactionNow = Date.now();
     const room = current.room;
     const live = current.live;
     const offer = live.retentionOffer;
@@ -285,7 +285,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
       failureReason = "Only the active eligible buyer, or the active host acting for the matching bot buyer, can submit this counter-bid.";
       return;
     }
-    if (now > Number(offer.expiresAt || 0)) {
+    if (transactionNow > Number(offer.expiresAt || 0)) {
       failureReason = "The counter-bid window has expired.";
       return;
     }
@@ -306,11 +306,11 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
       decision: null,
       decidedBy: null,
       decidedAt: null,
-      expiresAt: now + 10000
+      expiresAt: transactionNow + 10000
     };
     return {
       ...current,
-      room: { ...room, lastActivityAt: now },
+      room: { ...room, lastActivityAt: transactionNow },
       live: {
         ...live,
         currentBid: counterBid,
