@@ -886,3 +886,44 @@
   }
 }
 
+/* Make the leading franchise instantly readable without dimming rival tables. */
+.ss-franchise-table.is-active {
+  outline: 2px solid rgba(110,231,183,.78);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(110,231,183,.3), 0 0 1.8rem rgba(16,185,129,.34), inset 0 0 1.25rem rgba(16,185,129,.08);
+}
+.ss-franchise-table.is-active::before {
+  content: "LEADING";
+  position: absolute;
+  top: -.58rem;
+  left: 50%;
+  z-index: 9;
+  transform: translateX(-50%);
+  padding: .18rem .42rem;
+  border: 1px solid rgba(167,243,208,.7);
+  border-radius: 999px;
+  background: linear-gradient(135deg,#065f46,#064e3b);
+  color: #ecfdf5;
+  font-size: .43rem;
+  font-weight: 1000;
+  line-height: 1.2;
+  letter-spacing: .12em;
+  white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(0,0,0,.35);
+  pointer-events: none;
+}
+.ss-franchise-table.is-active .ss-franchise-table-state {
+  font-weight: 1000;
+  letter-spacing: .075em;
+}
+@media (max-width: 640px) {
+  .ss-franchise-table.is-active::before {
+    top: -.48rem;
+    font-size: .38rem;
+    padding: .15rem .34rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-franchise-table.is-active { outline-offset: 2px; }
+}
+
