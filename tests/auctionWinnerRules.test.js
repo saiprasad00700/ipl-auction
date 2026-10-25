@@ -43,16 +43,41 @@ test('XI validation rejects duplicate or out-of-squad selections', () => {
 
 test('Playing XI allows at most four overseas players while squad can contain more', () => {
   const mixedCatalog = [
-    ...Array.from({ length: 5 }, (_, i) => ({ id: `overseas${i}`, country: 'AUS', role: 'Batter' })),
-    ...Array.from({ length: 8 }, (_, i) => ({ id: `indian${i}`, country: 'IND', role: 'Batter' })),
+    { id: 'overseas0', country: 'AUS', role: 'All-Rounder' },
+    { id: 'overseas1', country: 'AUS', role: 'All-Rounder' },
+    { id: 'overseas2', country: 'AUS', role: 'Bowler' },
+    { id: 'overseas3', country: 'AUS', role: 'Batter' },
+    { id: 'overseas4', country: 'AUS', role: 'Batter' },
+    { id: 'indian0', country: 'IND', role: 'Wicket-Keeper' },
+    ...Array.from({ length: 3 }, (_, i) => ({ id: `indianBat${i}`, country: 'IND', role: 'Batter' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `indianAR${i}`, country: 'IND', role: 'All-Rounder' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `indianBowl${i}`, country: 'IND', role: 'Bowler' })),
   ];
+  const byId = Object.fromEntries(mixedCatalog.map((p) => [p.id, p]));
   const mixedSquad = mixedCatalog.map((p) => ({ id: p.id, bid: 1 }));
-  const validXI = [...mixedCatalog.slice(0, 4), ...mixedCatalog.slice(5, 12)];
-  assert.equal(validatePlayingXI(validXI, mixedCatalog[4], mixedSquad, mixedCatalog), true);
-  const invalidXI = mixedCatalog.slice(0, 5).concat(mixedCatalog.slice(5, 11));
-  assert.equal(validatePlayingXI(invalidXI, mixedCatalog[11], mixedSquad, mixedCatalog), false);
+  const validIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'indian0', 'indianBat0', 'indianBat1', 'indianBat2', 'indianAR0', 'indianBowl0', 'indianBowl1'];
+  const validXI = validIds.map((id) => byId[id]);
+  assert.equal(validatePlayingXI(validXI, byId.overseas4, mixedSquad, mixedCatalog), true);
+  const invalidIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'overseas4', 'indian0', 'indianBat0', 'indianBat1', 'indianAR0', 'indianBowl0', 'indianBowl1'];
+  const invalidXI = invalidIds.map((id) => byId[id]);
+  assert.equal(validatePlayingXI(invalidXI, byId.indianAR1, mixedSquad, mixedCatalog), false);
 });
 
+
+
+test('XI validation requires at least two all-rounders and five bowling options', () => {
+  const invalidCatalog = [
+    { id: 'wk-only', role: 'Wicket-Keeper', country: 'IND' },
+    ...Array.from({ length: 6 }, (_, i) => ({ id: `bat-only-${i}`, role: 'Batsman', country: 'IND' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-only-${i}`, role: 'Bowler', country: 'IND' })),
+    { id: 'impact', role: 'Batsman', country: 'IND' },
+  ];
+  const invalidSquad = invalidCatalog.map((p) => ({ id: p.id }));
+  assert.equal(
+    validatePlayingXI(invalidCatalog.slice(0, 11), invalidCatalog[11], invalidSquad, invalidCatalog),
+    false,
+  );
+});
 
 test('automatic XI selection never exceeds four known overseas starters', () => {
   const overseasBatters = Array.from({ length: 5 }, (_, i) => ({
@@ -74,9 +99,12 @@ test('automatic XI selection never exceeds four known overseas starters', () => 
 });
 
 test('missing nationality metadata does not falsely count every player as overseas', () => {
-  const catalogWithoutCountry = Array.from({ length: 12 }, (_, i) => ({
-    id: `unknown-country-${i}`, role: i === 0 ? 'Wicket-Keeper' : 'Batsman',
-  }));
+  const catalogWithoutCountry = [
+    { id: 'unknown-country-0', role: 'Wicket-Keeper' },
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `unknown-country-bat${i}`, role: 'Batsman' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `unknown-country-ar${i}`, role: 'All-Rounder' })),
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `unknown-country-bowl${i}`, role: 'Bowler' })),
+  ];
   const squadWithoutCountry = catalogWithoutCountry.map((p) => ({ id: p.id }));
   assert.equal(
     validatePlayingXI(catalogWithoutCountry.slice(0, 11), catalogWithoutCountry[11], squadWithoutCountry, catalogWithoutCountry),
