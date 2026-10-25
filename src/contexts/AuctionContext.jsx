@@ -10,7 +10,6 @@ import {
   set, 
   get, 
   remove,
-  update as updateRtdb, 
   onValue, 
   onDisconnect,
   runTransaction as runTransactionRtdb,
@@ -45,7 +44,7 @@ import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
-import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI } from '../lib/auctionWinnerRules';
+import { autoSelectBestXI, validatePlayingXI } from '../lib/auctionWinnerRules';
 
 
 const TEAMS = [
