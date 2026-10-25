@@ -95,6 +95,9 @@ const AuctionRoom = () => {
    const [mobileTab, setMobileTab] = useState('arena'); // arena, squad, activity
    const [showSettings, setShowSettings] = useState(false);
    const [showHeaderPanel, setShowHeaderPanel] = useState(false);
+   const settingsTriggerRef = useRef(null);
+   const activityTriggerRef = useRef(null);
+   const voiceChatTriggerRef = useRef(null);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -126,12 +129,16 @@ const AuctionRoom = () => {
       if (!showSettings && !showHeaderPanel) return undefined;
       const handlePanelKeyDown = (event) => {
          if (event.key !== 'Escape') return;
+         const focusTarget = showSettings
+            ? settingsTriggerRef.current
+            : (sidebarTab === 'chat' ? voiceChatTriggerRef.current : activityTriggerRef.current);
          setShowSettings(false);
          setShowHeaderPanel(false);
+         focusTarget?.focus();
       };
       window.addEventListener('keydown', handlePanelKeyDown);
       return () => window.removeEventListener('keydown', handlePanelKeyDown);
-   }, [showSettings, showHeaderPanel]);
+   }, [showSettings, showHeaderPanel, sidebarTab]);
 
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
    // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
@@ -1203,6 +1210,7 @@ const AuctionRoom = () => {
                )}
                <div className="flex items-center gap-1 border-l border-white/10 pl-1.5 sm:pl-3">
                   <button
+                     ref={settingsTriggerRef}
                      onClick={() => setShowSettings(!showSettings)}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Local & Room Settings"
@@ -1213,6 +1221,7 @@ const AuctionRoom = () => {
                      <SettingsIcon size={14} />
                   </button>
                   <button
+                     ref={activityTriggerRef}
                      onClick={() => { if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Live Activity"
@@ -1221,6 +1230,7 @@ const AuctionRoom = () => {
                      aria-expanded={showHeaderPanel && sidebarTab === "activity"}
                   ><History size={14} /></button>
                   <button
+                     ref={voiceChatTriggerRef}
                      onClick={() => { if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Voice Chat"
