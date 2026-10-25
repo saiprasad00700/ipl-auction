@@ -623,7 +623,7 @@ const Lobby = () => {
                 <div className="p-3 bg-white/5 rounded-2xl border border-white/5">
                   <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest block mb-1">Overseas Quota</span>
                   <span className="text-[11px] font-black text-purple-400 uppercase tracking-tight">
-                    Max {currentAuction?.overseasLimit || 8}
+                    Max {currentAuction?.overseasLimit || 4}
                   </span>
                 </div>
               </div>
