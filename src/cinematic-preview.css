@@ -72,3 +72,19 @@
 .ss3d-next-lot-button:disabled{opacity:.35;cursor:not-allowed}
 @media(max-width:700px){.ss3d-preview-settings{justify-content:flex-start;width:100%}.ss3d-console-head{flex-wrap:wrap}.ss3d-preview-settings label{flex:1}.ss3d-preview-settings select{max-width:100%;min-width:70px}.ss3d-preview-settings .ss3d-status-chip{margin-left:auto}}
 @media(max-width:440px){.ss3d-preview-settings{gap:6px}.ss3d-preview-settings label{font-size:7px}.ss3d-preview-settings button,.ss3d-preview-settings select{padding:8px 7px;font-size:8px}}
+
+
+/* Auction clock: high-contrast, readable at broadcast distance. */
+.ss3d-countdown{height:4px;margin-top:8px;width:100%;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.13)}
+.ss3d-countdown i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#5af0b8,#d6ff8f);transition:width .12s linear}
+.ss3d-countdown.urgent i{background:linear-gradient(90deg,#fb7185,#fbbf24);box-shadow:0 0 12px rgba(251,113,133,.5)}
+.ss3d-countdown-number{display:block;margin-top:3px;font-size:13px;text-align:right;color:#d9fbea;font-variant-numeric:tabular-nums}
+.ss3d-countdown-number.urgent{color:#fda4af;animation:ss3d-clock-pulse .65s ease-in-out infinite alternate}
+@keyframes ss3d-clock-pulse{from{opacity:.65;transform:scale(1)}to{opacity:1;transform:scale(1.08)}}
+.ss3d-lot-actions{display:flex;margin-top:10px}
+.ss3d-next-lot-button{width:100%;min-height:42px;padding:11px 13px;border:1px solid rgba(91,240,182,.35);border-radius:9px;background:rgba(21,128,88,.16);color:#73f3c5;font-size:10px;font-weight:950;letter-spacing:.08em;cursor:pointer;transition:background .2s,transform .2s}
+.ss3d-next-lot-button:hover:not(:disabled){background:rgba(21,128,88,.28);transform:translateY(-1px)}
+.ss3d-next-lot-button:disabled{opacity:.35;cursor:not-allowed}
+.ss3d-preview-settings label select{max-width:160px}
+@media(max-width:800px){.ss3d-bid-hud{min-width:110px}.ss3d-preview-settings label{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){.ss3d-countdown-number.urgent{animation:none}}
