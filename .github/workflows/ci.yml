@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/winner-calculation-retention-cards
+      - security/rtm-cloud-function
   pull_request:
     branches:
       - main
