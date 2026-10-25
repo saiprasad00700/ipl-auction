@@ -29,7 +29,7 @@ const FranchiseArenaStrip = ({
   }, [rtmTeamId, rtmEventKey]);
 
   return (
-    <div className="ss-franchise-arena-strip" aria-label="Franchise auction tables">
+    <div className="ss-franchise-arena-strip" data-active-team={activeTeamId || ""} aria-label="Franchise auction tables">
       {teams.map((team) => {
         const active = Boolean(activeTeamId && team.id === activeTeamId);
         const bidRaised = raisedBidTeam === team.id;
