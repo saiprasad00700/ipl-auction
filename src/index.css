@@ -530,3 +530,29 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-cinematic-mode-live-dot { box-shadow:none; }
 }
+
+
+/* Make the live leader explicit without changing bid authority or timing. */
+.ss-cinematic-bid-leader {
+  max-width: min(16rem, 48vw);
+  color: #d1fae5;
+  font-size: .43rem;
+  font-weight: 900;
+  letter-spacing: .055em;
+  line-height: 1.25;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.ss-cinematic-bid-hud:has(.ss-cinematic-bid-leader) {
+  min-width: 8rem;
+}
+@media (max-width:640px) {
+  .ss-cinematic-bid-leader {
+    max-width: 8.5rem;
+    font-size: .34rem;
+    letter-spacing: .025em;
+  }
+  .ss-cinematic-bid-hud:has(.ss-cinematic-bid-leader) {
+    min-width: 6.5rem;
+  }
+}
