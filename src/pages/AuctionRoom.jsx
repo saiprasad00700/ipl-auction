@@ -1487,7 +1487,7 @@ const AuctionRoom = () => {
                                     <span className="ss-cinematic-mode-live-dot" aria-hidden="true" />
                                     <span>{auctionModeLabel}</span>
                                  </div>
-                                 <div className="ss-cinematic-bid-hud" aria-live="polite">
+                                 <div className="ss-cinematic-bid-hud" aria-live="polite" aria-atomic="true" aria-label="Current bid and leading franchise">
                                     <span className="ss-cinematic-bid-hud-label">CURRENT BID</span>
                                     <strong key={`${displayAuctionState?.playerId || "lot"}-${Number(displayAuctionState?.currentBid) || 0}`} className="ss-cinematic-bid-value">₹{(Number(displayAuctionState?.currentBid) || 0).toFixed(2)} Cr</strong>
                                     <span className="ss-cinematic-bid-leader">
@@ -1500,7 +1500,7 @@ const AuctionRoom = () => {
                                     <span className="ss-cinematic-live-status-dot" aria-hidden="true" />
                                     <span>{showRoleIntro ? 'PLAYER INTRO' : displayAuctionState?.status === 'sold' ? 'PLAYER SOLD' : displayAuctionState?.status === 'unsold' ? 'PLAYER UNSOLD' : displayAuctionState?.status === 'processing_sale' ? 'RTM DECISION' : displayAuctionState?.status === 'bidding' ? 'BIDDING LIVE' : 'READY FOR BIDDING'}</span>
                                  </div>
-                                 <div key={`${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-shot-label" aria-live="polite">{displayAuctionState?.status === 'processing_sale' ? "CAM 03 · RTM DECISION" : showRoleIntro ? "CAM 01 · PLAYER INTRO" : displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
+                                 <div key={`${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-shot-label" aria-hidden="true">{displayAuctionState?.status === 'processing_sale' ? "CAM 03 · RTM DECISION" : showRoleIntro ? "CAM 01 · PLAYER INTRO" : displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
                                  <div key={`focus-${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.status === 'processing_sale' ? "LIVE FOCUS · RETENTION DECISION" : showRoleIntro ? "LIVE FOCUS · PLAYER INTRODUCTION" : displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-left" aria-hidden="true" />
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-right" aria-hidden="true" />
