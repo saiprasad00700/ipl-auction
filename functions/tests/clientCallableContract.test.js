@@ -25,9 +25,9 @@ test("every callable export uses a unique name", () => {
 });
 
 test("protected room, team and chat state is not written directly by the client", () => {
-  assert.doesNotMatch(clientSource, /\\bupdateRtdb\\b/);
-  assert.doesNotMatch(clientSource, /update\\(ref\\(rtdb,\\s*`auctions\\/\\$\\{[^}]+\\}\\/room`/);
-  assert.doesNotMatch(clientSource, /update\\(ref\\(rtdb,\\s*`auctions\\/\\$\\{[^}]+\\}\\/teams`/);
-  assert.match(clientSource, /httpsCallable\\(getFunctions\\(app\\),\\s*['"]endAuction['"]\\)/);
-  assert.match(clientSource, /httpsCallable\\(getFunctions\\(app\\),\\s*['"]sendAuctionChatMessage['"]\\)/);
+  assert.doesNotMatch(clientSource, /\bupdateRtdb\b/);
+  assert.doesNotMatch(clientSource, /update\(ref\(rtdb,\s*`auctions\/\$\{[^}]+\}\/room`/);
+  assert.doesNotMatch(clientSource, /update\(ref\(rtdb,\s*`auctions\/\$\{[^}]+\}\/teams`/);
+  assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]endAuction['"]\)/);
+  assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]sendAuctionChatMessage['"]\)/);
 });
