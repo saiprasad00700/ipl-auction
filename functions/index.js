@@ -1551,44 +1551,68 @@ export const submitPlayingXI = onCall({ enforceAppCheck: false }, async (request
       !PLAYER_CATALOG[impactId] || new Set(ids).size !== 11 || ids.includes(impactId)) {
     throw new HttpsError("invalid-argument", "The Playing XI must contain 11 unique valid players and a different Impact Player.");
   }
-
-  const root = database.ref(`auctions/${roomId}`);
-  const roomSnap = await root.child("room").get();
-  const room = roomSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (room.status !== "awaiting_xi") reject("Playing XI submissions are closed.");
-  const now = Date.now();
-  if (now > Number(room.xiSubmissionDeadline || 0)) reject("The Playing XI submission deadline has passed.");
-  if (!(Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid) || room.bannedPlayers?.includes(uid)) {
-    reject("Only an active room member can submit a Playing XI.");
-  }
-
-  const teamRef = root.child("teams").child(`${roomId}_${uid}`);
-  const teamSnap = await teamRef.get();
-  const team = teamSnap.val();
-  if (!team || team.userId !== uid || !team.teamId || team.teamId === "NONE") reject("Your franchise squad was not found.");
-  if (team.disqualified) reject(team.disqualificationReason || "Your franchise is disqualified.");
-  const squad = Array.isArray(team.squad) ? team.squad : [];
-  const squadIds = new Set(squad.map(playerIdOf));
-  if (ids.concat(impactId).some((id) => !squadIds.has(id))) {
-    throw new HttpsError("invalid-argument", "Every selected player must belong to your purchased squad.");
-  }
-  const overseasCount = ids.filter((id) => PLAYER_CATALOG[id].country !== "IND").length;
-  if (overseasCount > effectiveOverseasLimit(room)) {
-    throw new HttpsError("invalid-argument", `A Playing XI can include a maximum of ${effectiveOverseasLimit(room)} overseas players in this auction mode.`);
-  }
   const composition = validatePlayingXIComposition(ids, PLAYER_CATALOG);
   if (!composition.valid) throw new HttpsError("invalid-argument", composition.reason);
 
-  const result = await teamRef.child("playingXI").transaction((current) => {
-    if (current && Number(current.submittedAt || 0) > 0) return;
-    return { startingXI: ids, impactPlayer: impactId, submittedAt: now, autoSelected: false };
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const now = Date.now();
+  let failureReason = "Could not submit Playing XI. Refresh the room and try again.";
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Could not submit Playing XI. Refresh the room and try again.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const room = current.room;
+    if (room.status !== "awaiting_xi") {
+      failureReason = "Playing XI submissions are closed.";
+      return;
+    }
+    if (now > Number(room.xiSubmissionDeadline || 0)) {
+      failureReason = "The Playing XI submission deadline has passed.";
+      return;
+    }
+    const players = Array.isArray(room.players) ? room.players : [];
+    if (!players.some((player) => player?.id === uid) || room.bannedPlayers?.includes(uid)) {
+      failureReason = "Only an active room member can submit a Playing XI.";
+      return;
+    }
+    const teamKey = `${roomId}_${uid}`;
+    const team = current.teams?.[teamKey];
+    if (!team || team.userId !== uid || !team.teamId || team.teamId === "NONE") {
+      failureReason = "Your franchise squad was not found.";
+      return;
+    }
+    if (team.disqualified) {
+      failureReason = team.disqualificationReason || "Your franchise is disqualified.";
+      return;
+    }
+    if (team.playingXI?.submittedAt) {
+      failureReason = "A Playing XI has already been submitted for this franchise.";
+      return;
+    }
+    const squad = Array.isArray(team.squad) ? team.squad : [];
+    const squadIds = new Set(squad.map(playerIdOf));
+    if (ids.concat(impactId).some((id) => !squadIds.has(id))) {
+      failureReason = "Every selected player must belong to your purchased squad.";
+      return;
+    }
+    const overseasCount = ids.filter((id) => PLAYER_CATALOG[id].country !== "IND").length;
+    if (overseasCount > effectiveOverseasLimit(room)) {
+      failureReason = `A Playing XI can include a maximum of ${effectiveOverseasLimit(room)} overseas players in this auction mode.`;
+      return;
+    }
+    const playingXI = { startingXI: ids, impactPlayer: impactId, submittedAt: now, autoSelected: false };
+    return {
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      teams: { ...(current.teams || {}), [teamKey]: { ...team, playingXI } }
+    };
   }, undefined, false);
-  if (!result.committed) reject("A Playing XI has already been submitted for this franchise.");
-  await root.child("room/lastActivityAt").set(now);
+
+  if (!result.committed) reject(failureReason);
   return { ok: true, submittedAt: now };
 });
-
 
 // Runs independently of visitors so abandoned rooms are removed even when no
 // client is around to perform cleanup. Activity is rechecked transactionally
