@@ -173,7 +173,9 @@ test("bid and RTM expiry checks use fresh time inside retried transactions", () 
   const segments = [
     ["export const placeBid = onCall(", "export const decideRetention = onCall("],
     ["export const decideRetention = onCall(", "export const submitRetentionCounterBid = onCall("],
-    ["export const submitRetentionCounterBid = onCall(", "export const applySaleSettlement = onCall("]
+    ["export const submitRetentionCounterBid = onCall(", "export const applySaleSettlement = onCall("],
+    ["export const finalizeExpiredRetentionOffer = onCall(", "export const advanceAuctionPlayer = onCall("],
+    ["export const advanceAuctionPlayer = onCall(", "export const startAuction = onCall("]
   ];
   for (const [startMarker, endMarker] of segments) {
     const start = backendSource.indexOf(startMarker);
