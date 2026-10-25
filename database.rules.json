@@ -88,10 +88,9 @@
           // Lot lifecycle. The host-fallback that closes an expired lot can run
           // on any client, so this cannot be host-only.
           "status": {
-            // All lifecycle transitions are performed by host-authorized client actions
-            // or trusted Admin SDK Cloud Functions. Never let a non-host client write
-            // a status transition directly.
-            ".write": "auth != null && root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid",
+            // Status transitions are server-owned. Initial room creation is still
+            // allowed by the room-node create rule; Admin SDK callables bypass rules.
+            ".write": false,
             ".validate": "newData.val() == 'waiting' || newData.val() == 'active' || newData.val() == 'paused' || newData.val() == 'awaiting_xi' || newData.val() == 'analyzing' || newData.val() == 'analysis_failed' || newData.val() == 'completed'"
           },
 
@@ -129,7 +128,8 @@
 
         // The shuffled auction order is produced by the host when starting.
         "playerOrder": {
-          ".write": "auth != null && root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid"
+          // The trusted startAuction callable writes the shuffled order.
+          ".write": false
         },
 
         "messages": {
