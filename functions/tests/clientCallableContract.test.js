@@ -39,7 +39,7 @@ test("bid validation, live-state mutation and room activity use one root transac
   const source = backendSource.slice(start, end);
   assert.ok(source.includes("rootRef.transaction("));
   assert.ok(source.includes("current.teams?.["));
-  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: transactionNow }"));
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes('room/lastActivityAt'));
 });
