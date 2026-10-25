@@ -44,6 +44,7 @@ import { useAuth } from './AuthContext';
 import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
+import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount } from '../lib/auctionRules';
 import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI } from '../lib/auctionWinnerRules';
 
 
@@ -125,7 +126,7 @@ export const AuctionProvider = ({ children }) => {
     
     const budget = isSprint5 ? 60.0 : isSprint11 ? 90.0 : 120.0;
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
-    const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : 8;
+    const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : MEGA_OVERSEAS_LIMIT;
 
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     await set(liveRef, { status: 'waiting' });
@@ -157,7 +158,7 @@ export const AuctionProvider = ({ children }) => {
       }],
       bannedPlayers: [],
       settings: {
-        bidTimer: 10,
+        bidTimer: DEFAULT_BID_TIMER_SECONDS,
         budget
       }
     });
@@ -224,7 +225,7 @@ export const AuctionProvider = ({ children }) => {
             teamName: teamDetails?.name || 'Unknown',
             isHost: true
           }],
-          settings: { bidTimer: 10, budget }
+          settings: { bidTimer: DEFAULT_BID_TIMER_SECONDS, budget }
         });
 
         if (playerDetails.team) {
@@ -831,7 +832,7 @@ export const AuctionProvider = ({ children }) => {
                 currentBid: 0,
                 highBidderId: '',
                 highBidderName: 'No Bids',
-                timerEndsAt: getSyncedTime() + (settings?.bidTimer || 10) * 1000,
+                timerEndsAt: getSyncedTime() + (settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
                 status: 'bidding'
               };
             });
@@ -978,7 +979,7 @@ export const AuctionProvider = ({ children }) => {
         currentBid: 0,
         highBidderId: '',
         highBidderName: 'No Bids',
-        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || 10) * 1000,
+        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
         status: 'bidding'
       };
     });
@@ -1010,10 +1011,10 @@ export const AuctionProvider = ({ children }) => {
               auctionType: sData.auction_type || 'mega',
               isPublic: sData.is_public !== false,
               squadLimit: sData.squad_limit || 25,
-              overseasLimit: sData.overseas_limit || 8,
+              overseasLimit: sData.overseas_limit || MEGA_OVERSEAS_LIMIT,
               players: sData.players || [],
               bannedPlayers: sData.banned_players || [],
-              settings: sData.settings || { bidTimer: 10, budget: 120 }
+              settings: sData.settings || { bidTimer: DEFAULT_BID_TIMER_SECONDS, budget: 120 }
             };
             supabaseFound = true;
           }
@@ -1331,10 +1332,10 @@ export const AuctionProvider = ({ children }) => {
                   status: sData.status,
                   auctionType: sData.auction_type || 'mega',
                   squadLimit: sData.squad_limit || 25,
-                  overseasLimit: sData.overseas_limit || 8,
+                  overseasLimit: sData.overseas_limit || MEGA_OVERSEAS_LIMIT,
                   players: sData.players || [],
                   bannedPlayers: sData.banned_players || [],
-                  settings: sData.settings || { bidTimer: 10, budget: 120 }
+                  settings: sData.settings || { bidTimer: DEFAULT_BID_TIMER_SECONDS, budget: 120 }
                 };
               }
             }
@@ -1520,7 +1521,7 @@ export const AuctionProvider = ({ children }) => {
     // Overseas limit check
     const player = IPL_PLAYERS.find(p => p.id === currentAuction.currentAuction?.playerId);
     const isOverseas = player && player.country !== 'IND';
-    const overseasLimit = currentAuction.overseasLimit || 8;
+    const overseasLimit = currentAuction.overseasLimit || MEGA_OVERSEAS_LIMIT;
     if (isOverseas && team.squad) {
       const currentOverseasCount = team.squad.reduce((count, s) => {
         const pInfo = IPL_PLAYERS.find(p => p.id === (typeof s === 'string' ? s : s.id));
@@ -1536,10 +1537,7 @@ export const AuctionProvider = ({ children }) => {
     // inside it reads a stale React closure each retry, not the live DB value. We do the check here
     // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
     const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const incSnapshot = cBidSnapshot < 5 ? 0.20 : 0.25;
-    const nextBidSnapshot = cBidSnapshot === 0
-      ? (player?.basePrice || 0)
-      : parseFloat((cBidSnapshot + incSnapshot).toFixed(2));
+    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0);
     const myBudget = team.budgetRemaining || 0;
     if (myBudget < nextBidSnapshot) {
       throw new Error('Insufficient budget to place this bid.');
@@ -1558,10 +1556,7 @@ export const AuctionProvider = ({ children }) => {
       }
 
       const cBid = currentData.currentBid || 0;
-      const inc = cBid < 5 ? 0.20 : 0.25;
-      const nAmount = cBid === 0
-        ? (IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0)
-        : parseFloat((cBid + inc).toFixed(2));
+      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0);
 
       // Guard: Abort retried transaction if updated bid exceeds user's budget
       if (nAmount > myBudget) return;
@@ -1570,7 +1565,7 @@ export const AuctionProvider = ({ children }) => {
       currentData.highBidderId = user.uid;
       currentData.highBidderName = user.displayName || 'Manager';
       currentData.highBidderTeamId = team.teamId;
-      currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || 10) * 1000;
+      currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000;
       currentData.lastActivityAt = now;
 
       return currentData;
@@ -1756,7 +1751,7 @@ export const AuctionProvider = ({ children }) => {
     await Promise.all([
       updateRtdb(liveRef, { 
         status: 'bidding',
-        timerEndsAt: getSyncedTime() + (currentAuction.settings?.bidTimer || 10) * 1000
+        timerEndsAt: getSyncedTime() + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000
       }),
       push(msgRef, {
         userId: 'system',
@@ -2005,8 +2000,7 @@ export const AuctionProvider = ({ children }) => {
       if (currentData.timerEndsAt && now >= currentData.timerEndsAt) return;
       
       const cBid = currentData.currentBid || 0;
-      const inc = cBid < 5 ? 0.20 : 0.25;
-      const nAmount = cBid === 0 ? IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0 : parseFloat((cBid + inc).toFixed(2));
+      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0);
 
       // Guard: Abort retried transaction if updated bid exceeds bot's max valuation or remaining budget
       if (nAmount > maxValuation || nAmount > botBudget) return;
@@ -2174,7 +2168,7 @@ export const AuctionProvider = ({ children }) => {
       const squad = Array.isArray(botTeam.squad) ? botTeam.squad : [];
       const budget = Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120);
       const squadLimit = Number(roomData.squadLimit || 25);
-      const overseasLimit = Number(roomData.overseasLimit || 8);
+      const overseasLimit = Number(roomData.overseasLimit || MEGA_OVERSEAS_LIMIT);
       const slotsLeft = squadLimit - squad.length;
       const isOverseas = player.country && player.country !== 'IND';
       const overseasCount = squad.reduce((count, item) => {
@@ -2290,7 +2284,7 @@ export const AuctionProvider = ({ children }) => {
     lastBotBidCycleRef.current = cycleKey;
 
     const now = getSyncedTime();
-    const timerSec = currentAuction.settings?.bidTimer || 10;
+    const timerSec = currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS;
     const timerMs = timerSec * 1000;
     const remainingMs = Math.max(0, (live.timerEndsAt || 0) - now);
     const cBid = live.currentBid || 0;
@@ -2345,7 +2339,7 @@ export const AuctionProvider = ({ children }) => {
           highBidderId: live.highBidderId,
           botTeam,
           squadLimit: currentAuction.squadLimit || 25,
-          overseasLimit: currentAuction.overseasLimit || 8,
+          overseasLimit: currentAuction.overseasLimit || MEGA_OVERSEAS_LIMIT,
           initialBudget,
         });
 
