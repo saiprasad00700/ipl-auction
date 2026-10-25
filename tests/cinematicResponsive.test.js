@@ -19,6 +19,9 @@ test('cinematic controls expose accessible expanded and pressed states', () => {
   assert.match(room, /aria-expanded=/);
   assert.match(room, /aria-pressed=/);
   assert.match(room, /auction-room-settings-panel/);
+  assert.match(room, /aria-controls="auction-room-header-panel"/);
+  assert.match(room, /id="auction-room-header-panel"/);
+  assert.match(room, /aria-label=\{sidebarTab === 'chat' \? 'Voice Chat panel' : 'Live Activity panel'\}/);
 });
 
 test('Escape closes open settings and activity/chat header panels', () => {
