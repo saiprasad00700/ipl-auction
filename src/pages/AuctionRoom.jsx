@@ -1194,6 +1194,9 @@ const AuctionRoom = () => {
                      onClick={() => setShowSettings(!showSettings)}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showSettings ? 'bg-white/10 border-white/20 text-white shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Local & Room Settings"
+                     aria-label="Local and room settings"
+                     aria-expanded={showSettings}
+                     aria-controls="auction-room-settings-panel"
                   >
                      <SettingsIcon size={14} />
                   </button>
@@ -1201,13 +1204,17 @@ const AuctionRoom = () => {
                      onClick={() => { if (showHeaderPanel && sidebarTab === 'activity') setShowHeaderPanel(false); else { setSidebarTab('activity'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Live Activity"
-                     aria-label="Open Live Activity"
+                     aria-label="Live Activity"
+                     aria-pressed={showHeaderPanel && sidebarTab === "activity"}
+                     aria-expanded={showHeaderPanel && sidebarTab === "activity"}
                   ><History size={14} /></button>
                   <button
                      onClick={() => { if (showHeaderPanel && sidebarTab === 'chat') setShowHeaderPanel(false); else { setSidebarTab('chat'); setShowHeaderPanel(true); } }}
                      className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                      title="Voice Chat"
-                     aria-label="Open Voice Chat"
+                     aria-label="Voice Chat"
+                     aria-pressed={showHeaderPanel && sidebarTab === "chat"}
+                     aria-expanded={showHeaderPanel && sidebarTab === "chat"}
                   ><Mic size={14} /></button>
                   <button onClick={() => navigate('/')} className="p-1 sm:p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer" title="Back to Home"><Home size={14} /></button>
                </div>
