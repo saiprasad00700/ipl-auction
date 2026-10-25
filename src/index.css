@@ -1134,3 +1134,56 @@
 @media (prefers-reduced-motion: reduce) {
   .ss-cinematic-countdown.is-urgent strong { animation: none; }
 }
+
+
+/* Role-specific character motion adds a distinct player reveal without changing auction logic. */
+.ss-role-intro[data-player-role="batter"] .ss-character-arm-right,
+.ss-role-intro[data-player-role="keeper"] .ss-character-arm-right {
+  transform-origin: 15% 12%;
+  animation: ss-character-bat-ready 1.15s cubic-bezier(.2,.75,.25,1) both;
+}
+.ss-role-intro[data-player-role="bowler"] .ss-character-arm-right {
+  transform-origin: 15% 12%;
+  animation: ss-character-bowler-windup 1.35s cubic-bezier(.2,.75,.25,1) both;
+}
+.ss-role-intro[data-player-role="allrounder"] .ss-character-arm-right {
+  transform-origin: 15% 12%;
+  animation: ss-character-allrounder-ready 1.1s ease-out both;
+}
+.ss-role-intro[data-player-role="bowler"] .ss-character-ball {
+  animation: ss-character-ball-pulse 1s ease-in-out .35s 2;
+}
+.ss-role-intro[data-player-role="batter"] .ss-character-bat,
+.ss-role-intro[data-player-role="keeper"] .ss-character-bat {
+  animation: ss-character-bat-lift 1.15s cubic-bezier(.2,.75,.25,1) both;
+}
+@keyframes ss-character-bat-ready {
+  0% { transform: rotate(8deg); }
+  55% { transform: rotate(-13deg); }
+  100% { transform: rotate(-5deg); }
+}
+@keyframes ss-character-bowler-windup {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(-48deg); }
+  100% { transform: rotate(-28deg); }
+}
+@keyframes ss-character-allrounder-ready {
+  0%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(-22deg); }
+}
+@keyframes ss-character-bat-lift {
+  0% { transform: rotate(5deg) translateY(0); }
+  55% { transform: rotate(-9deg) translateY(-5px); }
+  100% { transform: rotate(-4deg) translateY(-2px); }
+}
+@keyframes ss-character-ball-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.18); filter: brightness(1.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-role-intro[data-player-role] .ss-character-arm-right,
+  .ss-role-intro[data-player-role] .ss-character-ball,
+  .ss-role-intro[data-player-role] .ss-character-bat {
+    animation: none;
+  }
+}
