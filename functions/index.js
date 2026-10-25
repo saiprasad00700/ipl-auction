@@ -922,60 +922,78 @@ export const manageAuctionBots = onCall({ enforceAppCheck: false }, async (reque
   const { roomId, action, teamId, botUserId } = request.data || {};
   requireRoomId(roomId);
   if (!["add", "remove", "fill_empty"].includes(action)) {
-    throw new HttpsError("invalid-argument", "Invalid bot-management action.");
+    throw new HttpsError("invalid-argument", "Invalid bot action.");
   }
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const snap = await roomRef.get();
-  const room = snap.val();
-  if (!room) reject("Auction room could not be found.");
-  if (room.hostId !== uid) reject("Only the room host can manage bots.");
-  if (room.status && !["waiting", "lobby"].includes(room.status)) {
-    reject("Bots can only be managed before the auction starts.");
-  }
-  const players = Array.isArray(room.players) ? room.players : [];
-  const budget = Number(room.settings?.budget || 120);
-  const teamRecord = (id) => ({
-    auctionId: roomId, userId: `bot_${id}`, teamId: id, teamName: FRANCHISES[id],
-    budgetRemaining: budget, spent: 0, squad: [], retentionCardsRemaining: 2
-  });
-
-  if (action === "remove") {
-    const match = /^bot_(MI|CSK|RCB|KKR|DC|PBKS|RR|SRH|GT|LSG)$/.exec(String(botUserId || ""));
-    if (!match) throw new HttpsError("invalid-argument", "Invalid bot identifier.");
-    const targetId = match[0];
-    const nextPlayers = players.filter((p) => p?.id !== targetId);
-    if (nextPlayers.length === players.length) reject("That bot is not in the room.");
-    await root.update({
-      "room/players": nextPlayers,
-      [`teams/${roomId}_${targetId}`]: null,
-      "room/lastActivityAt": Date.now()
-    });
-    return { ok: true, action };
-  }
-
-  const teamIds = action === "add" ? [teamId] : Object.keys(FRANCHISES);
-  if (action === "add" && !Object.prototype.hasOwnProperty.call(FRANCHISES, teamId)) {
+  if (action === "add" && !Object.hasOwn(FRANCHISES, teamId)) {
     throw new HttpsError("invalid-argument", "Invalid franchise.");
   }
-  const added = [];
-  const transaction = await roomRef.child("players").transaction((current) => {
-    const roster = Array.isArray(current) ? current : [];
-    const next = [...roster];
-    const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
-    for (const id of teamIds) {
-      if (taken.has(id) || next.some((p) => p?.id === `bot_${id}`)) continue;
-      next.push({ id: `bot_${id}`, name: `${FRANCHISES[id]} Bot`, team: id,
-        teamName: FRANCHISES[id], isHost: false, isBot: true });
+  const removeMatch = action === "remove" ? /^bot_(MI|CSK|RCB|KKR|DC|PBKS|RR|SRH|GT|LSG)$/.exec(String(botUserId || "")) : null;
+  if (action === "remove" && !removeMatch) {
+    throw new HttpsError("invalid-argument", "Invalid bot identifier.");
+  }
+
+  const rootRef = database.ref("auctions/" + roomId);
+  const now = Date.now();
+  let failureReason = "Could not update bots. Refresh the room and try again.";
+  let added = [];
+  const result = await rootRef.transaction((current) => {
+    added = [];
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const room = current.room;
+    if (room.hostId !== uid) {
+      failureReason = "Only the room host can manage bots.";
+      return;
+    }
+    if (room.status && !["waiting", "lobby"].includes(room.status)) {
+      failureReason = "Bots can only be managed before the auction starts.";
+      return;
+    }
+    const players = Array.isArray(room.players) ? room.players : [];
+    const teams = { ...(current.teams || {}) };
+    const nextPlayers = [...players];
+
+    if (action === "remove") {
+      const targetId = removeMatch[0];
+      if (!nextPlayers.some((player) => player?.id === targetId)) {
+        failureReason = "That bot is not in the room.";
+        return;
+      }
+      const next = {
+        ...current,
+        room: { ...room, players: nextPlayers.filter((player) => player?.id !== targetId), lastActivityAt: now },
+        teams
+      };
+      delete next.teams[`${roomId}_${targetId}`];
+      return next;
+    }
+
+    const budget = Number(room.settings?.budget || 120);
+    const requestedTeams = action === "add" ? [teamId] : Object.keys(FRANCHISES);
+    const taken = new Set(nextPlayers.map((player) => player?.team).filter(Boolean));
+    for (const id of requestedTeams) {
+      if (taken.has(id) || nextPlayers.some((player) => player?.id === `bot_${id}`)) continue;
+      nextPlayers.push({
+        id: `bot_${id}`, name: `${FRANCHISES[id]} Bot`, team: id,
+        teamName: FRANCHISES[id], isHost: false, isBot: true
+      });
+      teams[`${roomId}_bot_${id}`] = {
+        auctionId: roomId, userId: `bot_${id}`, teamId: id, teamName: FRANCHISES[id],
+        budgetRemaining: budget, spent: 0, squad: [], retentionCardsRemaining: 2
+      };
       taken.add(id);
       added.push(id);
     }
-    return next;
+    return {
+      ...current,
+      room: { ...room, players: nextPlayers, lastActivityAt: now },
+      teams
+    };
   }, undefined, false);
-  if (!transaction.committed) reject("Could not update the room roster.");
-  const updates = { "room/lastActivityAt": Date.now() };
-  for (const id of added) updates[`teams/${roomId}_bot_${id}`] = teamRecord(id);
-  if (added.length) await root.update(updates);
+
+  if (!result.committed) reject(failureReason);
   return { ok: true, action, added };
 });
 
