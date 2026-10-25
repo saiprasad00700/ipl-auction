@@ -388,7 +388,7 @@ export const AuctionProvider = ({ children }) => {
       currentBid: 0,
       highBidderId: '',
       highBidderName: 'No Bids',
-      timerEndsAt: getSyncedTime() + 15000,
+      timerEndsAt: getSyncedTime() + DEFAULT_BID_TIMER_SECONDS * 1000,
       status: 'bidding'
     });
     
@@ -1986,7 +1986,7 @@ export const AuctionProvider = ({ children }) => {
 
   // ─── Bot Management & Bidding Engine ───
 
-  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName, timerSeconds = 10, maxValuation = Infinity, botBudget = Infinity) => {
+  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName, timerSeconds = DEFAULT_BID_TIMER_SECONDS, maxValuation = Infinity, botBudget = Infinity) => {
     if (!roomId) return;
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
 
