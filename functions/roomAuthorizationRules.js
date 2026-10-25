@@ -31,3 +31,10 @@ export function canSubmitRtmCounterBid({ uid, room, offer, team, botAction = fal
     && team.userId === uid
     && team.teamId === offer.buyerTeamId;
 }
+
+export function canSendRoomChat(room, uid) {
+  if (!room || typeof room !== "object" || typeof uid !== "string" || !uid) return false;
+  const players = Array.isArray(room.players) ? room.players : [];
+  const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
+  return players.some((player) => player?.id === uid) && !banned.includes(uid);
+}
