@@ -10,7 +10,7 @@ import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTea
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
-import { canSyncTeamStats, canStartAuction } from "./roomAuthorizationRules.js";
+import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
 
 initializeApp();
@@ -196,15 +196,19 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   const room = roomSnapshot.val();
   const team = teamSnapshot.val();
   if (!room) reject("Auction room could not be found.");
-  if (botAction) {
-    if (room.hostId !== uid || !BOT_IDS.has(botUserId)) {
-      reject("Only the room host may submit a bot counter-bid.");
-    }
-  } else if (!team || team.userId !== uid) {
-    reject("Your franchise could not be found.");
+  if (!team || !canSubmitRtmCounterBid({
+    uid,
+    room,
+    offer: (await roomRef.child("live/retentionOffer").get()).val(),
+    team,
+    botAction,
+    botIds: [...BOT_IDS]
+  })) {
+    reject("Only the active eligible buyer, or the host acting for a bot buyer, can submit this counter-bid.");
   }
-  if (!team || team.userId !== (botAction ? botUserId : uid)) {
-    reject("The counter-bidder franchise record is invalid.");
+  if (botAction && botUserId !== String(request.data?.botTeamId || "").replace(/^bot_/, "").startsWith("bot_")
+    && !BOT_IDS.has(botUserId)) {
+    reject("Invalid bot counter-bid identity.");
   }
 
   const liveRef = roomRef.child("live");
