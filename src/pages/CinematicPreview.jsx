@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Camera, Gavel, Mic, Volume2, VolumeX, RotateCcw, Sparkles, Users } from 'lucide-react';
 import * as THREE from 'three';
+import '../cinematic-preview.css';
 
 const FRANCHISES = [
   ['CSK', '#f5c542'], ['DC', '#4aa8ff'], ['GT', '#8da6c8'], ['KKR', '#a78bfa'], ['LSG', '#38bdf8'],
