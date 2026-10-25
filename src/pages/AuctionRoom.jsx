@@ -1560,6 +1560,11 @@ const AuctionRoom = () => {
                                  </div>
                                  <div key={`${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-shot-label" aria-hidden="true">{displayAuctionState?.status === 'processing_sale' ? "CAM 03 · RTM DECISION" : showRoleIntro ? "CAM 01 · PLAYER INTRO" : displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
                                  <div key={`focus-${displayAuctionState?.status}-${showRoleIntro ? "intro" : "stage"}-${displayAuctionState?.highBidderTeamId || "floor"}`} className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.status === 'processing_sale' ? "LIVE FOCUS · RETENTION DECISION" : showRoleIntro ? "LIVE FOCUS · PLAYER INTRODUCTION" : displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
+                                 <div className={`ss-cinematic-countdown ${showRoleIntro ? 'is-intro' : timeLeft <= 5 ? 'is-urgent' : ''}`} aria-label={showRoleIntro ? 'Bidding timer starts after player introduction' : `Bidding timer: ${timeLeft} seconds remaining`} aria-hidden="true">
+                                    <span className="ss-countdown-label">{showRoleIntro ? 'BIDDING OPENS IN' : 'TIME LEFT'}</span>
+                                    <strong>{showRoleIntro ? '3' : Math.max(0, Number(timeLeft) || 0)}</strong>
+                                    <span className="ss-countdown-unit">{showRoleIntro ? 'SEC INTRO' : 'SECONDS'}</span>
+                                 </div>
                                  <div className="ss-cinematic-player-lower-third" aria-hidden="true">
                                     <span className="ss-lower-third-eyebrow">{showRoleIntro ? 'NEXT PLAYER' : displayAuctionState?.status === 'processing_sale' ? 'RETENTION REVIEW' : displayAuctionState?.status === 'sold' ? 'LOT CONFIRMED' : displayAuctionState?.status === 'unsold' ? 'LOT CLOSED' : 'PLAYER ON THE BLOCK'}</span>
                                     <strong>{currentPlayer?.name || 'Player awaiting selection'}</strong>
