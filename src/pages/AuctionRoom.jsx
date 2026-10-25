@@ -1481,6 +1481,10 @@ const AuctionRoom = () => {
                                           : 'WAITING FOR FIRST BID'}
                                     </span>
                                  </div>
+                                 <div className={`ss-cinematic-live-status is-${['bidding','sold','unsold','processing_sale'].includes(displayAuctionState?.status) ? displayAuctionState.status : 'ready'}`} role="status" aria-live="polite">
+                                    <span className="ss-cinematic-live-status-dot" aria-hidden="true" />
+                                    <span>{showRoleIntro ? 'PLAYER INTRO' : displayAuctionState?.status === 'sold' ? 'PLAYER SOLD' : displayAuctionState?.status === 'unsold' ? 'PLAYER UNSOLD' : displayAuctionState?.status === 'processing_sale' ? 'RTM DECISION' : displayAuctionState?.status === 'bidding' ? 'BIDDING LIVE' : 'READY FOR BIDDING'}</span>
+                                 </div>
                                  <div className="ss-arena-shot-label" aria-live="polite">{displayAuctionState?.highBidderTeamId ? "CAM 02 · FRANCHISE CLOSE-UP" : "CAM 01 · PLAYER STAGE"}</div>
                                  <div className="ss-arena-camera-focus" aria-live="polite"><span className="ss-arena-camera-dot" />{displayAuctionState?.highBidderTeamId ? "LIVE FOCUS · " + (TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.name || displayAuctionState.highBidderTeamId) : "LIVE FOCUS · AUCTION FLOOR"}</div>
                                  <div className="ss-cinematic-spotlight ss-cinematic-spotlight-left" aria-hidden="true" />
