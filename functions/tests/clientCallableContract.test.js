@@ -69,5 +69,5 @@ test("sale settlement updates purse, squad, roster and activity atomically", () 
   assert.ok(source.includes("room: { ...room, players: updatedMembers, lastActivityAt: now }"));
   assert.ok(source.includes("live: { ...live, lastActivityAt: now }"));
   assert.ok(!source.includes("teamRef.transaction("));
-  assert.ok(!source.includes('room/lastActivityAt').concat(".set("));
+  assert.doesNotMatch(source, /room\\/lastActivityAt[\\s\\S]*?\\.set\\(/);
 });
