@@ -944,3 +944,45 @@
   }
 }
 
+
+
+/* Keep floating controls clear of phone notches and make touch targets comfortable. */
+#auction-room-header-panel {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+#auction-room-settings-panel {
+  max-height: calc(100dvh - 5rem - env(safe-area-inset-top, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 640px) {
+  #auction-room-header-panel {
+    top: max(4rem, calc(3.5rem + env(safe-area-inset-top, 0px)));
+    right: max(.5rem, env(safe-area-inset-right, 0px));
+    width: min(24rem, calc(100vw - 1rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  #auction-room-settings-panel {
+    top: max(4rem, calc(3.5rem + env(safe-area-inset-top, 0px)));
+    right: max(.5rem, env(safe-area-inset-right, 0px));
+    width: min(24rem, calc(100vw - 1rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    padding: 1rem;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  #auction-room-settings-panel button,
+  #auction-room-header-panel button {
+    min-height: 2.75rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #auction-room-settings-panel,
+  #auction-room-header-panel {
+    scroll-behavior: auto !important;
+    overscroll-behavior: contain;
+  }
+}
