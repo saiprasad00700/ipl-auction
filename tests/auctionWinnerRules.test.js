@@ -31,7 +31,7 @@ test('auto-selection chooses 11 unique squad players and one distinct impact pla
   assert.equal(selection.startingXI.length, 11);
   assert.ok(selection.impactPlayer);
   assert.equal(new Set([...selection.startingXI.map((p) => p.id), selection.impactPlayer.id]).size, 12);
-  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squad), true);
+  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squad, catalog), true);
   assert.equal(selection.autoSelected, true);
 });
 
