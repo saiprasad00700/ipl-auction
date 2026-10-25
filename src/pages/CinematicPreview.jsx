@@ -158,6 +158,11 @@ export default function CinematicPreview() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [bidStep, setBidStep] = useState(0.5);
+  const [quality, setQuality] = useState('auto');
+  const [fx, setFx] = useState(true);
+  const [playerName, setPlayerName] = useState('Marquee Player');
+  const [playerCountry, setPlayerCountry] = useState('Overseas');
+  const [lotNumber, setLotNumber] = useState(1);
   const autoCameraRef = useRef(autoCamera); autoCameraRef.current = autoCamera;
   const roleRef = useRef(role); const rtmRef = useRef(rtm);
   roleRef.current = role; rtmRef.current = rtm;
@@ -172,9 +177,11 @@ export default function CinematicPreview() {
     let renderer, scene, camera, arena, frame = 0, raf = 0, observer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
+      const mobileDevice = window.matchMedia('(max-width: 700px)').matches;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobileDevice ? 1.15 : 1.7));
       renderer.setSize(host.clientWidth, host.clientHeight);
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = !mobileDevice;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -193,7 +200,8 @@ export default function CinematicPreview() {
       const animate = () => {
         raf = requestAnimationFrame(animate); frame += 0.008;
         const a = arena.userData;
-        a.daisRing.rotation.z += 0.002;
+        a.daisRing.rotation.z += fxRef.current ? 0.002 : 0;
+        if (qualityRef.current === 'low') renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 0.85));
         a.player.position.y = 0.52 + Math.sin(frame * 1.8) * 0.045;
         a.player.rotation.y = Math.sin(frame * 0.6) * 0.11;
         if (a.player.userData.bat) a.player.userData.bat.rotation.z = -0.18 + Math.sin(frame * 1.25) * 0.08;
@@ -219,7 +227,7 @@ export default function CinematicPreview() {
         camera.position.y += (p[1] - camera.position.y) * 0.025;
         camera.position.z += (p[2] - camera.position.z) * 0.025;
         camera.lookAt(p[3], p[4], p[5]);
-        arena.rotation.y = Math.sin(frame * 0.16) * 0.025;
+        arena.rotation.y = fxRef.current ? Math.sin(frame * 0.16) * 0.025 : 0;
         renderer.render(scene, camera);
       };
       animate();
@@ -238,6 +246,8 @@ export default function CinematicPreview() {
   }, []);
 
   const logActivity = (message) => setActivity(items => [{ id: Date.now(), message, time: 'NOW' }, ...items].slice(0, 8));
+  const resetLot = () => { setBid(2); setBidStep(0.5); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setLotNumber(n => n + 1); setIntro(true); logActivity('New lot opened'); announce('Next player is coming up for auction.'); };
+  const settleLot = () => { if (outcome !== 'SOLD' && outcome !== 'UNSOLD') return; setPlayerName('Next Marquee Player'); resetLot(); };
   const announce = (message) => {
     if (!sound || muted || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -264,19 +274,19 @@ export default function CinematicPreview() {
           {webglError && <div className="ss3d-webgl-error">{webglError}</div>}
           <div className="ss3d-scene-vignette"/>
           <div className="ss3d-cam-label"><Camera size={14}/> {['WIDE BROADCAST','PLAYER CLOSE-UP','AUCTIONEER CAM','OVERHEAD ARENA'][shot % 4]}</div>
-          <div className="ss3d-lot-label"><span>MARQUEE SET 01</span><small>BASE PRICE</small><strong>₹2.00 <i>Cr</i></strong></div>
+          <div className="ss3d-lot-label"><span>MARQUEE SET {String(lotNumber).padStart(2,'0')}</span><small>BASE PRICE</small><strong>₹2.00 <i>Cr</i></strong></div>
           <div className="ss3d-bid-hud"><small>CURRENT BID</small><strong>₹{bid.toFixed(2)} <i>Cr</i></strong><span>LEADING · {leader}</span></div>
           {intro && <div className="ss3d-intro-overlay"><small>PLAYER INTRODUCTION</small><strong>{introCount || 'BID'}</strong><span>BIDDING OPENS AFTER INTRO</span></div>}
           <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : outcome === 'UNSOLD' ? 'is-unsold' : '')}>{outcome}</div>
-          <div className="ss3d-player-caption"><span>LOT 001 / {role.toUpperCase()}</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
-          <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setBidStep(0.5); setActivity([{id:Date.now(),message:'Demo scene reset',time:'NOW'}]); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
+          <div className="ss3d-player-caption"><span>LOT {String(lotNumber).padStart(3,'0')} / {role.toUpperCase()}</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
+          <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setBidStep(0.5); setActivity([{id:Date.now(),message:'Demo scene reset',time:'NOW'}]); setLotNumber(1); setPlayerName('Marquee Player'); setPlayerCountry('Overseas'); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
         </div>
       </section>
       <section className="ss3d-console">
-        <div className="ss3d-console-head"><div><span className="ss3d-eyebrow">LIVE AUCTION CONTROL</span><h2>Every bid changes the room.</h2></div><span className="ss3d-status-chip"><i/> {outcome}</span></div>
+        <div className="ss3d-console-head"><div><span className="ss3d-eyebrow">LIVE AUCTION CONTROL</span><h2>Every bid changes the room.</h2></div><div className="ss3d-preview-settings"><label>RENDER QUALITY <select value={quality} onChange={e => setQuality(e.target.value)}><option value="auto">AUTO</option><option value="high">HIGH</option><option value="low">LOW</option></select></label><button onClick={() => setFx(v => !v)}>{fx ? 'AMBIENCE ON' : 'AMBIENCE OFF'}</button><span className="ss3d-status-chip"><i/> {outcome}</span></div></div>
         <div className="ss3d-extra-panels">{activityOpen && <aside className="ss3d-extra-panel"><div className="ss3d-panel-kicker">LIVE ACTIVITY <button onClick={() => setActivity([])}>CLEAR</button></div>{activity.length ? activity.map(item => <div className="ss3d-activity-item" key={item.id}><i/><span>{item.message}</span><small>{item.time}</small></div>) : <p className="ss3d-empty-state">No demo events yet.</p>}</aside>}{voiceOpen && <aside className="ss3d-extra-panel"><div className="ss3d-panel-kicker">VOICE & AUDIO</div><div className="ss3d-audio-row"><span>English announcements</span><button className={sound ? 'enabled' : ''} onClick={() => setSound(v => !v)}>{sound ? 'ON' : 'OFF'}</button></div><div className="ss3d-audio-row"><span>Mute speaker</span><button className={muted ? 'enabled' : ''} onClick={() => {setMuted(v => !v); if (!muted && 'speechSynthesis' in window) window.speechSynthesis.cancel();}}>{muted ? 'MUTED' : 'AUDIBLE'}</button></div><p className="ss3d-demo-note">This preview controls browser voice announcements only; it is not connected to room voice chat.</p></aside>}</div>
         <div className="ss3d-console-grid">
-          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><label className="ss3d-step-select">BID INCREMENT <select value={bidStep} onChange={e => setBidStep(Number(e.target.value))}><option value={0.25}>₹0.25 Cr</option><option value={0.5}>₹0.50 Cr</option><option value={1}>₹1.00 Cr</option><option value={2}>₹2.00 Cr</option></select></label><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={sell}>SOLD</button><button className="ss3d-unsold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={markUnsold}>UNSOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
+          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>{playerName}</strong><small>{role} · {playerCountry} · Demo character</small></div><b>LOT {String(lotNumber).padStart(3,'0')}</b></div><label className="ss3d-role-select">PLAYER NAME <input value={playerName} maxLength={42} onChange={e => setPlayerName(e.target.value)} /></label><label className="ss3d-role-select">PLAYER TYPE <select value={playerCountry} onChange={e => setPlayerCountry(e.target.value)}><option>Overseas</option><option>Indian</option></select></label><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><label className="ss3d-step-select">BID INCREMENT <select value={bidStep} onChange={e => setBidStep(Number(e.target.value))}><option value={0.25}>₹0.25 Cr</option><option value={0.5}>₹0.50 Cr</option><option value={1}>₹1.00 Cr</option><option value={2}>₹2.00 Cr</option></select></label><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={sell}>SOLD</button><button className="ss3d-unsold-button" disabled={intro || outcome === 'SOLD' || outcome === 'UNSOLD'} onClick={markUnsold}>UNSOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
           <div className="ss3d-franchise-panel"><div className="ss3d-panel-kicker"><Users size={14}/> FRANCHISE TABLES <span>10 ACTIVE</span></div><div className="ss3d-franchise-grid">{FRANCHISES.map(([name, color]) => <button key={name} className={leader === name ? 'leading' : ''} onClick={() => {setLeader(name); if (outcome === 'SOLD' || outcome === 'UNSOLD') setOutcome('LIVE LOT'); setRtm(false); logActivity(name + ' selected as leading franchise'); announce(name + ' is now leading.');}} style={{'--team-accent':color}}><i/><strong>{name}</strong><small>{leader === name ? 'LEADING' : '₹120 Cr'}</small></button>)}</div><div className="ss3d-feature-foot"><span><Mic size={14}/> VOICE CHAT READY</span><span><Sparkles size={14}/> 3D CAMERA CUTS</span></div></div>
         </div>
       </section>
