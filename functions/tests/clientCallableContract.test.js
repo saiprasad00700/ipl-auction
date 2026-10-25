@@ -71,3 +71,16 @@ test("sale settlement updates purse, squad, roster and activity atomically", () 
   assert.ok(!source.includes("teamRef.transaction("));
   assert.doesNotMatch(source, /room\\/lastActivityAt[\\s\\S]*?\\.set\\(/);
 });
+
+test("RTM decisions, match affordability and room heartbeat commit atomically", () => {
+  const start = backendSource.indexOf("export const decideRetention = onCall(");
+  const end = backendSource.indexOf("\n\nexport const submitRetentionCounterBid", start);
+  assert.ok(start >= 0 && end > start, "decideRetention callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("canAffordRtmMatch(originalTeam, offer.counterBid)"));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(source.includes("live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }"));
+  assert.ok(!source.includes("liveRef.transaction("));
+  assert.doesNotMatch(source, /room\/lastActivityAt[\\s\\S]*?\\.set\\(/);
+});
