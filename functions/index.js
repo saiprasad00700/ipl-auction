@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getDatabase } from "firebase-admin/database";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { applySaleToTeam, canAffordRtmMatch } from "./saleSettlementHelpers.js";
 import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 import { validatePlayingXIComposition } from "./playingXIRules.js";
@@ -8,6 +9,7 @@ import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./a
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
+import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -1136,4 +1138,48 @@ export const submitPlayingXI = onCall({ enforceAppCheck: false }, async (request
   if (!result.committed) reject("A Playing XI has already been submitted for this franchise.");
   await root.child("room/lastActivityAt").set(now);
   return { ok: true, submittedAt: now };
+});
+
+
+// Runs independently of visitors so abandoned rooms are removed even when no
+// client is around to perform cleanup. Activity is rechecked transactionally
+// before deletion to avoid racing a join, bid, chat message, or auction action.
+export const cleanupInactiveAuctionRooms = onSchedule("every 10 minutes", async () => {
+  const now = Date.now();
+  const [auctionsSnap, directorySnap] = await Promise.all([
+    database.ref("auctions").get(),
+    database.ref("publicRooms").get()
+  ]);
+  const auctions = auctionsSnap.val() || {};
+  const directory = directorySnap.val() || {};
+  let removed = 0;
+  let checked = 0;
+
+  for (const [roomId, initialRoomNode] of Object.entries(auctions)) {
+    if (!initialRoomNode || typeof initialRoomNode !== "object" || !initialRoomNode.room) continue;
+    checked += 1;
+    const directoryEntry = directory[roomId] || null;
+    if (!shouldDeleteInactiveRoom(initialRoomNode.room, now, undefined, directoryEntry)) continue;
+
+    const roomRef = database.ref("auctions/" + roomId);
+    const result = await roomRef.transaction((current) => {
+      if (!current || !current.room) return;
+      if (!shouldDeleteInactiveRoom(current.room, Date.now(), undefined, directoryEntry)) return;
+      return null;
+    }, undefined, false);
+
+    if (result.committed && result.snapshot.val() === null) {
+      await database.ref("publicRooms/" + roomId).remove();
+      removed += 1;
+    }
+  }
+
+  // Also remove orphaned public directory entries; never delete an actual room
+  // based on directory metadata alone.
+  for (const [roomId] of Object.entries(directory)) {
+    if (!Object.hasOwn(auctions, roomId)) {
+      await database.ref("publicRooms/" + roomId).remove();
+    }
+  }
+  console.info("Inactive auction room cleanup complete", { checked, removed });
 });
