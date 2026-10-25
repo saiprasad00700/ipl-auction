@@ -26,6 +26,13 @@ test('Escape closes open settings and activity/chat header panels', () => {
   assert.match(room, /event\.key !== 'Escape'/);
   assert.match(room, /setShowSettings\(false\)/);
   assert.match(room, /setShowHeaderPanel\(false\)/);
+  assert.match(room, /settingsTriggerRef = useRef\(null\)/);
+  assert.match(room, /activityTriggerRef = useRef\(null\)/);
+  assert.match(room, /voiceChatTriggerRef = useRef\(null\)/);
+  assert.match(room, /focusTarget\?\.focus\(\)/);
+  assert.match(room, /ref=\{settingsTriggerRef\}/);
+  assert.match(room, /ref=\{activityTriggerRef\}/);
+  assert.match(room, /ref=\{voiceChatTriggerRef\}/);
   assert.match(room, /removeEventListener\('keydown', handlePanelKeyDown\)/);
 });
 
