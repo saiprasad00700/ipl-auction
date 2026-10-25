@@ -138,3 +138,13 @@ test('final five seconds are announced accessibly without announcing every tick'
   assert.match(room, /Number\(timeLeft\) === 5 \? 'Five seconds remaining to bid\.' : ''/);
   assert.match(room, /aria-hidden="true">\s*<span className="ss-countdown-label">/);
 });
+
+
+test('player introduction uses role-specific motion and respects reduced motion', () => {
+  assert.match(playerStage, /data-player-role=\{roleKey\}/);
+  assert.match(playerStage, /const roleKey = isKeeper \? 'keeper' : isAllRounder \? 'allrounder' : isBowler \? 'bowler' : 'batter'/);
+  assert.match(css, /ss-role-intro\[data-player-role="bowler"\] \.ss-character-arm-right/);
+  assert.match(css, /@keyframes ss-character-bowler-windup/);
+  assert.match(css, /@keyframes ss-character-bat-lift/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*ss-role-intro\[data-player-role\]/);
+});
