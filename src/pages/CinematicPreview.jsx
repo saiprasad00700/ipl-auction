@@ -160,6 +160,8 @@ export default function CinematicPreview() {
   const [bidStep, setBidStep] = useState(0.5);
   const [quality, setQuality] = useState('auto');
   const [fx, setFx] = useState(true);
+  const fxRef = useRef(fx); fxRef.current = fx;
+  const qualityRef = useRef(quality); qualityRef.current = quality;
   const [playerName, setPlayerName] = useState('Marquee Player');
   const [playerCountry, setPlayerCountry] = useState('Overseas');
   const [lotNumber, setLotNumber] = useState(1);
