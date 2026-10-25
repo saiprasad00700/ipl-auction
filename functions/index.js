@@ -575,51 +575,68 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
   if (!Object.hasOwn(messages, event)) {
     throw new HttpsError("invalid-argument", "Unsupported system event.");
   }
-  const root = database.ref("auctions/" + roomId);
-  const [roomSnap, liveSnap] = await Promise.all([root.child("room").get(), root.child("live").get()]);
-  const room = roomSnap.val();
-  const live = liveSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  let savedXI = false;
-  if (event === "xi_submitted") {
-    const xiSnap = await root.child("teams").child(`${roomId}_${uid}`).child("playingXI").get();
-    savedXI = xiSnap.exists();
-  }
-  if (!canPostSystemEvent({ event, uid, room, hasSavedXI: savedXI })) {
-    reject("You are not authorized to post this event, or the auction is not in the required state.");
-  }
-  let text = messages[event];
-  let type = "log";
-  if (event === "sale_result") {
-    if (!["sold", "unsold"].includes(live?.status)) reject("There is no completed player lot to announce.");
-    text = live.status === "sold"
-      ? String(live.playerId) + " SOLD to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr"
-      : String(live.playerId) + " UNSOLD";
-    type = live.status === "sold" ? "sold_card" : "log";
-  } else if (event === "rtm_result") {
-    const offer = live?.retentionOffer;
-    if (live?.status !== "sold" || !["accepted", "declined", "expired"].includes(offer?.status)) reject("The RTM result is not final.");
-    text = offer.status === "accepted"
-      ? "RTM decision completed for " + String(live.highBidderName || "winning franchise") + "."
-      : "RTM not matched. " + String(live.playerId) + " goes to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr.";
-    type = offer.status === "accepted" ? "retention_accepted" : "log";
-  }
-  const now = Date.now();
-  const receiptKey = systemEventReceiptKey(event, room, live, uid);
-  // Use a deterministic message key as the idempotency boundary. This avoids
-  // orphaned receipts if a process crashes after claiming a receipt but before
-  // writing its message. Concurrent clients race on one transaction instead.
-  const messageRef = root.child("messages").child(`system_${receiptKey}`);
-  const message = { userId: "system", userName: "System", text, type, timestamp: now };
-  const posted = await messageRef.transaction((current) => {
-    if (current) return;
-    return message;
-  }, undefined, false);
-  if (!posted.committed) return { ok: true, messageId: messageRef.key, duplicate: true };
-  await root.child("room/lastActivityAt").set(now);
-  return { ok: true, messageId: messageRef.key, duplicate: false };
-});
 
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const now = Date.now();
+  let failureReason = "You are not authorized to post this event, or the auction is not in the required state.";
+  let duplicate = false;
+  let messageId = null;
+  const result = await rootRef.transaction((current) => {
+    duplicate = false;
+    messageId = null;
+    failureReason = "You are not authorized to post this event, or the auction is not in the required state.";
+    const room = current?.room;
+    const live = current?.live;
+    if (!room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const hasSavedXI = Boolean(current.teams?.[`${roomId}_${uid}`]?.playingXI);
+    if (!canPostSystemEvent({ event, uid, room, hasSavedXI })) return;
+
+    let text = messages[event];
+    let type = "log";
+    if (event === "sale_result") {
+      if (!["sold", "unsold"].includes(live?.status)) {
+        failureReason = "There is no completed player lot to announce.";
+        return;
+      }
+      text = live.status === "sold"
+        ? String(live.playerId) + " SOLD to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr"
+        : String(live.playerId) + " UNSOLD";
+      type = live.status === "sold" ? "sold_card" : "log";
+    } else if (event === "rtm_result") {
+      const offer = live?.retentionOffer;
+      if (live?.status !== "sold" || !["accepted", "declined", "expired"].includes(offer?.status)) {
+        failureReason = "The RTM result is not final.";
+        return;
+      }
+      text = offer.status === "accepted"
+        ? "RTM decision completed for " + String(live.highBidderName || "winning franchise") + "."
+        : "RTM not matched. " + String(live.playerId) + " goes to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr.";
+      type = offer.status === "accepted" ? "retention_accepted" : "log";
+    }
+
+    const receiptKey = systemEventReceiptKey(event, room, live, uid);
+    messageId = `system_${receiptKey}`;
+    if (current.messages?.[messageId]) {
+      duplicate = true;
+      return current;
+    }
+    const message = { userId: "system", userName: "System", text, type, timestamp: now };
+    return {
+      ...current,
+      room: { ...room, lastActivityAt: now },
+      messages: { ...(current.messages || {}), [messageId]: message }
+    };
+  }, undefined, false);
+
+  if (!result.committed) {
+    if (duplicate && messageId) return { ok: true, messageId, duplicate: true };
+    reject(failureReason);
+  }
+  return { ok: true, messageId, duplicate, timestamp: now };
+});
 
 export const sendAuctionChatMessage = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
