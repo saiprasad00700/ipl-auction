@@ -11,7 +11,7 @@ import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction } from "./roomAuthorizationRules.js";
-import { systemEventReceiptKey } from "./systemEventRules.js";
+import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -346,16 +346,14 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
   const room = roomSnap.val();
   const live = liveSnap.val();
   if (!room) reject("Auction room could not be found.");
-  const member = (Array.isArray(room.players) ? room.players : []).some((p) => p && p.id === uid);
-  if (!member || (Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid))) {
-    reject("Only an active room member can post system events.");
+  let savedXI = false;
+  if (event === "xi_submitted") {
+    const xiSnap = await root.child("teams").child(`${roomId}_${uid}`).child("playingXI").get();
+    savedXI = xiSnap.exists();
   }
-  if (["auction_started", "auction_paused", "auction_resumed", "auction_ended", "player_removed"].includes(event) && room.hostId !== uid) {
-    reject("Only the room host can post this event.");
+  if (!canPostSystemEvent({ event, uid, room, hasSavedXI: savedXI })) {
+    reject("You are not authorized to post this event, or the auction is not in the required state.");
   }
-  if (event === "auction_started" && room.status !== "active") reject("The auction has not started.");
-  if (event === "bidding_ended" && room.status !== "awaiting_xi") reject("Bidding has not ended.");
-  if (event === "auction_completed" && !["completed", "analyzing"].includes(room.status)) reject("Auction results are not ready.");
   let text = messages[event];
   let type = "log";
   if (event === "sale_result") {
@@ -372,11 +370,6 @@ export const postAuctionSystemEvent = onCall({ enforceAppCheck: false }, async (
       : "RTM not matched. " + String(live.playerId) + " goes to " + String(live.highBidderName || "winning franchise") + " for ₹" + Number(live.currentBid || 0) + " Cr.";
     type = offer.status === "accepted" ? "retention_accepted" : "log";
   }
-  if (event === "xi_submitted") {
-    const xiSnap = await root.child("teams").child(`${roomId}_${uid}`).child("playingXI").get();
-    if (!xiSnap.exists()) reject("Submit your Playing XI before announcing it.");
-  }
-
   const now = Date.now();
   const receiptKey = systemEventReceiptKey(event, room, live, uid);
   // Use a deterministic message key as the idempotency boundary. This avoids
