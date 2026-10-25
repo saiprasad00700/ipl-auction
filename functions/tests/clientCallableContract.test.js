@@ -58,3 +58,16 @@ test("auction start claims the room and initializes the first lot atomically", (
   assert.ok(!source.includes("roomRef.transaction("));
   assert.ok(!source.includes("root.update(updates)"));
 });
+
+test("sale settlement updates purse, squad, roster and activity atomically", () => {
+  const start = backendSource.indexOf("export const applySaleSettlement = onCall(");
+  const end = backendSource.indexOf("\n\nconst FRANCHISES", start);
+  assert.ok(start >= 0 && end > start, "applySaleSettlement callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("teams: { ...(current.teams || {}), [teamKey]: finalTeam }"));
+  assert.ok(source.includes("room: { ...room, players: updatedMembers, lastActivityAt: now }"));
+  assert.ok(source.includes("live: { ...live, lastActivityAt: now }"));
+  assert.ok(!source.includes("teamRef.transaction("));
+  assert.ok(!source.includes('room/lastActivityAt').concat(".set("));
+});
