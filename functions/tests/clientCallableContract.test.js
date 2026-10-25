@@ -41,5 +41,5 @@ test("bid validation, live-state mutation and room activity use one root transac
   assert.ok(source.includes("current.teams?.["));
   assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
   assert.ok(!source.includes("liveRef.transaction("));
-  assert.ok(!source.includes('room/lastActivityAt').includes('set('));
+  assert.ok(!source.includes('room/lastActivityAt'));
 });
