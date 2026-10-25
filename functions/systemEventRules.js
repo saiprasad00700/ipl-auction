@@ -15,3 +15,29 @@ export function systemEventReceiptKey(event, room = {}, live = {}, uid = "") {
   }
   return safe(`${event}_${room?.lastActivityAt ?? "once"}`);
 }
+
+
+const HOST_ONLY_SYSTEM_EVENTS = new Set([
+  "auction_started",
+  "bidding_ended",
+  "auction_paused",
+  "auction_resumed",
+  "auction_ended",
+  "auction_completed",
+  "sale_result",
+  "rtm_result",
+  "player_removed"
+]);
+
+export function canPostSystemEvent({ event, uid, room, hasSavedXI = false }) {
+  if (!uid || !room || !Array.isArray(room.players)) return false;
+  const member = room.players.some((player) => player?.id === uid);
+  if (!member || room.bannedPlayers?.includes(uid)) return false;
+  if (HOST_ONLY_SYSTEM_EVENTS.has(event) && room.hostId !== uid) return false;
+  if (event === "xi_submitted" && !hasSavedXI) return false;
+  if (event === "auction_started" && room.status !== "active") return false;
+  if (event === "bidding_ended" && room.status !== "awaiting_xi") return false;
+  if (event === "auction_ended" && !["awaiting_xi", "analyzing", "completed"].includes(room.status)) return false;
+  if (event === "auction_completed" && room.status !== "completed") return false;
+  return true;
+}
