@@ -92,6 +92,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
   }, undefined, false);
 
   if (!result.committed) reject("Bid failed: the timer expired, another bid was placed, or your franchise cannot afford this bid.");
+  await roomRef.child("room/lastActivityAt").set(now);
   return { ok: true, amount: result.snapshot.val()?.currentBid };
 });
 
@@ -174,6 +175,7 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
   }, undefined, false);
 
   if (!result.committed) reject("This RTM offer is no longer available or you are not authorized to decide it.");
+  await roomRef.child("room/lastActivityAt").set(clickedAt);
   return { ok: true, phase: result.snapshot.val()?.retentionOffer?.phase };
 });
 
@@ -232,6 +234,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   }, undefined, false);
 
   if (!result.committed) reject("Counter-bid must be higher than the current price and within your remaining budget, and the RTM window must still be open.");
+  await roomRef.child("room/lastActivityAt").set(now);
   return { ok: true, counterBid };
 });
 
@@ -279,6 +282,7 @@ export const applySaleSettlement = onCall({ enforceAppCheck: false }, async (req
     if (!Array.isArray(players)) return;
     return players.map((p) => p.id === buyerId ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: finalTeam.squad.length } : p);
   }, undefined, false);
+  await root.child("room/lastActivityAt").set(Date.now());
   return { ok: true, alreadyApplied: wasAlreadySettled, playerId, buyerId, budgetRemaining: finalTeam.budgetRemaining, spent: finalTeam.spent, squadCount: finalTeam.squad.length, team: finalTeam };
 });
 
