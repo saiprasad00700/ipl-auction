@@ -28,3 +28,21 @@ test("blocked or completed room joins return null", () => {
   assert.equal(upsertRoomMember({ status: "waiting", bannedPlayers: ["u1"], players: [] }, "u1", "Manager"), null);
   assert.equal(upsertRoomMember(null, "u1", "Manager"), null);
 });
+
+test("room removal only permits the host to remove another member before start", async () => {
+  const { removeRoomMember } = await import("../roomMemberRules.js");
+  const room = {
+    hostId: "host", status: "waiting",
+    players: [{ id: "host" }, { id: "member", name: "Member" }],
+    bannedPlayers: [], lastActivityAt: 1
+  };
+  const removed = removeRoomMember(room, "host", "member", 123);
+  assert.equal(removed.target.name, "Member");
+  assert.deepEqual(removed.room.players.map((p) => p.id), ["host"]);
+  assert.deepEqual(removed.room.bannedPlayers, ["member"]);
+  assert.equal(removed.room.lastActivityAt, 123);
+  assert.equal(removeRoomMember(room, "outsider", "member", 123), null);
+  assert.equal(removeRoomMember(room, "host", "host", 123), null);
+  assert.equal(removeRoomMember({ ...room, status: "active" }, "host", "member", 123), null);
+  assert.equal(removeRoomMember(room, "host", "missing", 123), null);
+});
