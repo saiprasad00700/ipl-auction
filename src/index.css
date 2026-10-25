@@ -591,3 +591,53 @@
     animation: none;
   }
 }
+
+
+/* Broadcast badge for the three-second player introduction phase. */
+.ss-cinematic-player-portrait.is-player-intro {
+  border-color: rgba(110,231,183,.65);
+  box-shadow: 0 0 0 1px rgba(110,231,183,.16), 0 0 2rem rgba(16,185,129,.22);
+}
+.ss-player-intro-badge {
+  position:absolute;
+  z-index:12;
+  top:.75rem;
+  left:.75rem;
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.42rem .62rem;
+  border:1px solid rgba(167,243,208,.5);
+  border-radius:999px;
+  background:rgba(2,6,23,.82);
+  color:#d1fae5;
+  font-size:.56rem;
+  font-weight:950;
+  letter-spacing:.15em;
+  box-shadow:0 .35rem 1.1rem rgba(0,0,0,.35);
+  backdrop-filter:blur(10px);
+  animation:ss-player-intro-badge-in .35s cubic-bezier(.2,.8,.2,1) both;
+}
+.ss-player-intro-badge i {
+  width:.42rem;
+  height:.42rem;
+  flex:0 0 auto;
+  border-radius:50%;
+  background:#34d399;
+  box-shadow:0 0 .65rem rgba(52,211,153,.85);
+  animation:ss-player-intro-pulse .9s ease-in-out infinite;
+}
+@keyframes ss-player-intro-badge-in {
+  from { opacity:0; transform:translateY(-.35rem) scale(.94); }
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes ss-player-intro-pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.4; }
+}
+@media (max-width:640px) {
+  .ss-player-intro-badge { top:.55rem; left:.55rem; padding:.35rem .48rem; font-size:.46rem; letter-spacing:.1em; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-player-intro-badge, .ss-player-intro-badge i { animation:none; }
+}
