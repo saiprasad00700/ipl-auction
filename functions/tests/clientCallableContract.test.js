@@ -168,3 +168,20 @@ test("host timer control updates only the timer while an auction is active", () 
   assert.match(roomPage, /updateRoomSettings\(id,\s*\{\s*bidTimer:\s*newTimerValue\s*\}\)/);
   assert.doesNotMatch(roomPage, /updateRoomSettings\(id,\s*\{\s*\.\.\.currentAuction\.settings,\s*bidTimer:/);
 });
+
+test("bid and RTM expiry checks use fresh time inside retried transactions", () => {
+  const segments = [
+    ["export const placeBid = onCall(", "export const decideRetention = onCall("],
+    ["export const decideRetention = onCall(", "export const submitRetentionCounterBid = onCall("],
+    ["export const submitRetentionCounterBid = onCall(", "export const applySaleSettlement = onCall("]
+  ];
+  for (const [startMarker, endMarker] of segments) {
+    const start = backendSource.indexOf(startMarker);
+    const end = backendSource.indexOf(endMarker, start);
+    assert.ok(start >= 0 && end > start, `missing transaction segment: ${startMarker}`);
+    const source = backendSource.slice(start, end);
+    assert.match(source, /const transactionNow = Date\.now\(\)/);
+    assert.doesNotMatch(source, /const now = Date\.now\(\)/);
+    assert.doesNotMatch(source, /lastActivityAt: now/);
+  }
+});
