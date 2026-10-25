@@ -24,6 +24,12 @@ test('cinematic controls expose accessible expanded and pressed states', () => {
   assert.match(room, /aria-label=\{sidebarTab === 'chat' \? 'Voice Chat panel' : 'Live Activity panel'\}/);
 });
 
+test('opening one header panel closes the other panel', () => {
+  assert.match(room, /setShowHeaderPanel\(false\); setShowSettings\(\(open\) => !open\)/);
+  assert.match(room, /setShowSettings\(false\); if \(showHeaderPanel && sidebarTab === 'activity'\)/);
+  assert.match(room, /setShowSettings\(false\); if \(showHeaderPanel && sidebarTab === 'chat'\)/);
+});
+
 test('Escape closes open settings and activity/chat header panels', () => {
   assert.match(room, /if \(!showSettings && !showHeaderPanel\) return undefined/);
   assert.match(room, /event\.key !== 'Escape'/);
