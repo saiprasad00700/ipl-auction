@@ -343,3 +343,75 @@ button, .no-select {
     animation: none !important;
   }
 }
+
+
+/* SS AUCTION cinematic stage foundation — presentation only; auction state remains authoritative. */
+.ss-cinematic-player-stage {
+  isolation: isolate;
+  transform-style: preserve-3d;
+  background-color: #050a13;
+}
+.ss-cinematic-player-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(59, 130, 246, .22), transparent 48%),
+    radial-gradient(ellipse at 6% 55%, rgba(14, 165, 233, .10), transparent 34%),
+    radial-gradient(ellipse at 94% 55%, rgba(168, 85, 247, .10), transparent 34%);
+}
+.ss-cinematic-spotlight {
+  position: absolute;
+  z-index: 0;
+  top: -18%;
+  width: 24%;
+  height: 75%;
+  pointer-events: none;
+  opacity: .42;
+  filter: blur(16px);
+  transform-origin: top center;
+  background: linear-gradient(180deg, rgba(96, 165, 250, .30), rgba(96, 165, 250, 0));
+  animation: ss-cinematic-light-sweep 8s ease-in-out infinite alternate;
+}
+.ss-cinematic-spotlight-left { left: 8%; transform: rotate(16deg); }
+.ss-cinematic-spotlight-right {
+  right: 8%;
+  background: linear-gradient(180deg, rgba(192, 132, 252, .26), rgba(192, 132, 252, 0));
+  transform: rotate(-16deg);
+  animation-delay: -3s;
+}
+.ss-cinematic-stage-grid {
+  position: absolute;
+  z-index: 0;
+  inset: auto 0 0;
+  height: 34%;
+  pointer-events: none;
+  opacity: .16;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, .22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, .22) 1px, transparent 1px);
+  background-size: 42px 28px;
+  mask-image: linear-gradient(transparent, #000);
+  transform: perspective(260px) rotateX(58deg) scale(1.35);
+  transform-origin: bottom center;
+}
+.ss-cinematic-player-stage > :not(.ss-cinematic-spotlight):not(.ss-cinematic-stage-grid) {
+  position: relative;
+  z-index: 1;
+}
+.ss-cinematic-player-portrait {
+  box-shadow: 0 0 0 1px rgba(191, 219, 254, .08), 0 18px 60px rgba(2, 6, 23, .5), 0 0 42px rgba(59, 130, 246, .12);
+}
+@keyframes ss-cinematic-light-sweep {
+  from { opacity: .24; }
+  to { opacity: .58; }
+}
+@media (max-width: 767px) {
+  .ss-cinematic-spotlight { opacity: .20; filter: blur(22px); }
+  .ss-cinematic-stage-grid { opacity: .08; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-spotlight { animation: none; }
+}
