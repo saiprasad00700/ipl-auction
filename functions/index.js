@@ -33,7 +33,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
       reject("Only the host may submit a bot bid.");
     }
     bidderId = botUserId;
-    bidderTeamId = botTeamId;
+    bidderTeamId = String(botTeamId).replace(/^bot_/, "");
     bidderName = typeof botName === "string" ? botName.slice(0, 80) : "Manager Bot";
     maxBid = Math.min(Number.isFinite(Number(maxValuation)) ? Number(maxValuation) : 0,
       Number.isFinite(Number(botBudget)) ? Number(botBudget) : 0);
@@ -172,6 +172,8 @@ export const decideRetention = onCall({ enforceAppCheck: false }, async (request
 export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, amount, botAction = false } = request.data || {};
+  const suppliedBotId = String(request.data?.botTeamId || "");
+  const botUserId = suppliedBotId.startsWith("bot_") ? suppliedBotId : "bot_" + suppliedBotId;
   requireRoomId(roomId);
   const counterBid = Number(Number(amount).toFixed(2));
   if (!Number.isFinite(counterBid) || counterBid <= 0) throw new HttpsError("invalid-argument", "Enter a valid counter-bid.");
@@ -179,19 +181,19 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   const roomRef = database.ref(`auctions/${roomId}`);
   const [roomSnapshot, teamSnapshot] = await Promise.all([
     roomRef.child("room").get(),
-    roomRef.child("teams").child(`${roomId}_${botAction ? request.data?.botTeamId : uid}`).get()
+    roomRef.child("teams").child(roomId + "_" + (botAction ? botUserId : uid)).get()
   ]);
   const room = roomSnapshot.val();
   const team = teamSnapshot.val();
   if (!room) reject("Auction room could not be found.");
   if (botAction) {
-    if (room.hostId !== uid || !BOT_IDS.has(`bot_${String(request.data?.botTeamId || "").replace(/^bot_/, "")}`)) {
+    if (room.hostId !== uid || !BOT_IDS.has(botUserId)) {
       reject("Only the room host may submit a bot counter-bid.");
     }
   } else if (!team || team.userId !== uid) {
     reject("Your franchise could not be found.");
   }
-  if (!team || team.userId !== (botAction ? request.data?.botTeamId : uid)) {
+  if (!team || team.userId !== (botAction ? botUserId : uid)) {
     reject("The counter-bidder franchise record is invalid.");
   }
 
@@ -202,7 +204,7 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
     const offer = live.retentionOffer;
     if (!offer || offer.status !== "pending" || offer.phase !== "counter_bid") return;
     if (botAction) {
-      if (offer.buyerId !== request.data?.botTeamId || room.hostId !== uid || !BOT_IDS.has(offer.buyerId)) return;
+      if (offer.buyerId !== botUserId || room.hostId !== uid || !BOT_IDS.has(offer.buyerId)) return;
     } else if (offer.buyerId !== uid) return;
     if (team.teamId !== offer.buyerTeamId) return;
     if (now > Number(offer.expiresAt || 0)) return;
