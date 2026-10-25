@@ -104,6 +104,11 @@ const AuctionRoom = () => {
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(() => clampBidTimerSeconds(currentAuction?.settings?.bidTimer));
+   useEffect(() => {
+      if (currentAuction?.settings?.bidTimer != null) {
+         setNewTimerValue(clampBidTimerSeconds(currentAuction.settings.bidTimer));
+      }
+   }, [currentAuction?.settings?.bidTimer]);
    const [optimisticState, setOptimisticState] = useState(null);
    const [joiningTeam, setJoiningTeam] = useState(null);
    const [banError, setBanError] = useState(null);
@@ -1974,7 +1979,14 @@ const AuctionRoom = () => {
                                  </button>
                               ))}
                            </div>
-                           <button onClick={async () => { await updateRoomSettings(id, { ...currentAuction.settings, bidTimer: newTimerValue }); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all mt-3 shadow-lg shadow-blue-500/20 active:scale-95 cursor-pointer">
+                           <button onClick={async () => {
+                              try {
+                                 await updateRoomSettings(id, { bidTimer: newTimerValue });
+                                 setError('');
+                              } catch (timerError) {
+                                 setError(timerError?.message || 'Could not update the auction timer.');
+                              }
+                           }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all mt-3 shadow-lg shadow-blue-500/20 active:scale-95 cursor-pointer">
                               Apply Timer Settings
                            </button>
                         </div>
