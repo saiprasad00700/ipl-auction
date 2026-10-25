@@ -50,6 +50,7 @@ import { TEAMS } from '../data/teams';
 import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import FranchiseArenaStrip from '../components/FranchiseArenaStrip';
+import RoleCharacterStage from '../components/RoleCharacterStage';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { ref, update } from 'firebase/database';
@@ -382,6 +383,19 @@ const AuctionRoom = () => {
 
    const currentPlayer = useMemo(() => {
       return IPL_PLAYERS.find(p => p.id === displayAuctionState?.playerId) || IPL_PLAYERS[0];
+   }, [displayAuctionState?.playerId]);
+
+   // Visual prototype only: briefly introduce each new player. The actual shared
+   // bidding clock remains owned by AuctionContext and is not modified here.
+   const [showRoleIntro, setShowRoleIntro] = useState(false);
+   useEffect(() => {
+      if (!displayAuctionState?.playerId) {
+         setShowRoleIntro(false);
+         return undefined;
+      }
+      setShowRoleIntro(true);
+      const introTimer = window.setTimeout(() => setShowRoleIntro(false), 3000);
+      return () => window.clearTimeout(introTimer);
    }, [displayAuctionState?.playerId]);
 
    const [isTtsEnabled, setIsTtsEnabled] = useState(true);
@@ -1437,8 +1451,12 @@ const AuctionRoom = () => {
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
                                  </div>
                                  <div className="p-4 sm:p-6 md:p-10 flex flex-col md:flex-row items-center gap-4 sm:gap-6 md:gap-10">
-                                    <div className="ss-cinematic-player-portrait w-32 h-32 sm:w-40 sm:h-40 md:w-60 md:h-80 bg-[radial-gradient(ellipse_at_top,_rgba(52,211,153,0.22),_transparent_70%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.015))] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] group hover:scale-[1.02] transition-transform duration-500 shrink-0">
-                                       <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full object-cover" />
+                                    <div className="ss-cinematic-player-portrait w-full md:w-60 min-h-[19rem] md:min-h-[20rem] rounded-2xl md:rounded-[2rem] overflow-hidden border border-emerald-200/25 relative z-10 shadow-[0_16px_48px_rgba(16,185,129,0.10)] shrink-0">
+                                       {showRoleIntro ? (
+                                          <RoleCharacterStage player={currentPlayer} />
+                                       ) : (
+                                          <img src={currentPlayer.image} alt={currentPlayer.name} decoding="async" className="w-full h-full min-h-[19rem] md:min-h-[20rem] object-cover" />
+                                       )}
                                     </div>
                                     <div className="flex-1 flex flex-col gap-4 md:gap-6 w-full text-center md:text-left">
                                        <div>
