@@ -105,7 +105,7 @@ test("expired RTM finalization and room heartbeat are atomic", () => {
   const source = backendSource.slice(start, end);
   assert.ok(source.includes("rootRef.transaction("));
   assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
-  assert.ok(source.includes("live:"));
+  assert.ok(source.includes("live.lastActivityAt = now"));
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
