@@ -1041,26 +1041,23 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
         if (safeSettings[key] === undefined) safeSettings[key] = value;
       }
     }
-    await roomRef.child("settings").update(safeSettings);
-    if (safeSettings.auctionType !== undefined) {
-      await roomRef.child("auctionType").set(safeSettings.auctionType);
+    const updates = {};
+    for (const [key, value] of Object.entries(safeSettings)) {
+      updates["room/settings/" + key] = value;
     }
-    if (safeSettings.overseasLimit !== undefined) {
-      await roomRef.child("overseasLimit").set(safeSettings.overseasLimit);
-    }
-    if (safeSettings.squadLimit !== undefined) {
-      await roomRef.child("squadLimit").set(safeSettings.squadLimit);
-    }
+    if (safeSettings.auctionType !== undefined) updates["room/auctionType"] = safeSettings.auctionType;
+    if (safeSettings.overseasLimit !== undefined) updates["room/overseasLimit"] = safeSettings.overseasLimit;
+    if (safeSettings.squadLimit !== undefined) updates["room/squadLimit"] = safeSettings.squadLimit;
     if (safeSettings.budget !== undefined) {
       const teamsSnapshot = await database.ref("auctions/" + roomId + "/teams").get();
       const teams = teamsSnapshot.val() || {};
-      const teamUpdates = {};
-      for (const [teamKey, team] of Object.entries(teams)) {
-        teamUpdates[teamKey + "/budgetRemaining"] = Number(safeSettings.budget);
+      for (const [teamKey] of Object.entries(teams)) {
+        updates["teams/" + teamKey + "/budgetRemaining"] = Number(safeSettings.budget);
       }
-      if (Object.keys(teamUpdates).length) await database.ref("auctions/" + roomId + "/teams").update(teamUpdates);
     }
-    await roomRef.child("lastActivityAt").set(Date.now());
+    updates["room/lastActivityAt"] = Date.now();
+    // Commit all mode, settings, purse, and activity updates atomically.
+    await database.ref("auctions/" + roomId).update(updates);
     return { ok: true, settings: safeSettings };
   }
 
