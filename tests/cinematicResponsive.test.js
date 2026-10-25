@@ -6,6 +6,7 @@ const css = await readFile(new URL('../src/index.css', import.meta.url), 'utf8')
 const room = await readFile(new URL('../src/pages/AuctionRoom.jsx', import.meta.url), 'utf8');
 const playerStage = await readFile(new URL('../src/components/RoleCharacterStage.jsx', import.meta.url), 'utf8');
 const auctioneerStage = await readFile(new URL('../src/components/AuctioneerStage.jsx', import.meta.url), 'utf8');
+const arena = await readFile(new URL('../src/components/FranchiseArenaStrip.jsx', import.meta.url), 'utf8');
 
 test('cinematic auction stage has responsive desktop and mobile layouts', () => {
   assert.match(css, /\.ss-cinematic-player-stage\s*\{/);
@@ -36,6 +37,22 @@ test('auctioneer illustration exposes its current auction status accessibly', ()
   assert.match(auctioneerStage, /role="img"/);
   assert.match(auctioneerStage, /SS Auctioneer stage illustration:/);
   assert.match(auctioneerStage, /aria-hidden="true"/);
+});
+
+test('franchise arena renders team tables with active bidder and decorative paddles', () => {
+  assert.match(arena, /teams\.map\(/);
+  assert.match(arena, /data-team-id=\{team\.id\}/);
+  assert.match(arena, /aria-current=\{active \? 'true' : undefined\}/);
+  assert.match(arena, /HIGH BID · LEADING/);
+  assert.match(arena, /ss-franchise-bid-paddle/);
+  assert.match(arena, /ss-franchise-rtm-paddle/);
+  assert.match(arena, /aria-hidden="true"/);
+});
+
+test('bid and RTM paddle effects have bounded cleanup timers', () => {
+  assert.match(arena, /setTimeout\(\(\) => setRaisedBidTeam\(null\), 850\)/);
+  assert.match(arena, /setTimeout\(\(\) => setRaisedRtmTeam\(null\), 1100\)/);
+  assert.match(arena, /return \(\) => clearTimeout\(timer\)/);
 });
 
 test('reduced-motion preferences are supported by the cinematic styling', () => {
