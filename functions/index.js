@@ -5,7 +5,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { applySaleToTeam, canAffordRtmMatch } from "./saleSettlementHelpers.js";
 import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 import { validatePlayingXIComposition } from "./playingXIRules.js";
-import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./auctionRules.js";
+import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount, transitionBiddingTimer } from "./auctionRules.js";
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember, removeRoomMember } from "./roomMemberRules.js";
@@ -1189,26 +1189,12 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
       return;
     }
 
-    let nextLive;
-    if (action === "pause") {
-      if (live.status !== "bidding") {
-        failureReason = "Only an active bidding timer can be paused.";
-        return;
-      }
-      const remainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
-      nextLive = { ...live, status: "paused", pausedRemainingMs: remainingMs, pausedAt: now };
-    } else {
-      if (live.status !== "paused") {
-        failureReason = "The auction is not paused.";
-        return;
-      }
-      const seconds = clampBidTimerSeconds(currentRoom.settings?.bidTimer, 15);
-      const remainingMs = Math.max(1000, Number(live.pausedRemainingMs || seconds * 1000));
-      nextLive = {
-        ...live, status: "bidding", timerEndsAt: now + remainingMs,
-        pausedRemainingMs: null, pausedAt: null
-      };
+    const transition = transitionBiddingTimer(live, action, currentRoom.settings?.bidTimer, now);
+    if (!transition.ok) {
+      failureReason = transition.error;
+      return;
     }
+    const nextLive = transition.live;
     return {
       ...current,
       live: nextLive,
