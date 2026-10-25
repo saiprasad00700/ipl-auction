@@ -986,3 +986,70 @@
     overscroll-behavior: contain;
   }
 }
+
+
+/* Player lower-third gives the live auction a broadcast-style identity panel. */
+.ss-cinematic-player-lower-third {
+  position: absolute;
+  z-index: 18;
+  left: clamp(1rem, 3vw, 2rem);
+  bottom: 4.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .28rem;
+  width: min(24rem, 48%);
+  padding: .85rem 1rem .9rem 1.1rem;
+  border-left: 3px solid #34d399;
+  border-radius: 0 .85rem .85rem 0;
+  background: linear-gradient(90deg, rgba(2,6,23,.94), rgba(2,6,23,.7) 76%, transparent);
+  box-shadow: 0 .6rem 1.8rem rgba(0,0,0,.22);
+  pointer-events: none;
+  animation: ss-lower-third-enter .35s cubic-bezier(.2,.8,.2,1) both;
+}
+.ss-lower-third-eyebrow {
+  color: #6ee7b7;
+  font-size: .52rem;
+  font-weight: 950;
+  letter-spacing: .19em;
+  line-height: 1.4;
+}
+.ss-cinematic-player-lower-third strong {
+  max-width: 100%;
+  color: #f8fafc;
+  font-size: clamp(1.05rem, 2vw, 1.65rem);
+  font-weight: 950;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 16px rgba(0,0,0,.6);
+}
+.ss-lower-third-role {
+  color: #cbd5e1;
+  font-size: .66rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+@keyframes ss-lower-third-enter {
+  from { opacity: 0; transform: translateX(-.7rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (max-width: 640px) {
+  .ss-cinematic-player-lower-third {
+    left: .65rem;
+    bottom: 3rem;
+    width: min(62%, 18rem);
+    padding: .55rem .65rem .6rem .75rem;
+    gap: .2rem;
+  }
+  .ss-lower-third-eyebrow { font-size: .39rem; letter-spacing: .12em; }
+  .ss-cinematic-player-lower-third strong { font-size: clamp(.85rem, 4vw, 1.15rem); }
+  .ss-lower-third-role { font-size: .49rem; letter-spacing: .05em; }
+}
+@media (max-width: 380px) {
+  .ss-cinematic-player-lower-third { width: 58%; bottom: 3.15rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-player-lower-third { animation: none; }
+}
