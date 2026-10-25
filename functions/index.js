@@ -621,42 +621,55 @@ export const syncRoomPlayerStats = onCall({ enforceAppCheck: false }, async (req
     throw new HttpsError("invalid-argument", "A valid team member is required.");
   }
 
-  const root = database.ref(`auctions/${roomId}`);
-  const roomRef = root.child("room");
-  const [roomSnap, teamSnap] = await Promise.all([
-    roomRef.get(),
-    root.child("teams").child(`${roomId}_${userId}`).get()
-  ]);
-  const room = roomSnap.val();
-  const team = teamSnap.val();
-  if (!room) reject("Auction room could not be found.");
-  const activeCaller = (Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid)
-    && !(Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid));
-  if (!canSyncTeamStats(uid, userId, room.hostId, activeCaller)) {
-    reject("Only the manager or room host can synchronize these team totals.");
-  }
-  if (!team || team.userId !== userId) reject("The authoritative team record could not be found.");
-  const playersRef = roomRef.child("players");
-  const result = await playersRef.transaction((current) => {
-    if (!Array.isArray(current)) return;
-    if (!current.some((p) => p?.id === userId)) return;
-    return current.map((p) => p?.id === userId
-      ? {
-          ...p,
-          spent: Number(team.spent || 0),
-          squadCount: Array.isArray(team.squad) ? team.squad.length : 0
-        }
-      : p);
+  // Read the authoritative team record and update its lobby projection in one
+  // transaction so a concurrent sale, kick, or franchise change cannot leave
+  // stale spend/squad totals in the room roster.
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const now = Date.now();
+  let failureReason = "Could not synchronize team totals. Refresh the room and try again.";
+  let syncedStats = null;
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Could not synchronize team totals. Refresh the room and try again.";
+    syncedStats = null;
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const room = current.room;
+    const players = Array.isArray(room.players) ? room.players : [];
+    const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : [];
+    const activeCaller = players.some((player) => player?.id === uid) && !banned.includes(uid);
+    if (!canSyncTeamStats(uid, userId, room.hostId, activeCaller)) {
+      failureReason = "Only the manager or room host can synchronize these team totals.";
+      return;
+    }
+    const team = current.teams?.[`${roomId}_${userId}`];
+    if (!team || team.userId !== userId) {
+      failureReason = "The authoritative team record could not be found.";
+      return;
+    }
+    if (!players.some((player) => player?.id === userId)) {
+      failureReason = "This manager is no longer in the room.";
+      return;
+    }
+    const spent = Number(team.spent || 0);
+    const squadCount = Array.isArray(team.squad) ? team.squad.length : 0;
+    syncedStats = { spent, squadCount };
+    return {
+      ...current,
+      room: {
+        ...room,
+        players: players.map((player) => player?.id === userId
+          ? { ...player, spent, squadCount }
+          : player),
+        lastActivityAt: now
+      }
+    };
   }, undefined, false);
-  if (!result.committed) reject("Could not synchronize team totals to the room roster.");
-  return {
-    ok: true,
-    userId,
-    spent: Number(team.spent || 0),
-    squadCount: Array.isArray(team.squad) ? team.squad.length : 0
-  };
-});
 
+  if (!result.committed) reject(failureReason);
+  return { ok: true, userId, ...syncedStats };
+});
 
 export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
