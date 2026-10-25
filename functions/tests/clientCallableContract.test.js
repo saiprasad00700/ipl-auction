@@ -7,10 +7,10 @@ const clientSource = readFileSync(new URL("../../src/contexts/AuctionContext.jsx
 
 test("every callable referenced by the auction client is exported by Cloud Functions", () => {
   const backendCallables = new Set(
-    [...backendSource.matchAll(/export const (\\w+) = onCall/g)].map((match) => match[1])
+    [...backendSource.matchAll(/export const (\w+) = onCall/g)].map((match) => match[1])
   );
   const clientCallables = new Set(
-    [...clientSource.matchAll(/httpsCallable\\(getFunctions\\(app\\),\\s*['"]([^'"]+)['"]\\)/g)]
+    [...clientSource.matchAll(/httpsCallable\(getFunctions\(app\),\s*['"]([^'"]+)['"]\)/g)]
       .map((match) => match[1])
   );
 
@@ -20,6 +20,6 @@ test("every callable referenced by the auction client is exported by Cloud Funct
 });
 
 test("every callable export uses a unique name", () => {
-  const names = [...backendSource.matchAll(/export const (\\w+) = onCall/g)].map((match) => match[1]);
+  const names = [...backendSource.matchAll(/export const (\w+) = onCall/g)].map((match) => match[1]);
   assert.equal(new Set(names).size, names.length, "duplicate callable export name detected");
 });
