@@ -136,3 +136,16 @@ test("room creation initializes protected room and initial team state through a 
   assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]createAuctionRoom['"]\)/);
   assert.doesNotMatch(clientSource, /set\(ref\(rtdb,\s*`auctions\/\$\{roomId\}\/room`/);
 });
+
+test("Playing XI submission and activity heartbeat are atomic", () => {
+  const start = backendSource.indexOf("export const submitPlayingXI = onCall(");
+  const end = backendSource.indexOf("\n\n// Runs independently of visitors", start);
+  assert.ok(start >= 0 && end > start, "submitPlayingXI callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("teams: { ...(current.teams || {}), [teamKey]: { ...team, playingXI } }"));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(source.includes("effectiveOverseasLimit(room)"));
+  assert.ok(!source.includes("teamRef.child(\"playingXI\").transaction("));
+  assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
+});
