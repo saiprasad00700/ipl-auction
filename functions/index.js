@@ -12,6 +12,7 @@ import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
+import { evaluateEndAuctionTeams } from "./auctionEndRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -1184,22 +1185,10 @@ export const endAuction = onCall({ enforceAppCheck: false }, async (request) => 
       return;
     }
 
-    const teams = current.teams || {};
-    const minimumSquadRuleApplies = (room.settings?.auctionType || room.auctionType || "mega") === "mega";
-    const nextTeams = { ...teams };
-    for (const [teamKey, team] of Object.entries(teams)) {
-      if (!team?.teamId || team.teamId === "NONE") continue;
-      const squadCount = Array.isArray(team.squad) ? team.squad.length : 0;
-      const disqualified = minimumSquadRuleApplies && squadCount < 18;
-      nextTeams[teamKey] = {
-        ...team,
-        disqualified,
-        disqualificationReason: disqualified
-          ? `Only ${squadCount} players bought; at least 18 are required.` : null,
-        squadCountAtEnd: squadCount
-      };
-      if (disqualified) disqualifiedNames.push(`${team.teamName || team.teamId} (${squadCount}/18)`);
-    }
+    const roomMode = room.settings?.auctionType || room.auctionType || "mega";
+    const evaluated = evaluateEndAuctionTeams(current.teams || {}, roomMode);
+    disqualifiedNames = evaluated.disqualifiedNames;
+    const nextTeams = evaluated.teams;
 
     return {
       ...current,
@@ -1210,7 +1199,7 @@ export const endAuction = onCall({ enforceAppCheck: false }, async (request) => 
         xiSubmissionStartedAt: now,
         xiSubmissionDeadline: deadline,
         winnerAnalysisStatus: "collecting",
-        minimumSquadSize: minimumSquadRuleApplies ? 18 : null,
+        minimumSquadSize: evaluated.minimumApplies ? 18 : null,
         lastActivityAt: now
       }
     };
