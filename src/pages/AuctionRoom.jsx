@@ -117,13 +117,13 @@ const AuctionRoom = () => {
    });
 
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
-   // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
+   // the room's inactivity heartbeat. Throttle writes to at most one per 30 seconds.
    const lastInteractionHeartbeatRef = useRef(0);
    useEffect(() => {
       if (!id || !user?.uid) return undefined;
       const markRoomActivity = () => {
          const now = Date.now();
-         if (now - lastInteractionHeartbeatRef.current < 10000) return;
+         if (now - lastInteractionHeartbeatRef.current < 30000) return;
          lastInteractionHeartbeatRef.current = now;
          void touchRoomActivity(id).catch((err) => {
             console.warn('[AuctionRoom] Could not update room activity:', err?.message || err);
