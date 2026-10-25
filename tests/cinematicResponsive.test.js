@@ -143,6 +143,14 @@ test('final five seconds are announced accessibly without announcing every tick'
 test('player introduction uses role-specific motion and respects reduced motion', () => {
   assert.match(playerStage, /data-player-role=\{roleKey\}/);
   assert.match(playerStage, /const roleKey = isKeeper \? 'keeper' : isAllRounder \? 'allrounder' : isBowler \? 'bowler' : 'batter'/);
+  assert.ok(
+    playerStage.indexOf('const isAllRounder =') < playerStage.indexOf('const roleKey ='),
+    'role flags must be initialized before deriving the role key'
+  );
+  assert.ok(
+    playerStage.indexOf('const isBowler =') < playerStage.indexOf('const roleKey ='),
+    'bowler flag must be initialized before deriving the role key'
+  );
   assert.match(css, /ss-role-intro\[data-player-role="bowler"\] \.ss-character-arm-right/);
   assert.match(css, /@keyframes ss-character-bowler-windup/);
   assert.match(css, /@keyframes ss-character-bat-lift/);
