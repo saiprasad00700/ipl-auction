@@ -711,3 +711,19 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-cinematic-live-status.is-bidding .ss-cinematic-live-status-dot { animation:none; }
 }
+
+
+/* Brief emphasis pulse when the accepted live bid amount changes. */
+.ss-cinematic-bid-value {
+  display:block;
+  transform-origin:right center;
+  animation:ss-live-bid-update .38s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes ss-live-bid-update {
+  0% { opacity:.65; transform:scale(.94); text-shadow:0 0 0 rgba(253,230,138,0); }
+  55% { opacity:1; transform:scale(1.06); text-shadow:0 0 1rem rgba(253,230,138,.55); }
+  100% { opacity:1; transform:scale(1); text-shadow:0 0 0 rgba(253,230,138,0); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-cinematic-bid-value { animation:none; }
+}
