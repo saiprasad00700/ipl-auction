@@ -838,7 +838,7 @@ const AuctionRoom = () => {
          }
 
          setTimeLeft(diff);
-         if (diff === 0) {
+         if (!isIntro && diff === 0) {
             // Primary trigger: Admin/Host triggers end immediately when timer expires
             // Fallback trigger: Non-host client triggers end if timer has expired by >1.5s (host tab closed/lagged)
             const shouldTrigger = (isAdmin || rawMs < -1500) && displayAuctionState.status === 'bidding' && !endTriggeredRef.current;
