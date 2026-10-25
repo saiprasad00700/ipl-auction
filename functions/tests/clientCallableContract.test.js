@@ -31,3 +31,15 @@ test("protected room, team and chat state is not written directly by the client"
   assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]endAuction['"]\)/);
   assert.match(clientSource, /httpsCallable\(getFunctions\(app\),\s*['"]sendAuctionChatMessage['"]\)/);
 });
+
+test("bid validation, live-state mutation and room activity use one root transaction", () => {
+  const start = backendSource.indexOf("export const placeBid = onCall(");
+  const end = backendSource.indexOf("export const decideRetention = onCall(", start);
+  assert.ok(start >= 0 && end > start, "placeBid callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.match(source, /rootRef\\.transaction\\(/);
+  assert.match(source, /current\\.teams\\?\\.\\[/);
+  assert.match(source, /room: \\{ \\.\\.\\.room, lastActivityAt: now \\}/);
+  assert.doesNotMatch(source, /liveRef\\.transaction\\(/);
+  assert.doesNotMatch(source, /room\\/lastActivityAt/);
+});
