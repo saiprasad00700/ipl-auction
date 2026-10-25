@@ -1481,7 +1481,7 @@ const AuctionRoom = () => {
                            </motion.div>
                         ) : (
                            <motion.div key="player-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full flex-col gap-4 md:gap-6 flex">
-                              <div className={`ss-cinematic-player-stage ${cameraCutActive ? "ss-camera-cut-active" : ""} bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]`} data-focus-team={displayAuctionState?.highBidderTeamId || "auctioneer"}>
+                              <div className={`ss-cinematic-player-stage ${cameraCutActive ? "ss-camera-cut-active" : ""} bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.12),_transparent_42%),linear-gradient(155deg,#101f2b_0%,#09111d_55%,#060a12_100%)] border border-emerald-300/15 rounded-[2rem] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] relative min-h-[400px] ring-1 ring-white/[0.03]`} data-focus-team={displayAuctionState?.highBidderTeamId || "auctioneer"} data-auction-status={displayAuctionState?.status || "ready"}>
                                  <div className="ss-camera-frame-corners" aria-hidden="true"><i /><i /><i /><i /></div>
                                  <div className="ss-cinematic-mode-chip" aria-label={`Auction mode: ${auctionModeLabel}`}>
                                     <span className="ss-cinematic-mode-live-dot" aria-hidden="true" />
