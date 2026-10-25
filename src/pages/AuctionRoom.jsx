@@ -2063,7 +2063,7 @@ const AuctionRoom = () => {
 
          <AnimatePresence>
             {showSettings && (
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
+               <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} id="auction-room-settings-panel" role="region" aria-label="Local and room settings" className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                      <div className="flex items-center gap-2.5">
 
