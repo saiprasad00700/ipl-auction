@@ -31,7 +31,7 @@ test('auto-selection chooses 11 unique squad players and one distinct impact pla
   assert.equal(selection.startingXI.length, 11);
   assert.ok(selection.impactPlayer);
   assert.equal(new Set([...selection.startingXI.map((p) => p.id), selection.impactPlayer.id]).size, 12);
-  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squad), true);
+  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squad, catalog), true);
   assert.equal(selection.autoSelected, true);
 });
 
@@ -43,14 +43,73 @@ test('XI validation rejects duplicate or out-of-squad selections', () => {
 
 test('Playing XI allows at most four overseas players while squad can contain more', () => {
   const mixedCatalog = [
-    ...Array.from({ length: 5 }, (_, i) => ({ id: `overseas${i}`, country: 'AUS', role: 'Batter' })),
-    ...Array.from({ length: 8 }, (_, i) => ({ id: `indian${i}`, country: 'IND', role: 'Batter' })),
+    { id: 'overseas0', country: 'AUS', role: 'All-Rounder' },
+    { id: 'overseas1', country: 'AUS', role: 'All-Rounder' },
+    { id: 'overseas2', country: 'AUS', role: 'Bowler' },
+    { id: 'overseas3', country: 'AUS', role: 'Batter' },
+    { id: 'overseas4', country: 'AUS', role: 'Batter' },
+    { id: 'indian0', country: 'IND', role: 'Wicket-Keeper' },
+    ...Array.from({ length: 3 }, (_, i) => ({ id: `indianBat${i}`, country: 'IND', role: 'Batter' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `indianAR${i}`, country: 'IND', role: 'All-Rounder' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `indianBowl${i}`, country: 'IND', role: 'Bowler' })),
   ];
+  const byId = Object.fromEntries(mixedCatalog.map((p) => [p.id, p]));
   const mixedSquad = mixedCatalog.map((p) => ({ id: p.id, bid: 1 }));
-  const validXI = [...mixedCatalog.slice(0, 4), ...mixedCatalog.slice(5, 12)];
-  assert.equal(validatePlayingXI(validXI, mixedCatalog[4], mixedSquad, mixedCatalog), true);
-  const invalidXI = mixedCatalog.slice(0, 5).concat(mixedCatalog.slice(5, 11));
-  assert.equal(validatePlayingXI(invalidXI, mixedCatalog[11], mixedSquad, mixedCatalog), false);
+  const validIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'indian0', 'indianBat0', 'indianBat1', 'indianBat2', 'indianAR0', 'indianBowl0', 'indianBowl1'];
+  const validXI = validIds.map((id) => byId[id]);
+  assert.equal(validatePlayingXI(validXI, byId.overseas4, mixedSquad, mixedCatalog), true);
+  const invalidIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'overseas4', 'indian0', 'indianBat0', 'indianBat1', 'indianAR0', 'indianBowl0', 'indianBowl1'];
+  const invalidXI = invalidIds.map((id) => byId[id]);
+  assert.equal(validatePlayingXI(invalidXI, byId.indianAR1, mixedSquad, mixedCatalog), false);
+});
+
+
+
+test('XI validation requires at least two all-rounders and five bowling options', () => {
+  const invalidCatalog = [
+    { id: 'wk-only', role: 'Wicket-Keeper', country: 'IND' },
+    ...Array.from({ length: 6 }, (_, i) => ({ id: `bat-only-${i}`, role: 'Batsman', country: 'IND' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-only-${i}`, role: 'Bowler', country: 'IND' })),
+    { id: 'impact', role: 'Batsman', country: 'IND' },
+  ];
+  const invalidSquad = invalidCatalog.map((p) => ({ id: p.id }));
+  assert.equal(
+    validatePlayingXI(invalidCatalog.slice(0, 11), invalidCatalog[11], invalidSquad, invalidCatalog),
+    false,
+  );
+});
+
+test('automatic XI selection never exceeds four known overseas starters', () => {
+  const overseasBatters = Array.from({ length: 5 }, (_, i) => ({
+    id: `overseasBat${i}`, role: 'Batsman', country: 'OS', type: 'Overseas',
+  }));
+  const indianPlayers = [
+    { id: 'wk-ind', role: 'Wicket-Keeper', country: 'IND', type: 'Indian' },
+    ...Array.from({ length: 7 }, (_, i) => ({ id: `bat-ind${i}`, role: 'Batsman', country: 'IND', type: 'Indian' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `ar-ind${i}`, role: 'All-Rounder', country: 'IND', type: 'Indian' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-ind${i}`, role: 'Bowler', country: 'IND', type: 'Indian' })),
+  ];
+  const catalogWithOverseas = [...overseasBatters, ...indianPlayers];
+  const squadWithOverseas = catalogWithOverseas.map((p) => ({ id: p.id }));
+  const selection = autoSelectBestXI(squadWithOverseas, catalogWithOverseas);
+  assert.equal(selection.startingXI.length, 11);
+  assert.ok(selection.impactPlayer);
+  assert.ok(selection.startingXI.filter((p) => p.country === 'OS').length <= 4);
+  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squadWithOverseas, catalogWithOverseas), true);
+});
+
+test('missing nationality metadata does not falsely count every player as overseas', () => {
+  const catalogWithoutCountry = [
+    { id: 'unknown-country-0', role: 'Wicket-Keeper' },
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `unknown-country-bat${i}`, role: 'Batsman' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `unknown-country-ar${i}`, role: 'All-Rounder' })),
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `unknown-country-bowl${i}`, role: 'Bowler' })),
+  ];
+  const squadWithoutCountry = catalogWithoutCountry.map((p) => ({ id: p.id }));
+  assert.equal(
+    validatePlayingXI(catalogWithoutCountry.slice(0, 11), catalogWithoutCountry[11], squadWithoutCountry, catalogWithoutCountry),
+    true,
+  );
 });
 
 test('ranking validation requires every franchise exactly once and ranks 1..N without ties', () => {
