@@ -1165,23 +1165,58 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     return { ok: true, settings: appliedSettings };
   }
 
-  const liveRef = database.ref(`auctions/${roomId}/live`);
-  const liveSnap = await liveRef.get();
-  const live = liveSnap.val();
-  if (!live) reject("Auction lot could not be found.");
-  if (action === "pause") {
-    if (live.status !== "bidding") reject("Only an active bidding timer can be paused.");
-    const remainingMs = Math.max(0, Number(live.timerEndsAt || Date.now()) - Date.now());
-    await liveRef.update({ status: "paused", pausedRemainingMs: remainingMs, pausedAt: Date.now() });
-  } else {
-    if (live.status !== "paused") reject("The auction is not paused.");
-    const seconds = clampBidTimerSeconds(room.settings?.bidTimer, 15);
-    const remainingMs = Math.max(1000, Number(live.pausedRemainingMs || seconds * 1000));
-    await liveRef.update({ status: "bidding", timerEndsAt: Date.now() + remainingMs, pausedRemainingMs: null, pausedAt: null });
-  }
-  await roomRef.child("lastActivityAt").set(Date.now());
-  return { ok: true, action };
-});
+  const rootRef = database.ref("auctions/" + roomId);
+  const now = Date.now();
+  let failureReason = "Could not update the auction timer. Refresh and try again.";
+  const result = await rootRef.transaction((current) => {
+    failureReason = "Could not update the auction timer. Refresh and try again.";
+    if (!current?.room) {
+      failureReason = "Auction room could not be found.";
+      return;
+    }
+    const currentRoom = current.room;
+    if (currentRoom.hostId !== uid) {
+      failureReason = "Only the room host can change auction controls.";
+      return;
+    }
+    if (!canSendRoomChat(currentRoom, uid)) {
+      failureReason = "Only an active room host can change auction controls.";
+      return;
+    }
+    const live = current.live;
+    if (!live) {
+      failureReason = "Auction lot could not be found.";
+      return;
+    }
+
+    let nextLive;
+    if (action === "pause") {
+      if (live.status !== "bidding") {
+        failureReason = "Only an active bidding timer can be paused.";
+        return;
+      }
+      const remainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
+      nextLive = { ...live, status: "paused", pausedRemainingMs: remainingMs, pausedAt: now };
+    } else {
+      if (live.status !== "paused") {
+        failureReason = "The auction is not paused.";
+        return;
+      }
+      const seconds = clampBidTimerSeconds(currentRoom.settings?.bidTimer, 15);
+      const remainingMs = Math.max(1000, Number(live.pausedRemainingMs || seconds * 1000));
+      nextLive = {
+        ...live, status: "bidding", timerEndsAt: now + remainingMs,
+        pausedRemainingMs: null, pausedAt: null
+      };
+    }
+    return {
+      ...current,
+      live: nextLive,
+      room: { ...currentRoom, lastActivityAt: now }
+    };
+  }, undefined, false);
+  if (!result.committed) reject(failureReason);
+  return { ok: true, action };;
 
 
 export const endAuction = onCall({ enforceAppCheck: false }, async (request) => {
