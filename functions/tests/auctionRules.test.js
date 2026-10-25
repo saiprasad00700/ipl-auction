@@ -32,3 +32,28 @@ test("overseas limit honors mode maximum and prevents legacy settings exceeding 
   assert.equal(effectiveOverseasLimit({ settings: { auctionType: "mega", overseasLimit: 3 } }), 3);
   assert.equal(effectiveOverseasLimit({}), 4);
 });
+
+test("pausing preserves remaining time and records pause timestamp", () => {
+  const result = transitionBiddingTimer({ status: "bidding", timerEndsAt: 12500 }, "pause", 15, 10000);
+  assert.equal(result.ok, true);
+  assert.equal(result.live.status, "paused");
+  assert.equal(result.live.pausedRemainingMs, 2500);
+  assert.equal(result.live.pausedAt, 10000);
+});
+
+test("resuming restores the saved time instead of resetting the full timer", () => {
+  const result = transitionBiddingTimer({ status: "paused", pausedRemainingMs: 2200, pausedAt: 10000 }, "resume", 15, 20000);
+  assert.equal(result.ok, true);
+  assert.equal(result.live.status, "bidding");
+  assert.equal(result.live.timerEndsAt, 22200);
+  assert.equal(result.live.pausedRemainingMs, null);
+  assert.equal(result.live.pausedAt, null);
+});
+
+test("invalid timer transitions are rejected and fallback resume never has zero time", () => {
+  assert.equal(transitionBiddingTimer({ status: "paused" }, "pause", 15, 1).ok, false);
+  assert.equal(transitionBiddingTimer({ status: "bidding" }, "resume", 15, 1).ok, false);
+  const resumed = transitionBiddingTimer({ status: "paused", pausedRemainingMs: 0 }, "resume", 15, 100);
+  assert.equal(resumed.live.timerEndsAt, 1100);
+  assert.equal(transitionBiddingTimer(null, "pause", 15, 1).ok, false);
+});
