@@ -27,7 +27,7 @@ test("legacy rooms without a status remain startable if host is present", () => 
 import { canSubmitRtmCounterBid } from "../roomAuthorizationRules.js";
 
 test("RTM counter-bid requires the eligible room member and matching buyer team", () => {
-  const room = { hostId: "host", players: [{ id: "buyer" }, { id: "host" }] };
+  const room = { hostId: "host", status: "active", players: [{ id: "buyer" }, { id: "host" }] };
   const offer = { buyerId: "buyer", buyerTeamId: "CSK" };
   const team = { userId: "buyer", teamId: "CSK" };
   assert.equal(canSubmitRtmCounterBid({ uid: "buyer", room, offer, team }), true);
@@ -38,7 +38,7 @@ test("RTM counter-bid requires the eligible room member and matching buyer team"
 });
 
 test("only the host can submit a counter-bid for a bot buyer", () => {
-  const room = { hostId: "host", players: [{ id: "host" }] };
+  const room = { hostId: "host", status: "active", players: [{ id: "host" }] };
   const offer = { buyerId: "bot_CSK", buyerTeamId: "CSK" };
   const team = { userId: "bot_CSK", teamId: "CSK" };
   const botIds = ["bot_CSK"];
