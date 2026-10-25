@@ -57,20 +57,20 @@ function buildCharacter(group, palette, kind = 'player', role = 'Wicket-keeper')
     add(new THREE.CylinderGeometry(0.19, 0.22, 0.7, 10), dark, [-0.28, 0.25, 0], [1,1,1]);
     add(new THREE.CylinderGeometry(0.19, 0.22, 0.7, 10), dark, [0.28, 0.25, 0], [1,1,1]);
     const number = makeLabel('SS', '#ffffff', 0.95); number.position.set(0, 1.23, 0.52); group.add(number);
-    if (role === 'Batter' || role === 'Wicket-keeper' || role === 'All-rounder') {
+    {
       const bat = new THREE.Group(); bat.position.set(-0.78, 0.9, 0.22); bat.rotation.z = -0.18; group.add(bat);
       const wood = new THREE.MeshStandardMaterial({ color: 0xc99b5b, roughness: 0.6 });
       const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.36, 8), dark); handle.position.y = 0.28; bat.add(handle);
       const blade = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.88, 0.09), wood); blade.position.y = -0.2; bat.add(blade);
-      group.userData.bat = bat;
+      group.userData.bat = bat; group.userData.bat.visible = role === 'Batter' || role === 'Wicket-keeper' || role === 'All-rounder';
     }
-    if (role === 'Bowler' || role === 'All-rounder') {
+    {
       const ball = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), new THREE.MeshStandardMaterial({ color: 0xb91c32, roughness: 0.45 }));
-      ball.position.set(0.78, 1.3, 0.25); group.add(ball); group.userData.ball = ball;
+      ball.position.set(0.78, 1.3, 0.25); group.add(ball); group.userData.ball = ball; group.userData.ball.visible = role === 'Bowler' || role === 'All-rounder';
     }
-    if (role === 'Wicket-keeper') {
+    {
       const gloveMat = new THREE.MeshStandardMaterial({ color: 0xf2c66d, roughness: 0.6 });
-      [-0.67, 0.67].forEach((x) => { const glove = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), gloveMat); glove.scale.set(1, 0.78, 0.55); glove.position.set(x, 0.95, 0.3); group.add(glove); });
+      const gloves = []; [-0.67, 0.67].forEach((x) => { const glove = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), gloveMat); glove.scale.set(1, 0.78, 0.55); glove.position.set(x, 0.95, 0.3); group.add(glove); gloves.push(glove); }); group.userData.gloves = gloves; group.userData.gloves.forEach(g => { g.visible = role === 'Wicket-keeper'; });
     }
   }
 }
@@ -141,6 +141,8 @@ export default function CinematicPreview() {
   const [role, setRole] = useState('Wicket-keeper');
   const [intro, setIntro] = useState(true);
   const [introCount, setIntroCount] = useState(3);
+  const roleRef = useRef(role); const rtmRef = useRef(rtm);
+  roleRef.current = role; rtmRef.current = rtm;
   const shotRef = useRef(shot);
   const leaderRef = useRef(leader);
   shotRef.current = shot;
@@ -177,7 +179,9 @@ export default function CinematicPreview() {
         a.player.position.y = 0.52 + Math.sin(frame * 1.8) * 0.045;
         a.player.rotation.y = Math.sin(frame * 0.6) * 0.11;
         if (a.player.userData.bat) a.player.userData.bat.rotation.z = -0.18 + Math.sin(frame * 1.25) * 0.08;
-        if (a.player.userData.ball) a.player.userData.ball.position.y = 1.3 + Math.sin(frame * 2.4) * 0.12;
+        if (a.player.userData.ball) { a.player.userData.ball.position.y = 1.3 + Math.sin(frame * 2.4) * 0.12; a.player.userData.ball.visible = roleRef.current === 'Bowler' || roleRef.current === 'All-rounder'; }
+        if (a.player.userData.bat) a.player.userData.bat.visible = roleRef.current === 'Batter' || roleRef.current === 'Wicket-keeper' || roleRef.current === 'All-rounder';
+        if (a.player.userData.gloves) a.player.userData.gloves.forEach(g => { g.visible = roleRef.current === 'Wicket-keeper'; });
         a.auctioneer.userData.gavel.rotation.z = Math.sin(frame * 1.5) * 0.28 - 0.18;
         a.tables.forEach((t, i) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); });
         const targetShot = shotRef.current % 4;
