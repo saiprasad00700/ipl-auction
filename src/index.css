@@ -440,3 +440,30 @@
 @media (prefers-reduced-motion: reduce) {
   .ss-auctioneer-overlay { transform: none; }
 }
+
+
+/* Live auctioneer cues: visual-only response to the authoritative auction status. */
+.ss-auctioneer-stage[data-auction-status="bidding"] .ss-auctioneer-live-dot {
+  animation: ss-auctioneer-live-pulse .8s ease-in-out infinite;
+}
+.ss-auctioneer-stage[data-auction-status="sold"] .ss-auctioneer-podium-front {
+  color: #a7f3d0;
+  border-color: rgba(52,211,153,.5);
+  background: linear-gradient(100deg,rgba(6,78,59,.96),rgba(5,46,35,.96));
+}
+.ss-auctioneer-stage[data-auction-status="unsold"] .ss-auctioneer-podium-front {
+  color: #fecaca;
+  border-color: rgba(248,113,113,.45);
+  background: linear-gradient(100deg,rgba(127,29,29,.9),rgba(69,10,10,.96));
+}
+.ss-auctioneer-stage[data-auction-status="processing_sale"] .ss-auctioneer-podium-front {
+  color: #ddd6fe;
+  border-color: rgba(167,139,250,.5);
+}
+@keyframes ss-auctioneer-live-pulse {
+  0%,100% { opacity: 1; box-shadow: 0 0 .7rem rgba(52,211,153,.9); }
+  50% { opacity: .45; box-shadow: 0 0 .2rem rgba(52,211,153,.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-auctioneer-stage[data-auction-status="bidding"] .ss-auctioneer-live-dot { animation: none; }
+}
