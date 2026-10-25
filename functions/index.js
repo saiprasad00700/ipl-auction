@@ -443,6 +443,93 @@ const FRANCHISES = {
   LSG: "Lucknow Super Giants"
 };
 
+export const createAuctionRoom = onCall({ enforceAppCheck: false }, async (request) => {
+  const uid = requireAuth(request);
+  const { roomId, userId, userName, auctionType = "mega", isPublic = true, teamId = "" } = request.data || {};
+  requireRoomId(roomId);
+  if (userId !== uid) reject("You can only create a room for yourself.");
+  if (typeof userName !== "string" || !userName.trim() || userName.trim().length > 80) {
+    throw new HttpsError("invalid-argument", "Enter a valid display name.");
+  }
+  if (!["mega", "sprint11", "sprint5"].includes(auctionType)) {
+    throw new HttpsError("invalid-argument", "Invalid auction mode.");
+  }
+  if (typeof isPublic !== "boolean") {
+    throw new HttpsError("invalid-argument", "Room visibility must be public or private.");
+  }
+  if (teamId && !Object.hasOwn(FRANCHISES, teamId)) {
+    throw new HttpsError("invalid-argument", "Choose a valid franchise.");
+  }
+
+  const defaults = auctionType === "sprint5"
+    ? { budget: 60, squadLimit: 5, overseasLimit: 2 }
+    : auctionType === "sprint11"
+      ? { budget: 90, squadLimit: 11, overseasLimit: 4 }
+      : { budget: 120, squadLimit: 25, overseasLimit: 4 };
+  const now = Date.now();
+  const cleanName = userName.trim();
+  const teamName = teamId ? FRANCHISES[teamId] : "Unknown";
+  const host = {
+    id: uid,
+    name: cleanName,
+    team: teamId || "",
+    teamName,
+    isHost: true
+  };
+  const rootRef = database.ref(`auctions/${roomId}`);
+  const result = await rootRef.transaction((current) => {
+    if (current) return;
+    const teams = {};
+    if (teamId) {
+      teams[`${roomId}_${uid}`] = buildTeamAssignmentRecord(
+        null, roomId, uid, teamId, teamName, defaults.budget
+      );
+    }
+    return {
+      room: {
+        hostId: uid,
+        hostName: cleanName,
+        status: "waiting",
+        auctionType,
+        isPublic,
+        createdAt: now,
+        lastActivityAt: now,
+        squadLimit: defaults.squadLimit,
+        overseasLimit: defaults.overseasLimit,
+        players: [host],
+        bannedPlayers: [],
+        settings: {
+          bidTimer: 15,
+          budget: defaults.budget,
+          squadLimit: defaults.squadLimit,
+          overseasLimit: defaults.overseasLimit,
+          auctionType
+        }
+      },
+      teams
+    };
+  }, undefined, false);
+
+  if (!result.committed) reject("That room code already exists. Generate a new code and try again.");
+  if (isPublic) {
+    try {
+      await database.ref(`publicRooms/${roomId}`).set({
+        roomId,
+        hostId: uid,
+        hostName: cleanName,
+        status: "waiting",
+        auctionType,
+        createdAt: now
+      });
+    } catch (error) {
+      // The authoritative room exists; private-code joining still works if the
+      // public directory write is temporarily unavailable.
+      console.error("Could not publish public room directory entry", { roomId, message: error?.message });
+    }
+  }
+  return { ok: true, roomId, createdAt: now, ...defaults };
+});
+
 export const joinAuctionRoom = onCall({ enforceAppCheck: false }, async (request) => {
   const uid = requireAuth(request);
   const { roomId, userId, userName } = request.data || {};
