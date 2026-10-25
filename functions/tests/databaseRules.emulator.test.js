@@ -38,8 +38,15 @@ test('unrelated authenticated users cannot change auction status', async () => {
   await assertFails(set(ref(env.authenticatedContext('outsider').database(), `auctions/${roomId}/room/status`), 'analyzing'));
 });
 
-test('host can update auction status using current rules', async () => {
-  await assertSucceeds(set(ref(env.authenticatedContext('host-1').database(), `auctions/${roomId}/room/status`), 'analyzing'));
+test('even the host cannot directly change auction status', async () => {
+  await assertFails(set(ref(env.authenticatedContext('host-1').database(), `auctions/${roomId}/room/status`), 'analyzing'));
+});
+
+test('clients cannot directly replace the player order', async () => {
+  const hostDb = env.authenticatedContext('host-1').database();
+  const memberDb = env.authenticatedContext('member-1').database();
+  await assertFails(set(ref(hostDb, `auctions/${roomId}/playerOrder`), [0, 1, 2]));
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/playerOrder`), [0, 1, 2]));
 });
 
 test('non-host cannot replace the entire auction room', async () => {
