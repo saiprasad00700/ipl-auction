@@ -9,6 +9,8 @@ export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
+export const MIN_ALL_ROUNDERS_IN_XI = 2;
+export const MIN_BOWLERS_IN_XI = 5;
 
 const normalizeRole = (player) => {
   const role = String(player?.role || player?.playingRole || '').toLowerCase();
@@ -87,11 +89,17 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
     || !selectedIds.every((id) => squadIds.has(id))) return false;
 
   // IPL's four-overseas-player restriction applies to the starting XI, not the full squad.
-  const overseasInXI = startingXI.reduce((count, item) => {
-    const player = toPlayer(item, playerCatalog);
-    return count + (player && isOverseasPlayer(player) ? 1 : 0);
-  }, 0);
-  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI;
+  const resolvedXI = startingXI.map((item) => toPlayer(item, playerCatalog)).filter(Boolean);
+  const overseasInXI = resolvedXI.filter(isOverseasPlayer).length;
+  const allRoundersInXI = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
+  // All-rounders count toward the five-player bowling group, as required by the game rules.
+  const bowlingOptionsInXI = resolvedXI.filter((player) =>
+    ['ar', 'bowl'].includes(normalizeRole(player))
+  ).length;
+
+  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI
+    && allRoundersInXI >= MIN_ALL_ROUNDERS_IN_XI
+    && bowlingOptionsInXI >= MIN_BOWLERS_IN_XI;
 }
 
 /** Deterministic validation of the no-ties 1..N ranking contract. */
