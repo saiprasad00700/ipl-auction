@@ -97,3 +97,29 @@ test("team-stat synchronization reads authoritative data and updates roster atom
   assert.ok(!source.includes("playersRef.transaction("));
   assert.ok(!source.includes("teamSnap"));
 });
+
+test("expired RTM finalization and room heartbeat are atomic", () => {
+  const start = backendSource.indexOf("export const finalizeExpiredRetentionOffer = onCall(");
+  const end = backendSource.indexOf("\n\nexport const advanceAuctionPlayer", start);
+  assert.ok(start >= 0 && end > start, "finalizeExpiredRetentionOffer callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
+  assert.ok(source.includes("live:"));
+  assert.ok(!source.includes("liveRef.transaction("));
+  assert.doesNotMatch(source, /room\/lastActivityAt[\s\S]*?\.set\(/);
+});
+
+test("advancing auction lots and entering the XI phase are atomic", () => {
+  const start = backendSource.indexOf("export const advanceAuctionPlayer = onCall(");
+  const end = backendSource.indexOf("\n\nexport const startAuction", start);
+  assert.ok(start >= 0 && end > start, "advanceAuctionPlayer callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("current.playerOrderIds"));
+  assert.ok(source.includes('status: "awaiting_xi"'));
+  assert.ok(source.includes("xiSubmissionDeadline: now + 120000"));
+  assert.ok(source.includes("timerEndsAt: now + clampBidTimerSeconds"));
+  assert.ok(!source.includes("liveRef.transaction("));
+  assert.ok(!source.includes("roomRef.update("));
+});
