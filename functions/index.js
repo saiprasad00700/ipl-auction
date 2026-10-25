@@ -206,11 +206,6 @@ export const submitRetentionCounterBid = onCall({ enforceAppCheck: false }, asyn
   })) {
     reject("Only the active eligible buyer, or the host acting for a bot buyer, can submit this counter-bid.");
   }
-  if (botAction && botUserId !== String(request.data?.botTeamId || "").replace(/^bot_/, "").startsWith("bot_")
-    && !BOT_IDS.has(botUserId)) {
-    reject("Invalid bot counter-bid identity.");
-  }
-
   const liveRef = roomRef.child("live");
   const now = Date.now();
   const result = await liveRef.transaction((live) => {
