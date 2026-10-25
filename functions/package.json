@@ -7,7 +7,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "test": "node --check index.js && node --test tests/saleSettlementHelpers.test.js tests/playingXIRules.test.js tests/auctionRules.test.js tests/teamAssignmentRules.test.js tests/auctionSettingsRules.test.js tests/roomMemberRules.test.js tests/roomLifecycleRules.test.js tests/roomAuthorizationRules.test.js tests/systemEventRules.test.js tests/clientCallableContract.test.js",
+    "test": "node --check index.js && node --test tests/auctionEndRules.test.js tests/saleSettlementHelpers.test.js tests/playingXIRules.test.js tests/auctionRules.test.js tests/teamAssignmentRules.test.js tests/auctionSettingsRules.test.js tests/roomMemberRules.test.js tests/roomLifecycleRules.test.js tests/roomAuthorizationRules.test.js tests/systemEventRules.test.js tests/clientCallableContract.test.js",
     "test:rules": "node --test tests/databaseRules.emulator.test.js"
   },
   "dependencies": {
