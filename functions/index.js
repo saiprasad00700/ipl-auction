@@ -10,6 +10,7 @@ import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTea
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember } from "./roomMemberRules.js";
 import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
+import { canSyncTeamStats, canStartAuction } from "./roomAuthorizationRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -447,9 +448,10 @@ export const syncRoomPlayerStats = onCall({ enforceAppCheck: false }, async (req
   const room = roomSnap.val();
   const team = teamSnap.val();
   if (!room) reject("Auction room could not be found.");
-  const activeCaller = (Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid);
-  if (!activeCaller || room.bannedPlayers?.includes(uid)) {
-    reject("Only an active room member can synchronize team totals.");
+  const activeCaller = (Array.isArray(room.players) ? room.players : []).some((p) => p?.id === uid)
+    && !(Array.isArray(room.bannedPlayers) && room.bannedPlayers.includes(uid));
+  if (!canSyncTeamStats(uid, userId, room.hostId, activeCaller)) {
+    reject("Only the manager or room host can synchronize these team totals.");
   }
   if (!team || team.userId !== userId) reject("The authoritative team record could not be found.");
   const playersRef = roomRef.child("players");
@@ -842,19 +844,19 @@ export const startAuction = onCall({ enforceAppCheck: false }, async (request) =
   const room = roomSnap.val();
   if (!room) reject("Auction room could not be found.");
   if (room.hostId !== uid) reject("Only the room host can start the auction.");
-  if (!["waiting", "lobby"].includes(room.status || "waiting")) reject("The auction has already started.");
-  const roster = Array.isArray(room.players) ? room.players : [];
-  if (!roster.some((p) => p?.id === uid && !room.bannedPlayers?.includes(uid))) {
-    reject("The host must be an active room member.");
-  }
-  const now = Date.now();
   const liveRef = root.child("live");
   const liveSnap = await liveRef.get();
-  if (liveSnap.exists()) reject("Auction live state already exists.");
+  if (!canStartAuction(room, liveSnap.exists(), uid)) {
+    reject("The auction has already started or the host is not an active room member.");
+  }
+  const now = Date.now();
+  const claim = await roomRef.transaction((current) => {
+    if (!canStartAuction(current, false, uid)) return;
+    return { ...current, status: "active", playerOrder, lastActivityAt: now };
+  }, undefined, false);
+  if (!claim.committed) reject("Another start request won the race. Refresh the room.");
+  const claimedRoom = claim.snapshot.val();
   const updates = {
-    "room/status": "active",
-    "room/playerOrder": playerOrder,
-    "room/lastActivityAt": now,
     "playerOrder": playerOrder,
     "playerOrderIds": playerOrderIds,
     "live": {
@@ -863,12 +865,24 @@ export const startAuction = onCall({ enforceAppCheck: false }, async (request) =
       highBidderId: "",
       highBidderName: "No Bids",
       highBidderTeamId: "",
-      timerEndsAt: now + clampBidTimerSeconds(room.settings?.bidTimer, 15) * 1000,
+      timerEndsAt: now + clampBidTimerSeconds(claimedRoom.settings?.bidTimer, 15) * 1000,
       status: "bidding"
     },
     "room/winnerAnalysisStatus": null
   };
-  await root.update(updates);
+  try {
+    await root.update(updates);
+  } catch (error) {
+    // If initialization fails after the room claim, allow a safe retry only
+    // while no live lot has been created.
+    await roomRef.transaction((current) => {
+      if (!current || current.status !== "active" || current.lastActivityAt !== now) return;
+      const latestLive = current.live;
+      if (latestLive) return;
+      return { ...current, status: room.status || "waiting", playerOrder: null, lastActivityAt: Date.now() };
+    }, undefined, false);
+    throw error;
+  }
   try { await database.ref(`publicRooms/${roomId}`).update({ status: "active" }); } catch {}
   return { ok: true, startedAt: now };
 });
