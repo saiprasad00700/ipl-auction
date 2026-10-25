@@ -261,7 +261,7 @@ export default function CinematicPreview() {
           <div className="ss3d-lot-label"><span>MARQUEE SET 01</span><small>BASE PRICE</small><strong>₹2.00 <i>Cr</i></strong></div>
           <div className="ss3d-bid-hud"><small>CURRENT BID</small><strong>₹{bid.toFixed(2)} <i>Cr</i></strong><span>LEADING · {leader}</span></div>
           {intro && <div className="ss3d-intro-overlay"><small>PLAYER INTRODUCTION</small><strong>{introCount || 'BID'}</strong><span>BIDDING OPENS AFTER INTRO</span></div>}
-          <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : '')}>{outcome}</div>
+          <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : outcome === 'UNSOLD' ? 'is-unsold' : '')}>{outcome}</div>
           <div className="ss3d-player-caption"><span>LOT 001 / {role.toUpperCase()}</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
           <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
         </div>
