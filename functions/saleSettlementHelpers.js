@@ -37,3 +37,14 @@ export function applySaleToTeam(team, playerId, price, retained = false) {
     squad: [...team.squad, { id: playerId, bid: roundedPrice }]
   };
 }
+
+export function canAffordRtmMatch(team, counterBid) {
+  const remaining = Number(team?.budgetRemaining);
+  const amount = Number(counterBid);
+  return Boolean(team)
+    && Number.isFinite(remaining)
+    && remaining >= 0
+    && Number.isFinite(amount)
+    && amount >= 0
+    && amount <= remaining;
+}
