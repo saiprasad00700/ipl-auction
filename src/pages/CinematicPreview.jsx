@@ -115,6 +115,16 @@ function createArena(scene) {
     const label = makeLabel(name, '#' + new THREE.Color(color).getHexString(), 1.8); label.position.set(0, 0.47, 0.74); tableGroup.add(label);
     const screen = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.04), new THREE.MeshBasicMaterial({ color: 0x0a1827 })); screen.position.set(0, 1.12, 0); tableGroup.add(screen);
     const dot = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color })); dot.position.set(0.86, 1.13, 0); tableGroup.add(dot);
+    const bidPaddle = new THREE.Group(); bidPaddle.position.set(0.82, 1.18, 0.28); tableGroup.add(bidPaddle);
+    const paddleFace = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.1, 24), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.65, metalness: 0.25 }));
+    paddleFace.rotation.x = Math.PI / 2; paddleFace.position.y = 0.28; bidPaddle.add(paddleFace);
+    const paddleStick = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.42, 10), mat(0xd8e4f0, 0.35, 0.45)); paddleStick.position.y = -0.02; bidPaddle.add(paddleStick);
+    tableGroup.userData.bidPaddle = bidPaddle; bidPaddle.visible = false;
+    const rtmPaddle = new THREE.Group(); rtmPaddle.position.set(-0.82, 1.18, 0.28); tableGroup.add(rtmPaddle);
+    const rtmFace = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.1, 24), new THREE.MeshStandardMaterial({ color: 0xa78bfa, emissive: 0x6d28d9, emissiveIntensity: 0.9, metalness: 0.3 }));
+    rtmFace.rotation.x = Math.PI / 2; rtmFace.position.y = 0.28; rtmPaddle.add(rtmFace);
+    const rtmStick = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.42, 10), mat(0xe9e5ff, 0.35, 0.45)); rtmStick.position.y = -0.02; rtmPaddle.add(rtmStick);
+    tableGroup.userData.rtmPaddle = rtmPaddle; rtmPaddle.visible = false;
     const players = new THREE.Group(); players.position.set(0, 0, 0.15); tableGroup.add(players);
     [-0.55, 0, 0.55].forEach((dx, j) => { const p = new THREE.Group(); p.position.set(dx, 0, j === 1 ? -0.12 : 0.04); p.scale.setScalar(0.24); players.add(p); buildCharacter(p, color, 'player'); });
     tables.push({ name, group: tableGroup, edge, color, angle, dot });
@@ -183,7 +193,7 @@ export default function CinematicPreview() {
         if (a.player.userData.bat) a.player.userData.bat.visible = roleRef.current === 'Batter' || roleRef.current === 'Wicket-keeper' || roleRef.current === 'All-rounder';
         if (a.player.userData.gloves) a.player.userData.gloves.forEach(g => { g.visible = roleRef.current === 'Wicket-keeper'; });
         a.auctioneer.userData.gavel.rotation.z = Math.sin(frame * 1.5) * 0.28 - 0.18;
-        a.tables.forEach((t, i) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); });
+        a.tables.forEach((t) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); if (t.group.userData.bidPaddle) { t.group.userData.bidPaddle.visible = active && !rtmRef.current; t.group.userData.bidPaddle.position.y = 1.18 + (active && !rtmRef.current ? Math.abs(Math.sin(frame * 2.2)) * 0.36 : 0); } if (t.group.userData.rtmPaddle) { t.group.userData.rtmPaddle.visible = active && rtmRef.current; t.group.userData.rtmPaddle.position.y = 1.18 + (active && rtmRef.current ? Math.abs(Math.sin(frame * 2.8)) * 0.42 : 0); } });
         const targetShot = shotRef.current % 4;
         const poses = [
           [0, 12.5, 27, 0, 1.1, 0],
