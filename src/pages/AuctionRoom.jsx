@@ -1565,6 +1565,7 @@ const AuctionRoom = () => {
                                     <strong>{showRoleIntro ? '3' : Math.max(0, Number(timeLeft) || 0)}</strong>
                                     <span className="ss-countdown-unit">{showRoleIntro ? 'SEC INTRO' : 'SECONDS'}</span>
                                  </div>
+                                 <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{!showRoleIntro && displayAuctionState?.status === 'bidding' && Number(timeLeft) === 5 ? 'Five seconds remaining to bid.' : ''}</span>
                                  <div className="ss-cinematic-player-lower-third" aria-hidden="true">
                                     <span className="ss-lower-third-eyebrow">{showRoleIntro ? 'NEXT PLAYER' : displayAuctionState?.status === 'processing_sale' ? 'RETENTION REVIEW' : displayAuctionState?.status === 'sold' ? 'LOT CONFIRMED' : displayAuctionState?.status === 'unsold' ? 'LOT CLOSED' : 'PLAYER ON THE BLOCK'}</span>
                                     <strong>{currentPlayer?.name || 'Player awaiting selection'}</strong>
