@@ -93,6 +93,16 @@ test('reduced-motion preferences are supported by the cinematic styling', () => 
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 });
 
+test('outside dismissal restores focus and panels respect mobile safe areas', () => {
+  assert.match(room, /settingsTriggerRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(room, /focus\(\{ preventScroll: true \}\)/);
+  assert.match(css, /env\(safe-area-inset-bottom, 0px\)/);
+  assert.match(css, /env\(safe-area-inset-top, 0px\)/);
+  assert.match(css, /@media \(hover: none\) and \(pointer: coarse\)/);
+  assert.match(css, /min-height: 2\.75rem/);
+  assert.match(css, /overscroll-behavior: contain/);
+});
+
 test('keyboard users receive a visible focus indicator', () => {
   assert.match(css, /:focus-visible/);
   assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
