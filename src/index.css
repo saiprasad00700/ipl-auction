@@ -342,3 +342,46 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-cinematic-player-stage.ss-camera-cut-active { animation:none; }
 }
+
+
+/* Broadcast camera frame and shot labels for the player/franchise focus sequence. */
+.ss-camera-frame-corners {
+  position:absolute; z-index:25; inset:.9rem; pointer-events:none; opacity:.6;
+}
+.ss-camera-frame-corners i {
+  position:absolute; width:1.2rem; height:1.2rem; border-color:rgba(167,243,208,.75); border-style:solid;
+}
+.ss-camera-frame-corners i:nth-child(1) { top:0; left:0; border-width:2px 0 0 2px; border-radius:.2rem 0 0 0; }
+.ss-camera-frame-corners i:nth-child(2) { top:0; right:0; border-width:2px 2px 0 0; border-radius:0 .2rem 0 0; }
+.ss-camera-frame-corners i:nth-child(3) { bottom:0; left:0; border-width:0 0 2px 2px; border-radius:0 0 0 .2rem; }
+.ss-camera-frame-corners i:nth-child(4) { bottom:0; right:0; border-width:0 2px 2px 0; border-radius:0 0 .2rem 0; }
+.ss-arena-shot-label {
+  position:absolute; z-index:40; top:3.15rem; right:.9rem;
+  padding:.28rem .5rem; border:1px solid rgba(148,163,184,.22); border-radius:.35rem;
+  background:rgba(2,6,23,.62); color:#cbd5e1; font-size:.48rem; font-weight:900; letter-spacing:.12em;
+  backdrop-filter:blur(8px);
+}
+.ss-cinematic-player-stage.ss-camera-cut-active .ss-camera-frame-corners {
+  animation:ss-camera-frame-flash .65s ease-out both;
+}
+.ss-cinematic-player-stage.ss-camera-cut-active .ss-arena-shot-label {
+  animation:ss-camera-shot-label .65s ease-out both;
+}
+@keyframes ss-camera-frame-flash {
+  0% { opacity:.15; transform:scale(.985); }
+  35% { opacity:1; transform:scale(1); }
+  100% { opacity:.6; transform:scale(1); }
+}
+@keyframes ss-camera-shot-label {
+  0% { opacity:0; transform:translateY(-.35rem); }
+  35%,100% { opacity:1; transform:translateY(0); }
+}
+@media (max-width:640px) {
+  .ss-camera-frame-corners { inset:.45rem; }
+  .ss-camera-frame-corners i { width:.75rem; height:.75rem; }
+  .ss-arena-shot-label { top:2.75rem; right:.55rem; font-size:.4rem; letter-spacing:.07em; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-cinematic-player-stage.ss-camera-cut-active .ss-camera-frame-corners,
+  .ss-cinematic-player-stage.ss-camera-cut-active .ss-arena-shot-label { animation:none; }
+}
