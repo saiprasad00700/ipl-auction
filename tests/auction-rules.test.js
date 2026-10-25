@@ -33,8 +33,9 @@ test('timer values are rounded and clamped to the server-supported 3–15 second
   assert.equal(clampBidTimerSeconds(undefined), DEFAULT_BID_TIMER_SECONDS);
   assert.equal(clampBidTimerSeconds(2), MIN_BID_TIMER_SECONDS);
   assert.equal(clampBidTimerSeconds(3.4), 3);
-  assert.equal(clampBidTimerSeconds(8.7), 9);
+  assert.equal(clampBidTimerSeconds(8.7), 10);
   assert.equal(clampBidTimerSeconds(60), MAX_BID_TIMER_SECONDS);
+  assert.equal(clampBidTimerSeconds(7), 5);
 });
 
 test('mode-aware overseas defaults apply when room settings are absent', () => {
