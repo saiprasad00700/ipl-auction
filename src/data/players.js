@@ -908,7 +908,7 @@ export const IPL_PLAYERS = [
     "type": "Indian",
     "country": "IND",
     "basePrice": 1,
-    "set": "Set 1",
+    "set": "Marquee Set 1",
     "image": "https://documents.iplt20.com/ipl/IPLHeadshot2026/212.png",
     "stats": {
       "matches": 92,
