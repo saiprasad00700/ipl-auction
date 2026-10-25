@@ -248,3 +248,79 @@
   .ss-franchise-table.is-active .ss-franchise-table-light { animation: none; opacity: .8; }
   .ss-franchise-table.bid-paddle-raised, .ss-franchise-table.rtm-paddle-raised { animation: none; }
 }
+
+
+/* Original cinematic auctioneer illustration (CSS 2.5D; no external likeness/assets). */
+.ss-auctioneer-stage {
+  position: relative;
+  display: flex;
+  min-height: 17rem;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: 1.25rem .75rem 0;
+  isolation: isolate;
+  background: radial-gradient(ellipse at 50% 75%, rgba(16,185,129,.16), transparent 46%), linear-gradient(180deg, rgba(3,10,20,.12), rgba(3,10,20,.65));
+}
+.ss-auctioneer-stage.is-compact { min-height: 13.5rem; }
+.ss-auctioneer-backlight {
+  position: absolute; z-index: -1; top: -35%; left: 50%; width: 70%; height: 130%;
+  transform: translateX(-50%); opacity: .7;
+  background: conic-gradient(from 245deg at 50% 20%, transparent 0deg, rgba(45,212,191,.12) 28deg, transparent 54deg, rgba(96,165,250,.12) 82deg, transparent 115deg);
+  filter: blur(5px); animation: ss-auctioneer-light-sweep 8s ease-in-out infinite alternate;
+}
+.ss-auctioneer-caption {
+  position: absolute; top: .6rem; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .45rem; white-space: nowrap;
+  color: #a7f3d0; font-size: .56rem; font-weight: 950; letter-spacing: .2em;
+}
+.ss-auctioneer-live-dot { width: .38rem; height: .38rem; border-radius: 50%; background: #34d399; box-shadow: 0 0 .7rem rgba(52,211,153,.9); }
+.ss-auctioneer-figure {
+  position: absolute; z-index: 2; bottom: 3.9rem; left: 50%; width: 8.4rem; height: 10.5rem;
+  transform: translateX(-50%); transform-style: preserve-3d;
+  animation: ss-auctioneer-idle 3.5s ease-in-out infinite;
+}
+.ss-auctioneer-head {
+  position: absolute; top: .1rem; left: 2.9rem; width: 2.55rem; height: 2.75rem;
+  border-radius: 46% 46% 44% 44%; background: linear-gradient(105deg,#f2c29d,#bb805e);
+  box-shadow: inset -.35rem -.2rem .35rem rgba(65,30,20,.24), 0 0 0 2px rgba(255,255,255,.06);
+}
+.ss-auctioneer-hair { position:absolute; top:-.1rem; left:.02rem; width:2.5rem; height:.95rem; border-radius:65% 65% 20% 20%; background:#17212e; }
+.ss-auctioneer-face { position:absolute; top:1.05rem; left:.45rem; right:.45rem; display:flex; justify-content:space-between; }
+.ss-auctioneer-face i { width:.28rem; height:.18rem; border-radius:50%; background:#172033; }
+.ss-auctioneer-face span { position:absolute; top:.7rem; left:.5rem; width:.7rem; height:.22rem; border-bottom:2px solid rgba(93,46,34,.7); border-radius:50%; }
+.ss-auctioneer-neck { position:absolute; top:2.55rem; left:3.65rem; width:1.05rem; height:.9rem; background:#c68a67; }
+.ss-auctioneer-torso {
+  position:absolute; top:3.1rem; left:1.9rem; width:4.6rem; height:5.3rem;
+  border-radius:1rem 1rem .4rem .4rem; clip-path:polygon(22% 0,78% 0,100% 20%,88% 100%,12% 100%,0 20%);
+  background:linear-gradient(100deg,#0f172a,#25364c 48%,#111827); box-shadow:inset -.7rem 0 1rem rgba(0,0,0,.35);
+}
+.ss-auctioneer-shirt { position:absolute; top:0; left:1.55rem; width:1.5rem; height:2.1rem; background:linear-gradient(90deg,#f8fafc,#cbd5e1); clip-path:polygon(0 0,100% 0,70% 100%,50% 78%,30% 100%); }
+.ss-auctioneer-tie { position:absolute; top:.4rem; left:2.05rem; width:.38rem; height:2.25rem; background:linear-gradient(90deg,#b45309,#fbbf24,#92400e); clip-path:polygon(30% 0,70% 0,100% 20%,60% 100%,40% 100%,0 20%); }
+.ss-auctioneer-pocket { position:absolute; top:1.4rem; right:.7rem; width:.75rem; height:.6rem; border-top:2px solid #94a3b8; }
+.ss-auctioneer-arm { position:absolute; z-index:3; top:3.55rem; width:1.1rem; height:3.8rem; border-radius:1rem; background:linear-gradient(90deg,#b97b58,#f0bd96); transform-origin:top center; }
+.ss-auctioneer-arm-left { left:1.7rem; transform:rotate(26deg); }
+.ss-auctioneer-arm-right { right:1.55rem; height:3.1rem; transform:rotate(-43deg); animation:ss-auctioneer-gavel-gesture 2.8s ease-in-out infinite; }
+.ss-auctioneer-hand { position:absolute; z-index:5; width:.9rem; height:.85rem; border-radius:45%; background:#e5b18b; }
+.ss-auctioneer-hand-left { top:6.9rem; left:1.75rem; }
+.ss-auctioneer-hand-right { top:5.1rem; right:.65rem; }
+.ss-auctioneer-gavel { position:absolute; top:-.75rem; right:-.35rem; width:.4rem; height:2.6rem; border-radius:.2rem; transform:rotate(-28deg); background:linear-gradient(90deg,#78350f,#d97706,#92400e); box-shadow:0 0 .5rem rgba(245,158,11,.25); }
+.ss-auctioneer-gavel span { position:absolute; top:-.15rem; left:-.48rem; width:1.35rem; height:.48rem; border-radius:.2rem; background:linear-gradient(180deg,#fbbf24,#92400e); }
+.ss-auctioneer-podium { position:absolute; z-index:4; bottom:0; left:50%; width:min(78%,22rem); transform:translateX(-50%); }
+.ss-auctioneer-podium-top { position:relative; z-index:2; display:flex; align-items:center; justify-content:center; gap:.6rem; min-height:1.8rem; border:1px solid rgba(167,243,208,.55); border-radius:.45rem .45rem 0 0; background:linear-gradient(90deg,#064e3b,#0f766e,#064e3b); color:#ecfdf5; box-shadow:0 0 1.5rem rgba(16,185,129,.18); }
+.ss-auctioneer-podium-top span { font-size:1rem; font-weight:1000; letter-spacing:.12em; }
+.ss-auctioneer-podium-top small { font-size:.48rem; font-weight:900; letter-spacing:.18em; }
+.ss-auctioneer-podium-front { display:grid; place-items:center; height:2.2rem; border:1px solid rgba(148,163,184,.18); border-top:0; background:linear-gradient(100deg,#0b1220,#18283a,#0b1220); color:#94a3b8; font-size:.48rem; font-weight:900; letter-spacing:.22em; }
+.ss-auctioneer-floor-glow { position:absolute; bottom:3.9rem; left:50%; width:65%; height:.7rem; transform:translateX(-50%); border-radius:50%; background:rgba(45,212,191,.28); filter:blur(1rem); }
+@keyframes ss-auctioneer-idle { 0%,100% { translate:0 0; } 50% { translate:0 -.25rem; } }
+@keyframes ss-auctioneer-gavel-gesture { 0%,70%,100% { transform:rotate(-43deg); } 78% { transform:rotate(-62deg); } 86% { transform:rotate(-35deg); } }
+@keyframes ss-auctioneer-light-sweep { from { rotate:-4deg; opacity:.4; } to { rotate:4deg; opacity:.85; } }
+@media (max-width:640px) {
+  .ss-auctioneer-stage.is-compact { min-height:11.5rem; }
+  .ss-auctioneer-figure { transform:translateX(-50%) scale(.8); transform-origin:bottom center; bottom:3.55rem; }
+  .ss-auctioneer-podium { width:88%; }
+  .ss-auctioneer-podium-front { height:1.8rem; font-size:.4rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-auctioneer-backlight,.ss-auctioneer-figure,.ss-auctioneer-arm-right { animation:none; }
+}
