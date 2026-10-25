@@ -8,15 +8,15 @@
       room. The public internet must never be able to read, tamper with, or
       delete a room. Every request must be authenticated.
 
-      How the app uses the tree (src/contexts/AuctionContext.jsx):
-        auctions/{roomId}/room            host creates; any room member updates
-                                          players/status; host-only for rules/bans
-        auctions/{roomId}/live            host starts a lot; ANY member may bid
-                                          and may close an expired lot (fallback)
-        auctions/{roomId}/playerOrder     host only (start auction)
-        auctions/{roomId}/messages        chat + system sale logs (any member)
-        auctions/{roomId}/teams/{id}      per-team roster/purse, synced by clients
-        auctions/{roomId}/presence/{uid}  per-user online flag
+      Security boundary:
+        auctions/{roomId}/room            host creates initial room; lifecycle and
+                                          roster/settings mutations use callables
+        auctions/{roomId}/live            bidding and RTM mutations use callables
+        auctions/{roomId}/playerOrder     trusted startAuction callable only
+        auctions/{roomId}/messages        authenticated members may write text chat;
+                                          system messages are server-owned
+        auctions/{roomId}/teams/{id}      trusted callables only
+        auctions/{roomId}/presence/{uid}  user may write their own online flag
     */
     ".read": false,
     ".write": false,
@@ -62,14 +62,14 @@
           runs after a sale will simply no-op for non-hosts (it is wrapped in a
           try/catch); use scripts/cleanup-rtdb-auctions.js to purge old rooms.
         */
-        ".write": "auth != null && data.child('room/hostId').val() == auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('room/hostId').val() == auth.uid) || (!newData.exists() && data.child('room/hostId').val() == auth.uid))",
 
         "room": {
           ".read": "auth != null",
 
           // Created by the host when the room node is empty; afterwards only the
           // host may replace the whole document.
-          ".write": "auth != null && (!data.exists() || data.child('hostId').val() == auth.uid)",
+          ".write": "auth != null && !data.exists() && newData.child('hostId').val() == auth.uid",
 
           // Host identity can never change once set.
           "hostId": { ".validate": "newData.isString() && (!data.exists() || newData.val() == data.val())" },
@@ -77,18 +77,19 @@
           // Roster is updated by every member (join / team pick) and by the
           // client that settles a lot (spent / squadCount), so it stays open to
           // authenticated users. (RTDB rules cannot assert "is an array".)
-          "players": { ".write": "auth != null" },
+          "players": { ".write": false },
 
           // Activity heartbeat used by the scheduled 30-minute inactivity cleanup.
           "lastActivityAt": {
-            ".write": "auth != null",
-            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+            // Updated only by trusted server functions.
+            ".write": false
           },
 
-          // Lot lifecycle. The host-fallback that closes an expired lot can run
-          // on any client, so this cannot be host-only.
+          // Auction lifecycle state is server-owned; clients use callable functions.
           "status": {
-            ".write": "auth != null && (root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid || data.val() == newData.val() || (data.val() == 'awaiting_xi' && newData.val() == 'analyzing') || (data.val() == 'analyzing' && (newData.val() == 'completed' || newData.val() == 'analysis_failed')))",
+            // Status transitions are server-owned. Initial room creation is still
+            // allowed by the room-node create rule; Admin SDK callables bypass rules.
+            ".write": false,
             ".validate": "newData.val() == 'waiting' || newData.val() == 'active' || newData.val() == 'paused' || newData.val() == 'awaiting_xi' || newData.val() == 'analyzing' || newData.val() == 'analysis_failed' || newData.val() == 'completed'"
           },
 
@@ -98,9 +99,8 @@
         },
 
         "live": {
-          // Bids are placed by any authenticated member; the lot may be closed by
-          // any client once the server-verified timer has expired.
-          ".write": "auth != null && ((!data.child('retentionOffer/decision').exists() && !newData.child('retentionOffer/decision').exists()) || (data.child('retentionOffer/decision').exists() && newData.child('retentionOffer/decision').val() == data.child('retentionOffer/decision').val()) || (!data.child('retentionOffer/decision').exists() && auth.uid == data.child('retentionOffer/eligibleUserId').val() && newData.child('retentionOffer/decision').exists() && newData.child('retentionOffer/decidedBy').val() == auth.uid) || (!data.child('retentionOffer/decision').exists() && auth.uid == root.child('auctions').child($roomId).child('room/hostId').val() && data.child('retentionOffer/eligibleUserId').val().beginsWith('bot_') && newData.child('retentionOffer/decision').exists() && newData.child('retentionOffer/decidedBy').val() == auth.uid) || (data.child('retentionOffer/decision').val() == 'accept' && !newData.child('retentionOffer/decision').exists() && auth.uid == data.child('retentionOffer/buyerId').val() && data.child('retentionOffer/phase').val() == 'counter_bid' && newData.child('retentionOffer/phase').val() == 'match_decision' && newData.child('retentionOffer/counterBid').isNumber() && newData.child('retentionOffer/counterBid').val() > data.child('retentionOffer/bid').val()) || (data.child('retentionOffer/decision').val() == 'accept' && !newData.child('retentionOffer/decision').exists() && auth.uid == root.child('auctions').child($roomId).child('room/hostId').val() && data.child('retentionOffer/buyerId').val().beginsWith('bot_') && data.child('retentionOffer/phase').val() == 'counter_bid' && newData.child('retentionOffer/phase').val() == 'match_decision' && newData.child('retentionOffer/counterBid').isNumber() && newData.child('retentionOffer/counterBid').val() > data.child('retentionOffer/bid').val()))",
+          // Bid, RTM, and lot-settlement state is server-owned by callable functions.
+          ".write": false,
           ".validate": "newData.hasChildren(['status']) && (newData.child('status').val() == 'bidding' || newData.child('status').val() == 'sold' || newData.child('status').val() == 'unsold' || newData.child('status').val() == 'paused' || newData.child('status').val() == 'waiting' || newData.child('status').val() == 'processing_sale')",
           "status": {
             ".validate": "newData.val() == data.val() || data.val() != 'processing_sale' || now >= data.parent().child('retentionOffer/expiresAt').val() || data.parent().child('retentionOffer/decision').exists()"
@@ -111,7 +111,7 @@
             "eligibleUserId": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "eligibleTeamName": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "decision": { ".validate": "!newData.exists() || newData.val() == 'accept' || newData.val() == 'decline' || newData.val() == 'match' || newData.val() == 'decline_counter'" },
-            "decidedBy": { ".validate": "!data.exists() || newData.val() == data.val() || (newData.parent().child('phase').val() == 'match_decision' && auth.uid == newData.val() && auth.uid == data.parent().child('eligibleUserId').val()) || (auth.uid == newData.val() && auth.uid == root.child('auctions').child($roomId).child('room/hostId').val() && newData.parent().child('eligibleUserId').val().beginsWith('bot_')) },
+            "decidedBy": { ".validate": "!newData.exists() || newData.isString()" },
             "decidedAt": { ".validate": "!data.exists() || newData.val() == data.val() || (newData.parent().child('phase').val() == 'match_decision' && newData.isNumber() && newData.val() >= data.val())" },
             "buyerId": { ".validate": "!data.exists() || newData.val() == data.val()" },
             "buyerTeamId": { ".validate": "!data.exists() || newData.val() == data.val()" },
@@ -126,13 +126,17 @@
 
         // The shuffled auction order is produced by the host when starting.
         "playerOrder": {
-          ".write": "auth != null && root.child('auctions').child($roomId).child('room/hostId').val() == auth.uid"
+          // The trusted startAuction callable writes the shuffled order.
+          ".write": false
         },
 
         "messages": {
-          ".write": "auth != null",
+          // Chat and system events are written only by trusted Cloud Functions.
+          // Admin SDK writes bypass these rules; direct client writes are denied.
+          ".write": false,
           "$messageId": {
-            ".validate": "newData.hasChildren(['userId', 'userName', 'text', 'type', 'timestamp']) && newData.child('userId').isString() && newData.child('userName').isString() && newData.child('userName').val().length <= 80 && newData.child('text').isString() && newData.child('text').val().length <= 2000 && newData.child('type').isString() && newData.child('type').val().length <= 32 && newData.child('timestamp').isNumber()",
+            ".write": false,
+            ".validate": "newData.hasChildren(['userId', 'userName', 'text', 'type', 'timestamp']) && newData.child('userId').isString() && newData.child('userId').val() == auth.uid && newData.child('userName').isString() && newData.child('userName').val().length <= 80 && newData.child('text').isString() && newData.child('text').val().length <= 2000 && newData.child('type').val() == 'text' && newData.child('timestamp').isNumber()",
             "userId": { ".validate": "newData.isString() && newData.val().length <= 128" },
             "userName": { ".validate": "newData.isString() && newData.val().length <= 80" },
             "text": { ".validate": "newData.isString() && newData.val().length <= 2000" },
@@ -141,9 +145,10 @@
           }
         },
 
-        // Whole-tree team sync happens from every client on each sale.
+        // Team budgets, squads and retention cards are written only by trusted
+        // Admin SDK Cloud Functions. Client SDK writes are denied.
         "teams": {
-          ".write": "auth != null"
+          ".write": false
         },
 
         // A user may only write their own presence entry.

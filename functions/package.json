@@ -1,0 +1,21 @@
+{
+  "name": "ss-auction-functions",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "node --check index.js && node --test tests/auctionEndRules.test.js tests/saleSettlementHelpers.test.js tests/playingXIRules.test.js tests/auctionRules.test.js tests/teamAssignmentRules.test.js tests/auctionSettingsRules.test.js tests/roomMemberRules.test.js tests/roomLifecycleRules.test.js tests/roomAuthorizationRules.test.js tests/systemEventRules.test.js tests/clientCallableContract.test.js",
+    "test:rules": "node --test tests/databaseRules.emulator.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0"
+  }
+}
