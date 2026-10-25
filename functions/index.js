@@ -1033,7 +1033,6 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
   const { roomId } = request.data || {};
   requireRoomId(roomId);
   const rootRef = database.ref(`auctions/${roomId}`);
-  const now = Date.now();
   let failureReason = "The RTM offer is not ready to finalize.";
   let finalizedState = null;
   const result = await rootRef.transaction((current) => {
@@ -1043,6 +1042,7 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
       failureReason = "Auction room or live offer could not be found.";
       return;
     }
+    const transactionNow = Date.now();
     const room = current.room;
     const live = current.live;
     const roster = Array.isArray(room.players) ? room.players : [];
@@ -1061,7 +1061,7 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
     const matchDecisionMade = offer.phase === "match_decision"
       && ["match", "decline_counter"].includes(offer.decision)
       && Number(offer.decidedAt) <= Number(offer.expiresAt);
-    if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
+    if (!initialDeclined && !matchDecisionMade && transactionNow < Number(offer.expiresAt) + 1500) return;
 
     if (offer.phase === "counter_bid" && offer.rtmUsed) {
       live.highBidderId = offer.eligibleUserId;
@@ -1087,12 +1087,12 @@ export const finalizeExpiredRetentionOffer = onCall({ enforceAppCheck: false }, 
       offer.status = offer.decision === "decline" ? "declined" : "expired";
     }
     live.status = live.highBidderId ? "sold" : "unsold";
-    live.transitionDeadline = now + (live.status === "sold" ? 5000 : 2000) + 2500;
-    live.lastActivityAt = now;
+    live.transitionDeadline = transactionNow + (live.status === "sold" ? 5000 : 2000) + 2500;
+    live.lastActivityAt = transactionNow;
     finalizedState = live;
     return {
       ...current,
-      room: { ...room, lastActivityAt: now },
+      room: { ...room, lastActivityAt: transactionNow },
       live
     };
   }, undefined, false);
@@ -1117,7 +1117,6 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
   // Advance the live lot and room lifecycle in a single transaction so the
   // final player cannot leave the room active or strand the XI deadline.
   const rootRef = database.ref(`auctions/${roomId}`);
-  const now = Date.now();
   let failureReason = "Auction lot changed before it could advance.";
   let reachedEnd = false;
   const result = await rootRef.transaction((current) => {
@@ -1127,6 +1126,7 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
       failureReason = "Auction room or live lot could not be found.";
       return;
     }
+    const transactionNow = Date.now();
     const room = current.room;
     const live = current.live;
     const players = Array.isArray(room.players) ? room.players : [];
@@ -1145,7 +1145,7 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
       return;
     }
     if (live.playerId !== expectedPlayerId || !["sold", "unsold"].includes(live.status)) return;
-    if (!Number.isFinite(Number(live.transitionDeadline)) || now < Number(live.transitionDeadline)) return;
+    if (!Number.isFinite(Number(live.transitionDeadline)) || transactionNow < Number(live.transitionDeadline)) return;
 
     const currentIndex = order.indexOf(live.playerId);
     if (currentIndex < 0) {
@@ -1160,27 +1160,27 @@ export const advanceAuctionPlayer = onCall({ enforceAppCheck: false }, async (re
         room: {
           ...room,
           status: "awaiting_xi",
-          xiSubmissionStartedAt: now,
-          xiSubmissionDeadline: now + 120000,
+          xiSubmissionStartedAt: transactionNow,
+          xiSubmissionDeadline: transactionNow + 120000,
           winnerAnalysisStatus: "collecting",
-          lastActivityAt: now
+          lastActivityAt: transactionNow
         },
-        live: { ...live, status: "awaiting_xi", transitionDeadline: null, lastActivityAt: now }
+        live: { ...live, status: "awaiting_xi", transitionDeadline: null, lastActivityAt: transactionNow }
       };
     }
 
     return {
       ...current,
-      room: { ...room, lastActivityAt: now },
+      room: { ...room, lastActivityAt: transactionNow },
       live: {
         playerId: nextId,
         currentBid: 0,
         highBidderId: "",
         highBidderName: "No Bids",
         highBidderTeamId: "",
-        timerEndsAt: now + clampBidTimerSeconds(room.settings?.bidTimer, 15) * 1000,
+        timerEndsAt: transactionNow + clampBidTimerSeconds(room.settings?.bidTimer, 15) * 1000,
         status: "bidding",
-        lastActivityAt: now
+        lastActivityAt: transactionNow
       }
     };
   }, undefined, false);
