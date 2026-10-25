@@ -875,12 +875,13 @@ export const startAuction = onCall({ enforceAppCheck: false }, async (request) =
   } catch (error) {
     // If initialization fails after the room claim, allow a safe retry only
     // while no live lot has been created.
-    await roomRef.transaction((current) => {
-      if (!current || current.status !== "active" || current.lastActivityAt !== now) return;
-      const latestLive = current.live;
-      if (latestLive) return;
-      return { ...current, status: room.status || "waiting", playerOrder: null, lastActivityAt: Date.now() };
-    }, undefined, false);
+    const latestLive = await liveRef.get();
+    if (!latestLive.exists()) {
+      await roomRef.transaction((current) => {
+        if (!current || current.status !== "active" || current.lastActivityAt !== now) return;
+        return { ...current, status: room.status || "waiting", playerOrder: null, lastActivityAt: Date.now() };
+      }, undefined, false);
+    }
     throw error;
   }
   try { await database.ref(`publicRooms/${roomId}`).update({ status: "active" }); } catch {}
