@@ -863,3 +863,26 @@
   .ss-cinematic-player-stage::after { transition: none; }
 }
 
+/* Honor reduced-motion preferences across the entire broadcast stage. */
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-player-stage,
+  .ss-cinematic-player-stage::after,
+  .ss-cinematic-mode-live-dot,
+  .ss-arena-camera-dot,
+  .ss-camera-cut-active,
+  .ss-arena-shot-label,
+  .ss-arena-camera-focus,
+  .ss-cinematic-bid-value,
+  .ss-cinematic-live-status,
+  .ss-auctioneer-figure,
+  .ss-auctioneer-stage,
+  .ss-auction-result-stamp {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .ss-cinematic-player-stage[data-focus-team]:not([data-focus-team="auctioneer"])::after {
+    animation: none !important;
+  }
+}
+
