@@ -13,8 +13,8 @@ export function normalizeAuctionSettings(settings, currentMode = "mega") {
   for (const [key, value] of Object.entries(settings)) {
     if (!allowed.has(key)) continue;
     const number = Number(value);
-    if (key === "bidTimer" && ![3, 5, 10, 15].includes(number)) {
-      return { valid: false, error: "Bid timer must be 3, 5, 10, or 15 seconds." };
+    if (key === "bidTimer" && (!Number.isInteger(number) || number < 3 || number > 15)) {
+      return { valid: false, error: "Bid timer must be a whole number from 3 to 15 seconds." };
     }
     if (key === "budget" && (!Number.isFinite(number) || number <= 0 || number > 1000)) {
       return { valid: false, error: "Invalid team budget." };
