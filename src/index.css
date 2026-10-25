@@ -1053,3 +1053,84 @@
 @media (prefers-reduced-motion: reduce) {
   .ss-cinematic-player-lower-third { animation: none; }
 }
+
+
+/* Broadcast countdown stays visually separate from the authoritative timer bar. */
+.ss-cinematic-countdown {
+  position: absolute;
+  z-index: 19;
+  top: 8.1rem;
+  right: 1rem;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  justify-items: end;
+  column-gap: .4rem;
+  row-gap: .08rem;
+  min-width: 6.4rem;
+  padding: .65rem .8rem .6rem;
+  border: 1px solid rgba(110,231,183,.38);
+  border-radius: .9rem;
+  background: linear-gradient(145deg, rgba(2,6,23,.94), rgba(15,23,42,.86));
+  box-shadow: 0 .5rem 1.8rem rgba(0,0,0,.28), inset 0 0 1.2rem rgba(16,185,129,.06);
+  pointer-events: none;
+}
+.ss-countdown-label {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  color: #a7f3d0;
+  font-size: .48rem;
+  font-weight: 950;
+  letter-spacing: .14em;
+  white-space: nowrap;
+}
+.ss-cinematic-countdown strong {
+  color: #f8fafc;
+  font-size: 2.15rem;
+  font-weight: 1000;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -.06em;
+}
+.ss-countdown-unit {
+  color: #cbd5e1;
+  font-size: .48rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+.ss-cinematic-countdown.is-urgent {
+  border-color: rgba(248,113,113,.72);
+  background: linear-gradient(145deg, rgba(69,10,10,.94), rgba(30,12,20,.92));
+  box-shadow: 0 .5rem 1.8rem rgba(127,29,29,.25), inset 0 0 1rem rgba(248,113,113,.1);
+}
+.ss-cinematic-countdown.is-urgent .ss-countdown-label { color: #fecaca; }
+.ss-cinematic-countdown.is-urgent strong {
+  color: #fca5a5;
+  animation: ss-countdown-urgent .65s ease-in-out infinite alternate;
+}
+.ss-cinematic-countdown.is-intro {
+  border-color: rgba(167,243,208,.55);
+}
+.ss-cinematic-countdown.is-intro strong { color: #6ee7b7; }
+@keyframes ss-countdown-urgent {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+@media (max-width: 640px) {
+  .ss-cinematic-countdown {
+    top: 8.9rem;
+    right: .55rem;
+    min-width: 5.1rem;
+    padding: .45rem .55rem;
+    border-radius: .7rem;
+  }
+  .ss-countdown-label { font-size: .39rem; letter-spacing: .09em; }
+  .ss-cinematic-countdown strong { font-size: 1.65rem; }
+  .ss-countdown-unit { font-size: .39rem; }
+}
+@media (max-width: 380px) {
+  .ss-cinematic-countdown { top: 9.4rem; right: .45rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-cinematic-countdown.is-urgent strong { animation: none; }
+}
