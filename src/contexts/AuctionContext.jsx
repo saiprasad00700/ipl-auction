@@ -1161,6 +1161,12 @@ export const AuctionProvider = ({ children }) => {
     await call({ roomId, action: 'update_settings', settings });
   }, [user]);
 
+  const touchRoomActivity = useCallback(async (roomId) => {
+    if (!user?.uid || !roomId) return;
+    const call = httpsCallable(getFunctions(app), 'touchAuctionActivity');
+    await call({ roomId });
+  }, [user]);
+
   const pauseAuction = useCallback(async (roomId) => {
     if (!user?.uid) throw new Error('Sign in before pausing the auction.');
     const call = httpsCallable(getFunctions(app), 'updateAuctionControls');
@@ -1561,6 +1567,7 @@ export const AuctionProvider = ({ children }) => {
     placeBid,
     updatePlayerTeam,
     updateRoomSettings,
+    touchRoomActivity,
     startAuction,
     endPlayerAuction,
     recoverPlayerTransition,
