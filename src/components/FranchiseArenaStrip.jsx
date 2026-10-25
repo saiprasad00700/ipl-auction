@@ -29,7 +29,7 @@ const FranchiseArenaStrip = ({
   }, [rtmTeamId, rtmEventKey]);
 
   return (
-    <div className="ss-franchise-arena-strip" data-active-team={activeTeamId || ""} aria-label="Franchise auction tables">
+    <div className="ss-franchise-arena-strip" data-active-team={activeTeamId || ""} role="group" aria-label="Franchise auction tables">
       {teams.map((team) => {
         const active = Boolean(activeTeamId && team.id === activeTeamId);
         const bidRaised = raisedBidTeam === team.id;
@@ -45,7 +45,7 @@ const FranchiseArenaStrip = ({
             <div className="ss-franchise-table-light" aria-hidden="true" />
             <img src={team.logo} alt="" loading="lazy" decoding="async" />
             <span className="ss-franchise-table-name">{team.id}</span>
-            <span className="ss-franchise-table-state">{active ? 'HIGH BID' : 'TABLE'}</span>
+            <span className="ss-franchise-table-state" aria-live={active ? "polite" : "off"}>{active ? 'HIGH BID · LEADING' : 'TABLE'}</span>
             <span className="ss-franchise-paddle ss-franchise-bid-paddle" aria-hidden="true">BID</span>
             <span className="ss-franchise-paddle ss-franchise-rtm-paddle" aria-hidden="true">RTM</span>
           </div>
