@@ -84,3 +84,16 @@ test("RTM decisions, match affordability and room heartbeat commit atomically", 
   assert.ok(!source.includes("liveRef.transaction("));
   assert.doesNotMatch(source, /room\/lastActivityAt[\\s\\S]*?\\.set\\(/);
 });
+
+test("team-stat synchronization reads authoritative data and updates roster atomically", () => {
+  const start = backendSource.indexOf("export const syncRoomPlayerStats = onCall(");
+  const end = backendSource.indexOf("\n\nexport const updatePlayerTeam", start);
+  assert.ok(start >= 0 && end > start, "syncRoomPlayerStats callable should exist");
+  const source = backendSource.slice(start, end);
+  assert.ok(source.includes("rootRef.transaction("));
+  assert.ok(source.includes("current.teams?.[`\${roomId}_\${userId}`]"));
+  assert.ok(source.includes("players: players.map("));
+  assert.ok(source.includes("lastActivityAt: now"));
+  assert.ok(!source.includes("playersRef.transaction("));
+  assert.ok(!source.includes("teamSnap"));
+});
