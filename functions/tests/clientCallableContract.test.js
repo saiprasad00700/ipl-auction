@@ -79,8 +79,8 @@ test("RTM decisions, match affordability and room heartbeat commit atomically", 
   const source = backendSource.slice(start, end);
   assert.ok(source.includes("rootRef.transaction("));
   assert.ok(source.includes("canAffordRtmMatch(originalTeam, offer.counterBid)"));
-  assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
-  assert.ok(source.includes("live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }"));
+  assert.ok(source.includes("room: { ...room, lastActivityAt: transactionNow }"));
+  assert.ok(source.includes("live: { ...live, retentionOffer: nextOffer, lastActivityAt: transactionNow }"));
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
@@ -105,7 +105,7 @@ test("expired RTM finalization and room heartbeat are atomic", () => {
   const source = backendSource.slice(start, end);
   assert.ok(source.includes("rootRef.transaction("));
   assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
-  assert.ok(source.includes("live.lastActivityAt = now"));
+  assert.ok(source.includes("live.lastActivityAt = transactionNow"));
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
@@ -118,8 +118,8 @@ test("advancing auction lots and entering the XI phase are atomic", () => {
   assert.ok(source.includes("rootRef.transaction("));
   assert.ok(source.includes("current.playerOrderIds"));
   assert.ok(source.includes('status: "awaiting_xi"'));
-  assert.ok(source.includes("xiSubmissionDeadline: now + 120000"));
-  assert.ok(source.includes("timerEndsAt: now + clampBidTimerSeconds"));
+  assert.ok(source.includes("xiSubmissionDeadline: transactionNow + 120000"));
+  assert.ok(source.includes("timerEndsAt: transactionNow + clampBidTimerSeconds"));
   assert.ok(!source.includes("liveRef.transaction("));
   assert.ok(!source.includes("roomRef.update("));
 });
