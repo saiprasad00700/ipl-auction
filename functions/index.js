@@ -77,7 +77,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
     live.highBidderTeamId = bidderTeamId;
     const seconds = botAction
       ? Math.max(3, Math.min(15, Number(timerSeconds) || Number(room.settings?.bidTimer) || 15))
-      : Math.max(3, Math.min(15, Number(room.settings?.bidTimer) || 10));
+      : Math.max(3, Math.min(15, Number(room.settings?.bidTimer) || 15));
     live.timerEndsAt = now + seconds * 1000;
     live.lastActivityAt = now;
     return live;
