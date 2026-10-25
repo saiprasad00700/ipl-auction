@@ -556,3 +556,38 @@
     min-width: 6.5rem;
   }
 }
+
+
+/* Auctioneer reacts to settlement: a short gavel strike for sold/unsold outcomes. */
+.ss-auctioneer-stage[data-auction-status="sold"] .ss-auctioneer-arm-right {
+  animation: ss-auctioneer-sold-strike .62s cubic-bezier(.2,.8,.2,1) both;
+}
+.ss-auctioneer-stage[data-auction-status="sold"] .ss-auctioneer-podium-top {
+  animation: ss-auctioneer-sold-glow .9s ease-out both;
+}
+.ss-auctioneer-stage[data-auction-status="unsold"] .ss-auctioneer-arm-right {
+  animation: ss-auctioneer-unsold-strike .62s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes ss-auctioneer-sold-strike {
+  0% { transform: rotate(-43deg); }
+  38% { transform: rotate(-72deg); }
+  62% { transform: rotate(-24deg); }
+  100% { transform: rotate(-43deg); }
+}
+@keyframes ss-auctioneer-unsold-strike {
+  0% { transform: rotate(-43deg); }
+  38% { transform: rotate(-65deg); }
+  62% { transform: rotate(-28deg); }
+  100% { transform: rotate(-43deg); }
+}
+@keyframes ss-auctioneer-sold-glow {
+  0%,100% { box-shadow: 0 0 1.5rem rgba(16,185,129,.18); }
+  35% { box-shadow: 0 0 2.3rem rgba(52,211,153,.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-auctioneer-stage[data-auction-status="sold"] .ss-auctioneer-arm-right,
+  .ss-auctioneer-stage[data-auction-status="unsold"] .ss-auctioneer-arm-right,
+  .ss-auctioneer-stage[data-auction-status="sold"] .ss-auctioneer-podium-top {
+    animation: none;
+  }
+}
