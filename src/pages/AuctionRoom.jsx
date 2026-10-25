@@ -98,6 +98,8 @@ const AuctionRoom = () => {
    const settingsTriggerRef = useRef(null);
    const activityTriggerRef = useRef(null);
    const voiceChatTriggerRef = useRef(null);
+   const settingsPanelRef = useRef(null);
+   const headerPanelRef = useRef(null);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -139,6 +141,28 @@ const AuctionRoom = () => {
       window.addEventListener('keydown', handlePanelKeyDown);
       return () => window.removeEventListener('keydown', handlePanelKeyDown);
    }, [showSettings, showHeaderPanel, sidebarTab]);
+
+   // Close floating header panels when a pointer interaction happens outside them.
+   useEffect(() => {
+      if (!showSettings && !showHeaderPanel) return undefined;
+      const handleOutsidePointerDown = (event) => {
+         const target = event.target;
+         if (!(target instanceof Node)) return;
+         if (showSettings
+            && !settingsPanelRef.current?.contains(target)
+            && !settingsTriggerRef.current?.contains(target)) {
+            setShowSettings(false);
+         }
+         if (showHeaderPanel
+            && !headerPanelRef.current?.contains(target)
+            && !activityTriggerRef.current?.contains(target)
+            && !voiceChatTriggerRef.current?.contains(target)) {
+            setShowHeaderPanel(false);
+         }
+      };
+      document.addEventListener('pointerdown', handleOutsidePointerDown);
+      return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+   }, [showSettings, showHeaderPanel]);
 
    // Meaningful interactions (typing, tapping controls, scrolling, etc.) refresh
    // the room's inactivity heartbeat. Throttle writes to at most one per 10 seconds.
@@ -1697,6 +1721,7 @@ const AuctionRoom = () => {
             </div>
 
             <aside
+               ref={headerPanelRef}
                id="auction-room-header-panel"
                role="region"
                aria-label={sidebarTab === 'chat' ? 'Voice Chat panel' : 'Live Activity panel'}
@@ -2092,7 +2117,7 @@ const AuctionRoom = () => {
 
          <AnimatePresence>
             {showSettings && (
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} id="auction-room-settings-panel" role="region" aria-label="Local and room settings" className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
+               <motion.div ref={settingsPanelRef} initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} id="auction-room-settings-panel" role="region" aria-label="Local and room settings" className="fixed top-16 right-3 sm:right-6 z-[100] bg-[#0c0d12]/95 border border-white/10 p-5 sm:p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] w-80 sm:w-96 backdrop-blur-2xl">
                   <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                      <div className="flex items-center gap-2.5">
 
