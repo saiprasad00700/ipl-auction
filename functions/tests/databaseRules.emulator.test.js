@@ -96,9 +96,9 @@ test('host cannot bypass roster protection by writing the room parent', async ()
   }));
 });
 
-test('members can send only chat messages under their own identity', async () => {
+test('direct client writes to chat are denied; trusted callable owns message writes', async () => {
   const memberDb = env.authenticatedContext('member-1').database();
-  await assertSucceeds(set(ref(memberDb, `auctions/${roomId}/messages/chat-1`), {
+  await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/chat-1`), {
     userId: 'member-1', userName: 'Member', text: 'Hello everyone', type: 'text', timestamp: Date.now()
   }));
   await assertFails(set(ref(memberDb, `auctions/${roomId}/messages/fake-system`), {
