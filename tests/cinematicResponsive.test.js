@@ -131,3 +131,9 @@ test('cinematic countdown reflects intro and urgent bidding states', () => {
   assert.match(css, /@media \(max-width: 640px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+
+test('final five seconds are announced accessibly without announcing every tick', () => {
+  assert.match(room, /role="status" aria-live="polite" aria-atomic="true"\}>\{!showRoleIntro && displayAuctionState\?\.status === 'bidding' && Number\(timeLeft\) === 5 \? 'Five seconds remaining to bid\.' : ''\}<\/span>/);
+  assert.match(room, /aria-hidden="true">\s*<span className="ss-countdown-label">/);
+});
