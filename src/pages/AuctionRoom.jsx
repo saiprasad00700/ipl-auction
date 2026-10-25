@@ -824,10 +824,15 @@ const AuctionRoom = () => {
 
       const interval = setInterval(() => {
          const rawTimerEndsAt = displayAuctionState.timerEndsAt;
-         const rawMs = rawTimerEndsAt - getSyncedTime();
-         const diff = Math.max(0, Math.ceil(rawMs / 1000));
+         const syncedNow = getSyncedTime();
+         const introEndsAt = Number(displayAuctionState.introEndsAt || 0);
+         const isIntro = introEndsAt > syncedNow;
+         const rawMs = rawTimerEndsAt - syncedNow;
+         const diff = isIntro
+            ? Math.max(0, Math.ceil((introEndsAt - syncedNow) / 1000))
+            : Math.max(0, Math.ceil(rawMs / 1000));
 
-         if (diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
+         if (!isIntro && diff <= 5 && diff > 0 && diff !== lastBeepedSecRef.current) {
             lastBeepedSecRef.current = diff;
             playBeep(diff === 1 ? 880 : 440, 0.1);
          }
@@ -1575,7 +1580,7 @@ const AuctionRoom = () => {
                                     <div className="flex gap-3 md:gap-4">
                                        <button
                                           onClick={handleBid}
-                                          disabled={spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
+                                          disabled={spectateMode || !team || timeLeft === 0 || (displayAuctionState?.introEndsAt && getSyncedTime() < Number(displayAuctionState.introEndsAt)) || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid}
                                           className={`flex-1 min-h-14 sm:min-h-16 md:min-h-[4.5rem] px-3 font-black text-sm sm:text-base md:text-xl rounded-2xl border border-white/10 flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale cursor-pointer ${spectateMode
                                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                              : displayAuctionState?.highBidderId === user?.uid
