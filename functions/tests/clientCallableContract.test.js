@@ -69,7 +69,7 @@ test("sale settlement updates purse, squad, roster and activity atomically", () 
   assert.ok(source.includes("room: { ...room, players: updatedMembers, lastActivityAt: now }"));
   assert.ok(source.includes("live: { ...live, lastActivityAt: now }"));
   assert.ok(!source.includes("teamRef.transaction("));
-  assert.doesNotMatch(source, /room\\/lastActivityAt[\\s\\S]*?\\.set\\(/);
+  assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
 
 test("RTM decisions, match affordability and room heartbeat commit atomically", () => {
@@ -82,7 +82,7 @@ test("RTM decisions, match affordability and room heartbeat commit atomically", 
   assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
   assert.ok(source.includes("live: { ...live, retentionOffer: nextOffer, lastActivityAt: now }"));
   assert.ok(!source.includes("liveRef.transaction("));
-  assert.doesNotMatch(source, /room\/lastActivityAt[\\s\\S]*?\\.set\\(/);
+  assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
 
 test("team-stat synchronization reads authoritative data and updates roster atomically", () => {
@@ -107,7 +107,7 @@ test("expired RTM finalization and room heartbeat are atomic", () => {
   assert.ok(source.includes("room: { ...room, lastActivityAt: now }"));
   assert.ok(source.includes("live:"));
   assert.ok(!source.includes("liveRef.transaction("));
-  assert.doesNotMatch(source, /room\/lastActivityAt[\s\S]*?\.set\(/);
+  assert.ok(!source.includes("room/lastActivityAt"), "heartbeat must not be written separately");
 });
 
 test("advancing auction lots and entering the XI phase are atomic", () => {
