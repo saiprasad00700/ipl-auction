@@ -18,6 +18,7 @@ import {
    Share2,
    Copy,
    MessageSquare,
+   Mic,
    Settings as SettingsIcon,
    Home,
    Pause,
@@ -90,6 +91,7 @@ const AuctionRoom = () => {
    const [selectedTeamId, setSelectedTeamId] = useState(null);
    const [mobileTab, setMobileTab] = useState('arena'); // arena, squad, activity
    const [showSettings, setShowSettings] = useState(false);
+   const [showHeaderPanel, setShowHeaderPanel] = useState(false);
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -1137,6 +1139,18 @@ const AuctionRoom = () => {
                   >
                      <SettingsIcon size={14} />
                   </button>
+                  <button
+                     onClick={() => { setSidebarTab('activity'); setShowHeaderPanel(true); }}
+                     className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'activity' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     title="Live Activity"
+                     aria-label="Open Live Activity"
+                  ><History size={14} /></button>
+                  <button
+                     onClick={() => { setSidebarTab('chat'); setShowHeaderPanel(true); }}
+                     className={`p-1 sm:p-1.5 rounded-lg border transition-all cursor-pointer ${showHeaderPanel && sidebarTab === 'chat' ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                     title="Voice Chat"
+                     aria-label="Open Voice Chat"
+                  ><Mic size={14} /></button>
                   <button onClick={() => navigate('/')} className="p-1 sm:p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer" title="Back to Home"><Home size={14} /></button>
                </div>
             </div>
@@ -1551,9 +1565,10 @@ const AuctionRoom = () => {
                </main>
             </div>
 
-            <aside className={`${mobileTab === 'activity' ? 'flex' : 'hidden'} md:flex w-full md:w-96 bg-[#07111d]/80 backdrop-blur-xl border-l border-emerald-300/10 flex-col h-full md:max-h-[calc(100dvh-3.5rem)]`}>
+            <aside className={`${showHeaderPanel ? 'flex' : 'hidden'} fixed right-3 top-16 z-[70] w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-5rem)] bg-[#07111d]/95 backdrop-blur-xl border border-emerald-300/15 rounded-2xl shadow-2xl flex-col overflow-hidden`}>
                {/* Premium Tabs Header */}
                <div className="h-14 bg-white/[0.025] border-b border-emerald-300/10 flex items-center shrink-0 w-full">
+                  <button onClick={() => setShowHeaderPanel(false)} className="absolute right-2 top-2 z-10 rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white" title="Close panel" aria-label="Close panel"><X size={14} /></button>
                   <button
                      onClick={() => setSidebarTab('activity')}
                      className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'activity'
@@ -1702,7 +1717,7 @@ const AuctionRoom = () => {
                   <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-emerald-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setMobileTab('activity')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
+               <button onClick={() => { setSidebarTab('activity'); setShowHeaderPanel(true); }} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${showHeaderPanel && sidebarTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
                   <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
                      <History size={16} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
                   </div>
