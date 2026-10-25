@@ -5,6 +5,7 @@ import { applySaleToTeam, canAffordRtmMatch } from "./saleSettlementHelpers.js";
 import { PLAYER_ORIGINAL_FRANCHISES } from "./playerOriginalFranchises.js";
 import { validatePlayingXIComposition } from "./playingXIRules.js";
 import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount } from "./auctionRules.js";
+import { canChangeFranchise } from "./teamAssignmentRules.js";
 
 initializeApp();
 const database = getDatabase();
@@ -496,7 +497,7 @@ export const updatePlayerTeam = onCall({ enforceAppCheck: false }, async (reques
   const roomSnap = await roomRef.child("room").get();
   const room = roomSnap.val();
   if (!room) reject("Auction room could not be found.");
-  if (room.status && room.status !== "waiting") reject("Franchises can only be changed before the auction starts.");
+  if (!canChangeFranchise(room.status)) reject("Franchises can only be changed before the auction starts.");
   if (uid !== userId && room.hostId !== uid) reject("You cannot change another manager's franchise.");
 
   const members = Array.isArray(room.players) ? room.players : [];
