@@ -1445,7 +1445,9 @@ const AuctionRoom = () => {
                                  <FranchiseArenaStrip
                                     teams={TEAMS}
                                     activeTeamId={displayAuctionState?.highBidderTeamId || null}
-                                    auctionStatus={displayAuctionState?.status || 'waiting'}
+                                    bidEventKey={displayAuctionState?.playerId + '-' + displayAuctionState?.currentBid + '-' + displayAuctionState?.highBidderTeamId}
+                                    rtmTeamId={displayAuctionState?.retentionOffer?.rtmUsed ? displayAuctionState.retentionOffer.originalFranchiseId : null}
+                                    rtmEventKey={displayAuctionState?.retentionOffer?.rtmUsed ? displayAuctionState?.playerId + '-' + displayAuctionState.retentionOffer.phase + '-' + displayAuctionState.retentionOffer.decision : ''}
                                  />
                                  <div className="absolute top-0 inset-x-0 h-1 bg-white/5">
                                     <motion.div initial={{ width: "100%" }} animate={{ width: `${(timeLeft / (currentAuction?.settings?.bidTimer || 10)) * 100}%` }} className={`h-full transition-colors duration-1000 ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]'}`} />
