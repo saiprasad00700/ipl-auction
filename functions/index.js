@@ -61,7 +61,7 @@ export const placeBid = onCall({ enforceAppCheck: false }, async (request) => {
     if (squad.some((p) => (typeof p === "string" ? p : p?.id) === live.playerId)) return;
     const squadLimit = Number(room.squadLimit || 25);
     if (squad.length >= squadLimit) return;
-    const overseasLimit = Number(room.overseasLimit ?? 4);
+    const overseasLimit = effectiveOverseasLimit(room);
     const overseasCount = squad.reduce((n, item) => {
       const entry = PLAYER_CATALOG[typeof item === "string" ? item : item?.id];
       return n + (entry && entry.country !== "IND" ? 1 : 0);
@@ -982,8 +982,10 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
       if (key === "squadLimit" && (!Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 40)) {
         throw new HttpsError("invalid-argument", "Invalid squad limit.");
       }
-      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > 4)) {
-        throw new HttpsError("invalid-argument", "Overseas-player limit cannot exceed four.");
+      const modeForLimit = safeSettings.auctionType || room.settings?.auctionType || room.auctionType || "mega";
+      const maximumOverseas = modeForLimit === "sprint5" ? 2 : 4;
+      if (key === "overseasLimit" && (!Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > maximumOverseas)) {
+        throw new HttpsError("invalid-argument", `Overseas-player limit cannot exceed ${maximumOverseas} for this auction mode.`);
       }
       if (key === "auctionType" && !["mega", "sprint11", "sprint5"].includes(value)) {
         throw new HttpsError("invalid-argument", "Invalid auction mode.");
@@ -992,6 +994,12 @@ export const updateAuctionControls = onCall({ enforceAppCheck: false }, async (r
     }
     if (!Object.keys(safeSettings).length) throw new HttpsError("invalid-argument", "No valid settings were supplied.");
     await roomRef.child("settings").update(safeSettings);
+    if (safeSettings.overseasLimit !== undefined) {
+      await roomRef.child("overseasLimit").set(safeSettings.overseasLimit);
+    }
+    if (safeSettings.squadLimit !== undefined) {
+      await roomRef.child("squadLimit").set(safeSettings.squadLimit);
+    }
     await roomRef.child("lastActivityAt").set(Date.now());
     return { ok: true, settings: safeSettings };
   }
@@ -1098,7 +1106,11 @@ export const submitPlayingXI = onCall({ enforceAppCheck: false }, async (request
     throw new HttpsError("invalid-argument", "Every selected player must belong to your purchased squad.");
   }
   const overseasCount = ids.filter((id) => PLAYER_CATALOG[id].country !== "IND").length;
-  if (overseasCount > 4) throw new HttpsError("invalid-argument", "A Playing XI can include a maximum of four overseas players.");
+  if (overseasCount > effectiveOverseasLimit(room)) {
+    throw new HttpsError("invalid-argument", `A Playing XI can include a maximum of ${effectiveOverseasLimit(room)} overseas players in this auction mode.`);
+  }
+  const composition = validatePlayingXIComposition(ids, PLAYER_CATALOG);
+  if (!composition.valid) throw new HttpsError("invalid-argument", composition.reason);
 
   const result = await teamRef.child("playingXI").transaction((current) => {
     if (current && Number(current.submittedAt || 0) > 0) return;
