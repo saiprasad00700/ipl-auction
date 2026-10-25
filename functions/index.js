@@ -13,6 +13,7 @@ import { shouldDeleteInactiveAuction } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid, canSendRoomChat } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
 import { evaluateEndAuctionTeams } from "./auctionEndRules.js";
+import { requireAuth, requireRoomId, reject } from "./callableGuards.js";
 
 initializeApp();
 const database = getDatabase();
