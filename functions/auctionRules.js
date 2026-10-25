@@ -26,3 +26,34 @@ export function effectiveOverseasLimit(room) {
   const configured = Number(room?.settings?.overseasLimit ?? room?.overseasLimit ?? modeMaximum);
   return Number.isFinite(configured) ? Math.max(0, Math.min(modeMaximum, configured)) : modeMaximum;
 }
+
+export function transitionBiddingTimer(live, action, bidTimerSeconds, now = Date.now()) {
+  if (!live || typeof live !== "object") {
+    return { ok: false, error: "Auction lot could not be found." };
+  }
+  if (action === "pause") {
+    if (live.status !== "bidding") {
+      return { ok: false, error: "Only an active bidding timer can be paused." };
+    }
+    const remainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
+    return {
+      ok: true,
+      live: { ...live, status: "paused", pausedRemainingMs: remainingMs, pausedAt: now }
+    };
+  }
+  if (action === "resume") {
+    if (live.status !== "paused") {
+      return { ok: false, error: "The auction is not paused." };
+    }
+    const seconds = clampBidTimerSeconds(bidTimerSeconds, DEFAULT_BID_TIMER_SECONDS);
+    const remainingMs = Math.max(1000, Number(live.pausedRemainingMs || seconds * 1000));
+    return {
+      ok: true,
+      live: {
+        ...live, status: "bidding", timerEndsAt: now + remainingMs,
+        pausedRemainingMs: null, pausedAt: null
+      }
+    };
+  }
+  return { ok: false, error: "Invalid auction timer action." };
+}
