@@ -151,6 +151,9 @@ export default function CinematicPreview() {
   const [role, setRole] = useState('Wicket-keeper');
   const [intro, setIntro] = useState(true);
   const [introCount, setIntroCount] = useState(3);
+  const outcomeRef = useRef(outcome); outcomeRef.current = outcome;
+  const [autoCamera, setAutoCamera] = useState(true);
+  const autoCameraRef = useRef(autoCamera); autoCameraRef.current = autoCamera;
   const roleRef = useRef(role); const rtmRef = useRef(rtm);
   roleRef.current = role; rtmRef.current = rtm;
   const shotRef = useRef(shot);
@@ -192,9 +195,14 @@ export default function CinematicPreview() {
         if (a.player.userData.ball) { a.player.userData.ball.position.y = 1.3 + Math.sin(frame * 2.4) * 0.12; a.player.userData.ball.visible = roleRef.current === 'Bowler' || roleRef.current === 'All-rounder'; }
         if (a.player.userData.bat) a.player.userData.bat.visible = roleRef.current === 'Batter' || roleRef.current === 'Wicket-keeper' || roleRef.current === 'All-rounder';
         if (a.player.userData.gloves) a.player.userData.gloves.forEach(g => { g.visible = roleRef.current === 'Wicket-keeper'; });
-        a.auctioneer.userData.gavel.rotation.z = Math.sin(frame * 1.5) * 0.28 - 0.18;
+        const result = outcomeRef.current;
+        const strike = result === 'SOLD' ? 1 : result === 'UNSOLD' ? -0.45 : 0;
+        const idleGavel = Math.sin(frame * 1.5) * 0.12 - 0.12;
+        const gavelTarget = strike ? idleGavel - strike * Math.max(0, Math.sin(frame * 4)) : idleGavel;
+        a.auctioneer.userData.gavel.rotation.z += (gavelTarget - a.auctioneer.userData.gavel.rotation.z) * (strike ? 0.24 : 0.06);
+        a.auctioneer.rotation.y = Math.sin(frame * (result === 'LIVE LOT' ? 0.7 : 1.8)) * (result === 'LIVE LOT' ? 0.09 : 0.18);
         a.tables.forEach((t) => { const active = t.name === leaderRef.current; t.edge.material.emissiveIntensity = active ? 1.6 + Math.sin(frame * 5) * 0.45 : 0.22; t.dot.scale.setScalar(active ? 1.2 + Math.sin(frame * 5) * 0.12 : 1); if (t.group.userData.bidPaddle) { t.group.userData.bidPaddle.visible = active && !rtmRef.current; t.group.userData.bidPaddle.position.y = 1.18 + (active && !rtmRef.current ? Math.abs(Math.sin(frame * 2.2)) * 0.36 : 0); } if (t.group.userData.rtmPaddle) { t.group.userData.rtmPaddle.visible = active && rtmRef.current; t.group.userData.rtmPaddle.position.y = 1.18 + (active && rtmRef.current ? Math.abs(Math.sin(frame * 2.8)) * 0.42 : 0); } });
-        const targetShot = shotRef.current % 4;
+        const targetShot = autoCameraRef.current ? Math.floor(frame / 8) % 4 : shotRef.current % 4;
         const poses = [
           [0, 12.5, 27, 0, 1.1, 0],
           [-10, 7.2, 16, 0, 1.0, 0],
@@ -231,7 +239,8 @@ export default function CinematicPreview() {
     utterance.lang = 'en-US'; utterance.rate = 0.92; window.speechSynthesis.speak(utterance);
   };
   const nextBid = () => { if (intro) return; const next = +(bid + 0.5).toFixed(2); setBid(next); setOutcome('BID ACCEPTED'); announce('New bid. ' + next.toFixed(2) + ' crore.'); };
-  const sell = () => { setOutcome('SOLD'); announce('Sold! Sold for ' + bid.toFixed(2) + ' crore.'); };
+  const sell = () => { if (intro) return; setOutcome('SOLD'); setShot(2); announce('Going once. Going twice. Sold! Sold for ' + bid.toFixed(2) + ' crore to ' + leader + '.'); };
+  const markUnsold = () => { if (intro) return; setOutcome('UNSOLD'); announce('No further bids. Unsold.'); };
   const useRtm = () => { if (intro) return; setRtm(v => !v); setOutcome(rtm ? 'LIVE LOT' : 'RTM REVIEW'); announce(rtm ? 'Back to live bidding.' : 'Retention card review.'); };
   useEffect(() => { if (!intro) return undefined; setIntroCount(3); const start = Date.now(); const id = window.setInterval(() => { const left = 3 - Math.floor((Date.now() - start) / 1000); if (left <= 0) { setIntroCount(0); setIntro(false); window.clearInterval(id); } else setIntroCount(left); }, 100); return () => window.clearInterval(id); }, [intro]);
 
@@ -253,14 +262,14 @@ export default function CinematicPreview() {
           <div className="ss3d-bid-hud"><small>CURRENT BID</small><strong>₹{bid.toFixed(2)} <i>Cr</i></strong><span>LEADING · {leader}</span></div>
           {intro && <div className="ss3d-intro-overlay"><small>PLAYER INTRODUCTION</small><strong>{introCount || 'BID'}</strong><span>BIDDING OPENS AFTER INTRO</span></div>}
           <div className={'ss3d-status ' + (outcome === 'SOLD' ? 'is-sold' : outcome === 'RTM REVIEW' ? 'is-rtm' : '')}>{outcome}</div>
-          <div className="ss3d-player-caption"><span>LOT 001 / WICKET-KEEPER</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
-          <div className="ss3d-scene-controls"><button onClick={() => setShot(v => (v + 1) % 4)}><Camera size={15}/> Change camera</button><button onClick={() => {setShot(0); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false);}}><RotateCcw size={15}/> Reset scene</button></div>
+          <div className="ss3d-player-caption"><span>LOT 001 / {role.toUpperCase()}</span><strong>THE NEXT GAME CHANGER</strong><small>Original demo character · cinematic player introduction</small></div>
+          <div className="ss3d-scene-controls"><button onClick={() => { setAutoCamera(v => !v); setShot(v => (v + 1) % 4); }}><Camera size={15}/> {autoCamera ? 'Manual camera' : 'Auto camera'}</button><button onClick={() => {setShot(0); setAutoCamera(true); setBid(2); setLeader('LSG'); setOutcome('LIVE LOT'); setRtm(false); setIntro(true);}}><RotateCcw size={15}/> Reset scene</button></div>
         </div>
       </section>
       <section className="ss3d-console">
         <div className="ss3d-console-head"><div><span className="ss3d-eyebrow">LIVE AUCTION CONTROL</span><h2>Every bid changes the room.</h2></div><span className="ss3d-status-chip"><i/> {outcome}</span></div>
         <div className="ss3d-console-grid">
-          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro} onClick={sell}>SOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
+          <div className="ss3d-bid-panel"><div className="ss3d-panel-kicker">PLAYER ON THE BLOCK</div><div className="ss3d-player-mini"><div className="ss3d-avatar">{role === 'Wicket-keeper' ? 'WK' : role === 'All-rounder' ? 'AR' : role === 'Bowler' ? 'BOWL' : 'BAT'}</div><div><strong>Marquee Player</strong><small>{role} · Original demo character</small></div><b>LOT 001</b></div><label className="ss3d-role-select">PLAYER ROLE <select value={role} onChange={e => { setRole(e.target.value); setIntro(true); }}><option>Batter</option><option>Wicket-keeper</option><option>Bowler</option><option>All-rounder</option></select></label><div className="ss3d-price-row"><span>Current bid</span><strong>₹{bid.toFixed(2)} Cr</strong></div><div className="ss3d-action-row"><button className="ss3d-bid-button" disabled={intro} onClick={nextBid}><Gavel size={17}/> PLACE BID · ₹{(bid + 0.5).toFixed(2)} Cr</button><button className={'ss3d-rtm-button ' + (rtm ? 'active' : '')} disabled={intro} onClick={useRtm}>RTM CARD</button><button className="ss3d-sold-button" disabled={intro} onClick={sell}>SOLD</button><button className="ss3d-unsold-button" disabled={intro} onClick={markUnsold}>UNSOLD</button></div><p className="ss3d-demo-note">Demo controls only — no real auction or database is changed.</p></div>
           <div className="ss3d-franchise-panel"><div className="ss3d-panel-kicker"><Users size={14}/> FRANCHISE TABLES <span>10 ACTIVE</span></div><div className="ss3d-franchise-grid">{FRANCHISES.map(([name, color]) => <button key={name} className={leader === name ? 'leading' : ''} onClick={() => {setLeader(name); setOutcome('LIVE LOT'); announce(name + ' is now leading.');}} style={{'--team-accent':color}}><i/><strong>{name}</strong><small>{leader === name ? 'LEADING' : '₹120 Cr'}</small></button>)}</div><div className="ss3d-feature-foot"><span><Mic size={14}/> VOICE CHAT READY</span><span><Sparkles size={14}/> 3D CAMERA CUTS</span></div></div>
         </div>
       </section>
