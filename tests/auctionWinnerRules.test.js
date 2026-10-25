@@ -53,6 +53,37 @@ test('Playing XI allows at most four overseas players while squad can contain mo
   assert.equal(validatePlayingXI(invalidXI, mixedCatalog[11], mixedSquad, mixedCatalog), false);
 });
 
+
+test('automatic XI selection never exceeds four known overseas starters', () => {
+  const overseasBatters = Array.from({ length: 5 }, (_, i) => ({
+    id: `overseasBat${i}`, role: 'Batsman', country: 'OS', type: 'Overseas',
+  }));
+  const indianPlayers = [
+    { id: 'wk-ind', role: 'Wicket-Keeper', country: 'IND', type: 'Indian' },
+    ...Array.from({ length: 7 }, (_, i) => ({ id: `bat-ind${i}`, role: 'Batsman', country: 'IND', type: 'Indian' })),
+    ...Array.from({ length: 2 }, (_, i) => ({ id: `ar-ind${i}`, role: 'All-Rounder', country: 'IND', type: 'Indian' })),
+    ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-ind${i}`, role: 'Bowler', country: 'IND', type: 'Indian' })),
+  ];
+  const catalogWithOverseas = [...overseasBatters, ...indianPlayers];
+  const squadWithOverseas = catalogWithOverseas.map((p) => ({ id: p.id }));
+  const selection = autoSelectBestXI(squadWithOverseas, catalogWithOverseas);
+  assert.equal(selection.startingXI.length, 11);
+  assert.ok(selection.impactPlayer);
+  assert.ok(selection.startingXI.filter((p) => p.country === 'OS').length <= 4);
+  assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squadWithOverseas, catalogWithOverseas), true);
+});
+
+test('missing nationality metadata does not falsely count every player as overseas', () => {
+  const catalogWithoutCountry = Array.from({ length: 12 }, (_, i) => ({
+    id: `unknown-country-${i}`, role: i === 0 ? 'Wicket-Keeper' : 'Batsman',
+  }));
+  const squadWithoutCountry = catalogWithoutCountry.map((p) => ({ id: p.id }));
+  assert.equal(
+    validatePlayingXI(catalogWithoutCountry.slice(0, 11), catalogWithoutCountry[11], squadWithoutCountry, catalogWithoutCountry),
+    true,
+  );
+});
+
 test('ranking validation requires every franchise exactly once and ranks 1..N without ties', () => {
   const ids = ['MI', 'CSK', 'RCB'];
   assert.equal(validateUniqueRankings(ids.map((franchiseId, i) => ({ franchiseId, rank: i + 1 })), ids), true);
