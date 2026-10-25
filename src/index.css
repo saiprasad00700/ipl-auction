@@ -324,3 +324,21 @@
 @media (prefers-reduced-motion:reduce) {
   .ss-auctioneer-backlight,.ss-auctioneer-figure,.ss-auctioneer-arm-right { animation:none; }
 }
+
+
+/* Camera-cut style transition on focus changes; CSS-only, no auction-state mutation. */
+.ss-cinematic-player-stage.ss-camera-cut-active {
+  animation: ss-arena-camera-cut .65s cubic-bezier(.2,.8,.2,1) both;
+}
+.ss-cinematic-player-stage.ss-camera-cut-active .ss-arena-camera-focus {
+  border-color: rgba(167,243,208,.7);
+  box-shadow: 0 0 1.5rem rgba(16,185,129,.2);
+}
+@keyframes ss-arena-camera-cut {
+  0% { filter:brightness(.82) saturate(.85); }
+  28% { filter:brightness(1.15) saturate(1.16); }
+  100% { filter:brightness(1) saturate(1); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ss-cinematic-player-stage.ss-camera-cut-active { animation:none; }
+}
