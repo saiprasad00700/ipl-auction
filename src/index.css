@@ -385,3 +385,58 @@
   .ss-cinematic-player-stage.ss-camera-cut-active .ss-camera-frame-corners,
   .ss-cinematic-player-stage.ss-camera-cut-active .ss-arena-shot-label { animation:none; }
 }
+
+
+/* Keep the auctioneer visible as a non-interactive stage element without blocking bids. */
+.ss-auctioneer-overlay {
+  position: absolute;
+  z-index: 4;
+  left: .65rem;
+  bottom: .45rem;
+  width: min(13rem, 30%);
+  pointer-events: none;
+  opacity: .94;
+  transform: perspective(900px) rotateY(5deg);
+  transform-origin: bottom left;
+  filter: drop-shadow(0 1rem 1.5rem rgba(0,0,0,.32));
+}
+.ss-auctioneer-overlay .ss-auctioneer-stage {
+  min-height: 12rem;
+  padding-inline: .25rem;
+  border: 1px solid rgba(110,231,183,.16);
+  border-radius: .85rem;
+  background: linear-gradient(180deg, rgba(2,6,23,.12), rgba(2,6,23,.76));
+}
+.ss-auctioneer-overlay .ss-auctioneer-caption {
+  top: .45rem;
+  font-size: .42rem;
+  letter-spacing: .12em;
+}
+.ss-auctioneer-overlay .ss-auctioneer-figure {
+  transform: translateX(-50%) scale(.72);
+  transform-origin: bottom center;
+  bottom: 2.8rem;
+}
+.ss-auctioneer-overlay .ss-auctioneer-podium { width: 82%; }
+.ss-auctioneer-overlay .ss-auctioneer-podium-front { height: 1.45rem; font-size: .34rem; }
+.ss-auctioneer-overlay .ss-auctioneer-floor-glow { bottom: 2.8rem; }
+@media (max-width: 640px) {
+  .ss-auctioneer-overlay {
+    left: .4rem;
+    bottom: .35rem;
+    width: 6.5rem;
+    opacity: .82;
+    transform: none;
+  }
+  .ss-auctioneer-overlay .ss-auctioneer-stage { min-height: 8.5rem; }
+  .ss-auctioneer-overlay .ss-auctioneer-figure {
+    transform: translateX(-50%) scale(.48);
+    bottom: 2.15rem;
+  }
+  .ss-auctioneer-overlay .ss-auctioneer-caption { font-size: .32rem; letter-spacing: .05em; }
+  .ss-auctioneer-overlay .ss-auctioneer-podium-front { height: 1.1rem; font-size: .28rem; letter-spacing: .08em; }
+  .ss-auctioneer-overlay .ss-auctioneer-floor-glow { bottom: 2.15rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-auctioneer-overlay { transform: none; }
+}
