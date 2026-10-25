@@ -9,7 +9,7 @@ import { clampBidTimerSeconds, effectiveOverseasLimit, nextBidAmount, transition
 import { canChangeFranchise, isFranchiseAvailable, hasPurchasedPlayers, buildTeamAssignmentRecord } from "./teamAssignmentRules.js";
 import { normalizeAuctionSettings } from "./auctionSettingsRules.js";
 import { upsertRoomMember, removeRoomMember } from "./roomMemberRules.js";
-import { shouldDeleteInactiveRoom } from "./roomLifecycleRules.js";
+import { shouldDeleteInactiveAuction } from "./roomLifecycleRules.js";
 import { canSyncTeamStats, canStartAuction, canSubmitRtmCounterBid, canSendRoomChat } from "./roomAuthorizationRules.js";
 import { systemEventReceiptKey, canPostSystemEvent } from "./systemEventRules.js";
 import { evaluateEndAuctionTeams } from "./auctionEndRules.js";
@@ -1471,12 +1471,12 @@ export const cleanupInactiveAuctionRooms = onSchedule("every 10 minutes", async 
     if (!initialRoomNode || typeof initialRoomNode !== "object" || !initialRoomNode.room) continue;
     checked += 1;
     const directoryEntry = directory[roomId] || null;
-    if (!shouldDeleteInactiveRoom(initialRoomNode.room, now, undefined, directoryEntry)) continue;
+    if (!shouldDeleteInactiveAuction(initialRoomNode, now, undefined, directoryEntry)) continue;
 
     const roomRef = database.ref("auctions/" + roomId);
     const result = await roomRef.transaction((current) => {
       if (!current || !current.room) return;
-      if (!shouldDeleteInactiveRoom(current.room, Date.now(), undefined, directoryEntry)) return;
+      if (!shouldDeleteInactiveAuction(current, Date.now(), undefined, directoryEntry)) return;
       return null;
     }, undefined, false);
 
