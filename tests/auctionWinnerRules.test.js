@@ -41,7 +41,7 @@ test('XI validation rejects duplicate or out-of-squad selections', () => {
   assert.equal(validatePlayingXI(selection.startingXI, { id: 'not-in-squad' }, squad), false);
 });
 
-test('Playing XI allows at most four overseas players while squad can contain more', () => {
+test('Playing XI plus Impact Player allows at most four overseas players while squad can contain more', () => {
   const mixedCatalog = [
     { id: 'overseas0', country: 'AUS', role: 'All-Rounder' },
     { id: 'overseas1', country: 'AUS', role: 'All-Rounder' },
@@ -57,7 +57,10 @@ test('Playing XI allows at most four overseas players while squad can contain mo
   const mixedSquad = mixedCatalog.map((p) => ({ id: p.id, bid: 1 }));
   const validIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'indian0', 'indianBat0', 'indianBat1', 'indianBat2', 'indianAR0', 'indianBowl0', 'indianBowl1'];
   const validXI = validIds.map((id) => byId[id]);
-  assert.equal(validatePlayingXI(validXI, byId.overseas4, mixedSquad, mixedCatalog), true);
+  // Four overseas starters plus an overseas Impact Player is five and must fail.
+  assert.equal(validatePlayingXI(validXI, byId.overseas4, mixedSquad, mixedCatalog), false);
+  // Four overseas players total is valid when the Impact Player is Indian.
+  assert.equal(validatePlayingXI(validXI, byId.indianAR1, mixedSquad, mixedCatalog), true);
   const invalidIds = ['overseas0', 'overseas1', 'overseas2', 'overseas3', 'overseas4', 'indian0', 'indianBat0', 'indianBat1', 'indianAR0', 'indianBowl0', 'indianBowl1'];
   const invalidXI = invalidIds.map((id) => byId[id]);
   assert.equal(validatePlayingXI(invalidXI, byId.indianAR1, mixedSquad, mixedCatalog), false);
@@ -79,7 +82,7 @@ test('XI validation requires at least two all-rounders and five bowling options'
   );
 });
 
-test('automatic XI selection never exceeds four known overseas starters', () => {
+test('automatic XI selection never exceeds four overseas players across starters and Impact Player', () => {
   const overseasBatters = Array.from({ length: 5 }, (_, i) => ({
     id: `overseasBat${i}`, role: 'Batsman', country: 'OS', type: 'Overseas',
   }));
@@ -94,7 +97,7 @@ test('automatic XI selection never exceeds four known overseas starters', () => 
   const selection = autoSelectBestXI(squadWithOverseas, catalogWithOverseas);
   assert.equal(selection.startingXI.length, 11);
   assert.ok(selection.impactPlayer);
-  assert.ok(selection.startingXI.filter((p) => p.country === 'OS').length <= 4);
+  assert.ok([...selection.startingXI, selection.impactPlayer].filter((p) => p.country === 'OS').length <= 4);
   assert.equal(validatePlayingXI(selection.startingXI, selection.impactPlayer, squadWithOverseas, catalogWithOverseas), true);
 });
 

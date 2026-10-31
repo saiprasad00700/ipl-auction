@@ -1276,9 +1276,14 @@ export const AuctionProvider = ({ children }) => {
           }
         }
 
+        const roomAuctionType = currentRoomData.auctionType || 'mega';
+        const effectiveOverseasLimit = roomAuctionType === 'sprint5' ? 2
+          : roomAuctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
         setCurrentAuction({ 
           id: auctionId, 
           ...currentRoomData,
+          // Apply the current mode quota to existing rooms as well as newly created rooms.
+          overseasLimit: effectiveOverseasLimit,
           players: playersWithPresence,
           currentAuction: currentRtdbData || currentRoomData.currentAuction
         });
@@ -1849,13 +1854,14 @@ export const AuctionProvider = ({ children }) => {
       throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
     }
     if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [], IPL_PLAYERS)) {
-      const overseasCount = (startingXI || []).filter((item) => {
+      const selectedPlayers = [...(startingXI || []), impactPlayer].filter(Boolean);
+      const overseasCount = selectedPlayers.filter((item) => {
         const playerId = typeof item === 'string' ? item : item?.id;
         const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
         return player && player.country !== 'IND';
       }).length;
       if (overseasCount > 4) {
-        throw new Error('An IPL Playing XI can include a maximum of 4 overseas players. Please replace an overseas player with an Indian player.');
+        throw new Error('Your 11 starters plus Impact Player can include a maximum of 4 overseas players combined. Please select an Indian player.');
       }
       throw new Error('Choose 11 unique players and one different Impact Player from your squad');
     }
@@ -2190,7 +2196,8 @@ export const AuctionProvider = ({ children }) => {
       const squad = Array.isArray(botTeam.squad) ? botTeam.squad : [];
       const budget = Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120);
       const squadLimit = Number(roomData.squadLimit || 25);
-      const overseasLimit = Number(roomData.overseasLimit || MEGA_OVERSEAS_LIMIT);
+      const overseasLimit = roomData.auctionType === 'sprint5' ? 2
+        : roomData.auctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
       const slotsLeft = squadLimit - squad.length;
       const isOverseas = player.country && player.country !== 'IND';
       const overseasCount = squad.reduce((count, item) => {

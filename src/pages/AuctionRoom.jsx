@@ -876,7 +876,7 @@ const AuctionRoom = () => {
          }).length || 0;
 
          if (overseasCount >= overseasLimit) {
-            setError(`Overseas Player Limit Reached (Max ${overseasLimit})`);
+            setError(`Overseas squad limit reached (Max ${overseasLimit} players)`);
             playBeep(220, 0.3); // Low error beep
             setTimeout(() => setError(''), 3000);
             return;
@@ -2127,7 +2127,7 @@ const AuctionRoom = () => {
                         })()}
                      </div>
                   ) : (
-                     <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Deadline: 2 minutes</p>
+                     <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Overseas: {mySquadPlayers.filter((p) => selectedXIIds.includes(p.id) || selectedImpactId === p.id).filter((p) => p.country && p.country !== 'IND').length}/4 (including Impact Player) · Deadline: 2 minutes</p>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                      {mySquadPlayers.map((player) => {
