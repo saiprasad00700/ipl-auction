@@ -139,7 +139,8 @@ ${JSON.stringify(normalized)}`;
     }
 
     if (!response.ok) {
-      const detail = await response.text();
+      // The response body was already consumed in the retry loop; reuse its saved text.
+      const detail = lastDetail;
       console.error("Gemini ranking request failed", response.status, detail.slice(0, 1000));
       let providerMessage = "";
       try {
