@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BID_INCREMENT_CRORE, DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount } from '../src/lib/auctionRules.js';
 
-test('mega auction defaults to a 15-second bid timer and four overseas players', () => {
+test('mega auction defaults to a 15-second bid timer and eight overseas squad players', () => {
   assert.equal(DEFAULT_BID_TIMER_SECONDS, 15);
-  assert.equal(MEGA_OVERSEAS_LIMIT, 4);
+  assert.equal(MEGA_OVERSEAS_LIMIT, 8);
 });
 
 test('first bid uses the player base price', () => {
