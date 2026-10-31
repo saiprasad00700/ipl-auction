@@ -1500,7 +1500,8 @@ export const AuctionProvider = ({ children }) => {
       type,
       timestamp: serverTimestampRtdb()
     });
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+    // Members may write the dedicated heartbeat child, not the host-only /room parent.
+    await set(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now());
   }, [user]);
 
   const placeBid = useCallback(async (amount) => {
