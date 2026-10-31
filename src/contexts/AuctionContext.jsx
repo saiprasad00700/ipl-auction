@@ -1684,9 +1684,24 @@ export const AuctionProvider = ({ children }) => {
     const data = rtdbRoomSnap.val();
     const teamDetails = TEAMS.find(t => t.id === newTeamId);
     
-    const updatedPlayers = (data.players || []).map(p => 
-      p.id === userId ? { ...p, team: newTeamId, teamName: teamDetails?.name || 'Unknown' } : p
+    const existingPlayers = Array.isArray(data.players) ? data.players : [];
+    const playerIndex = existingPlayers.findIndex(p => p && (p.id === userId || p.userId === userId));
+    const updatedPlayers = existingPlayers.map(p =>
+      p && (p.id === userId || p.userId === userId)
+        ? { ...p, id: userId, team: newTeamId, teamName: teamDetails?.name || 'Unknown' }
+        : p
     );
+    // Repair older/malformed room rosters where the signed-in member is not
+    // present under either identifier instead of silently updating zero rows.
+    if (playerIndex === -1) {
+      updatedPlayers.push({
+        id: userId,
+        name: user?.displayName || user?.email || 'Manager',
+        team: newTeamId,
+        teamName: teamDetails?.name || 'Unknown',
+        isHost: false
+      });
+    }
     await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
 
     /*
@@ -1717,7 +1732,7 @@ export const AuctionProvider = ({ children }) => {
       };
       await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
     }
-  }, []);
+  }, [user]);
   
   const updateRoomSettings = useCallback(async (roomId, settings) => {
     await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { settings, lastActivityAt: Date.now() });
