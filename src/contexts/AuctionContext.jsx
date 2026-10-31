@@ -90,7 +90,7 @@ export const AuctionProvider = ({ children }) => {
   // getServerTime() returns Date.now() + serverOffset, synced across all clients.
   const getSyncedTime = useCallback(() => {
     return getServerTime();
-  }, [syncAuctionToServer]);
+  }, []);
 
   // RTM actions can be clicked immediately after a room reconnects. Wait briefly
   // for Firebase's server-time metadata instead of rejecting the user's click
@@ -235,7 +235,7 @@ export const AuctionProvider = ({ children }) => {
     // Sync through Render using Firebase identity; the server reads the
     // authoritative room/team data from RTDB and writes with its service key.
     await syncAuctionToServer(roomId);
-  }, []);
+  }, [syncAuctionToServer]);
   
   // Sync the authoritative RTDB snapshot through the authenticated Render endpoint.
   const flushAuctionToFirestore = useCallback(async (roomId) => {
@@ -307,6 +307,8 @@ export const AuctionProvider = ({ children }) => {
       playerOrder: randomizedIndices,
       lastActivityAt: Date.now()
     });
+    // Keep the Supabase index in step with the authoritative RTDB room state.
+    await syncAuctionToServer(roomId);
     try {
       const publicRoomSnap = await get(ref(rtdb, `publicRooms/${roomId}`));
       if (publicRoomSnap.exists()) await updateRtdb(ref(rtdb, `publicRooms/${roomId}`), { status: 'active' });
@@ -338,7 +340,7 @@ export const AuctionProvider = ({ children }) => {
       timestamp: serverTimestampRtdb()
     });
 
-  }, [getSyncedTime]);
+  }, [getSyncedTime, syncAuctionToServer]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
     // A single missed sync check must not permanently stall the lot at 0 seconds.
