@@ -1276,9 +1276,14 @@ export const AuctionProvider = ({ children }) => {
           }
         }
 
+        const roomAuctionType = currentRoomData.auctionType || 'mega';
+        const effectiveOverseasLimit = roomAuctionType === 'sprint5' ? 2
+          : roomAuctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
         setCurrentAuction({ 
           id: auctionId, 
           ...currentRoomData,
+          // Apply the current mode quota to existing rooms as well as newly created rooms.
+          overseasLimit: effectiveOverseasLimit,
           players: playersWithPresence,
           currentAuction: currentRtdbData || currentRoomData.currentAuction
         });
@@ -2191,7 +2196,8 @@ export const AuctionProvider = ({ children }) => {
       const squad = Array.isArray(botTeam.squad) ? botTeam.squad : [];
       const budget = Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120);
       const squadLimit = Number(roomData.squadLimit || 25);
-      const overseasLimit = Number(roomData.overseasLimit || MEGA_OVERSEAS_LIMIT);
+      const overseasLimit = roomData.auctionType === 'sprint5' ? 2
+        : roomData.auctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
       const slotsLeft = squadLimit - squad.length;
       const isOverseas = player.country && player.country !== 'IND';
       const overseasCount = squad.reduce((count, item) => {
