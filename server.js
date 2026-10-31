@@ -247,6 +247,120 @@ function startRoomCleanup() {
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (pathname === '/health') return sendJson(res, 200, { ok: true });
+  if (pathname === '/api/sync-auction') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
+        return sendJson(res, 403, { error: 'Automated accounts cannot sync auction data' });
+      }
+
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+
+      // Only the authenticated room host can request a sync. The server reads
+      // the authoritative data from Firebase; no client-supplied auction rows
+      // or team records are trusted.
+      const roomSnapshot = await database.ref(`auctions/${roomId}/room`).get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      if (roomData.hostId !== decoded.uid) {
+        return sendJson(res, 403, { error: 'Only the auction host can sync this room' });
+      }
+
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceKey) {
+        return sendJson(res, 503, { error: 'Secure Supabase sync is not configured on the server' });
+      }
+
+      let baseUrl;
+      try {
+        baseUrl = new URL(supabaseUrl);
+        if (baseUrl.protocol !== 'https:' && baseUrl.hostname !== 'localhost') throw new Error('Invalid protocol');
+      } catch {
+        return sendJson(res, 500, { error: 'Supabase server URL is invalid' });
+      }
+
+      const headers = {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      };
+      const auctionPayload = {
+        id: roomId,
+        host_id: roomData.hostId || '',
+        host_name: roomData.hostName || 'Manager',
+        host_online: true,
+        is_public: roomData.isPublic !== false,
+        status: roomData.status || 'waiting',
+        auction_type: roomData.auctionType || 'mega',
+        squad_limit: roomData.squadLimit || 25,
+        overseas_limit: roomData.overseasLimit || 8,
+        players: roomData.players || [],
+        settings: {
+          ...(roomData.settings || {}),
+          ...(roomData.winnerRankings ? {
+            winnerRankings: roomData.winnerRankings,
+            winnerAnalysisStatus: roomData.winnerAnalysisStatus || 'completed',
+            winnerAnalysisModel: roomData.winnerAnalysisModel || 'AI',
+            winnerAnalysisCompletedAt: roomData.winnerAnalysisCompletedAt || null
+          } : {})
+        },
+        banned_players: roomData.bannedPlayers || [],
+        ...(roomData.playerOrder ? { player_order: roomData.playerOrder } : {})
+      };
+
+      const auctionUrl = new URL('/rest/v1/auctions?on_conflict=id', baseUrl);
+      const auctionResponse = await fetch(auctionUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(auctionPayload)
+      });
+      if (!auctionResponse.ok) {
+        const detail = (await auctionResponse.text()).slice(0, 500);
+        console.error('[Supabase sync] Auction upsert failed:', auctionResponse.status, detail);
+        return sendJson(res, 502, { error: 'Could not save auction data to Supabase' });
+      }
+
+      const teamsSnapshot = await database.ref(`auctions/${roomId}/teams`).get();
+      const teamsData = teamsSnapshot.exists() ? teamsSnapshot.val() : {};
+      const teamRows = Object.entries(teamsData).map(([id, team]) => ({
+        id,
+        auction_id: roomId,
+        user_id: team?.userId || '',
+        team_id: team?.teamId || '',
+        team_name: team?.teamName || 'Unknown',
+        budget_remaining: team?.budgetRemaining ?? 120,
+        spent: team?.spent ?? 0,
+        squad: team?.squad || []
+      }));
+
+      if (teamRows.length > 0) {
+        const teamsUrl = new URL('/rest/v1/teams?on_conflict=id', baseUrl);
+        const teamsResponse = await fetch(teamsUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(teamRows)
+        });
+        if (!teamsResponse.ok) {
+          const detail = (await teamsResponse.text()).slice(0, 500);
+          console.error('[Supabase sync] Teams upsert failed:', teamsResponse.status, detail);
+          return sendJson(res, 502, { error: 'Auction saved, but team data could not be saved to Supabase' });
+        }
+      }
+
+      return sendJson(res, 200, { ok: true, roomId, teamsSynced: teamRows.length });
+    } catch (error) {
+      console.error('[Supabase sync] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not sync auction data' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
