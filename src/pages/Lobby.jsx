@@ -70,6 +70,7 @@ const Lobby = () => {
   const [guestName, setGuestName] = useState('');
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [banError, setBanError] = useState(null);
+  const [teamSelectError, setTeamSelectError] = useState('');
   const [showBotInfo, setShowBotInfo] = useState(false);
 
   const [spectateMode, setSpectateMode] = useState(() => {
@@ -85,9 +86,10 @@ const Lobby = () => {
     return acc;
   }, {});
 
-  const currentUserPlayer = players.find(p => p.id === user?.uid);
+  // Support both current player records (id) and older room records (userId).
+  const currentUserPlayer = players.find(p => p.id === user?.uid || p.userId === user?.uid);
 
-  const isJoined = players.some(p => p.id === user?.uid);
+  const isJoined = !!currentUserPlayer;
 
   // ─── Chat unread indicator ───
   // Purely client-side: it reuses the `messages` array already streamed into
@@ -221,16 +223,25 @@ const Lobby = () => {
   };
 
   const handleTeamSelect = async (teamId) => {
+    if (!user?.uid || isSelectingTeam) return;
     if (teamAssignments[teamId] && teamId !== currentUserPlayer?.team) return;
+    setTeamSelectError('');
     setIsSelectingTeam(teamId);
     try {
       if (!isJoined) {
-        await joinRoomDb(id, user.uid, { name: user.displayName || 'Manager', team: teamId });
+        await joinRoomDb(id, user.uid, { name: user.displayName || user.email || 'Manager', team: teamId });
       } else {
         await updatePlayerTeam(id, user.uid, teamId);
       }
     } catch (e) {
-      if (e.message.includes("kicked")) setBanError(e.message);
+      const message = e?.message || 'Could not select this team. Please try again.';
+      if (message.toLowerCase().includes('kicked')) setBanError(message);
+      else {
+        console.error('[Lobby] Team selection failed:', e);
+        setTeamSelectError(message.includes('PERMISSION_DENIED') || message.toLowerCase().includes('permission')
+          ? 'Firebase blocked the team update. Please contact the room host.'
+          : message);
+      }
     } finally {
       setIsSelectingTeam(null);
     }
@@ -473,6 +484,12 @@ const Lobby = () => {
             <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-4">Select Your Squad</h1>
             <p className="text-gray-500 font-bold text-xs uppercase tracking-[0.3em]">Choose a vacant franchise to enter the auction hub</p>
           </div>
+
+          {teamSelectError && (
+            <div role="alert" className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm font-semibold text-red-300">
+              {teamSelectError}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
             {TEAMS.map((team) => {
