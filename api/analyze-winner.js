@@ -92,7 +92,8 @@ ${JSON.stringify(normalized)}`;
   try {
     // Gemini can temporarily return 503 during demand spikes. Retry transient failures,
     // then fall back to a widely supported Flash model instead of failing immediately.
-    const models = ["gemini-3.8-flash", "gemini-2.5-flash"];
+    // Use the current stable Gemini Flash model. Do not fall back to retired Gemini 2.5 Flash.
+    const models = ["gemini-3.8-flash"];
     let response = null;
     let activeModel = models[0];
     let lastDetail = "";
@@ -108,7 +109,6 @@ ${JSON.stringify(normalized)}`;
               body: JSON.stringify({
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
-                  temperature: 0.2,
                   responseMimeType: "application/json",
                 },
               }),
