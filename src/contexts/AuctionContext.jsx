@@ -1702,7 +1702,12 @@ export const AuctionProvider = ({ children }) => {
         isHost: false
       });
     }
-    await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
+    // Write only to the child paths explicitly permitted for room members.
+    // A parent-level update at /room is host-only under database.rules.json.
+    await Promise.all([
+      set(ref(rtdb, `auctions/${roomId}/room/players`), updatedPlayers),
+      set(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now())
+    ]);
 
     /*
     try {
