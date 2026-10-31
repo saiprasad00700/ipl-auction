@@ -9,6 +9,7 @@ export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
+export const MAX_OVERSEAS_PLAYERS_IN_SELECTION = 4;
 export const MIN_ALL_ROUNDERS_IN_XI = 2;
 export const MIN_BOWLERS_IN_XI = 5;
 
@@ -73,9 +74,12 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   addBest((p) => normalizeRole(p) === 'bowl', 4);
   addBest(() => true, PLAYING_XI_SIZE);
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
+  // The four-player overseas restriction applies to all 12 selected players,
+  // including the Impact Player, not only the starting XI.
   const impact = unique
     .filter((p) => !startingXI.some((s) => s.id === p.id))
-    [0] || null;
+    .find((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION)
+    || null;
 
   return { startingXI, impactPlayer: impact, autoSelected: true };
 }
@@ -88,16 +92,19 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
     || new Set(selectedIds).size !== PLAYING_XI_SIZE + IMPACT_PLAYER_COUNT
     || !selectedIds.every((id) => squadIds.has(id))) return false;
 
-  // IPL's four-overseas-player restriction applies to the starting XI, not the full squad.
+  // The four-overseas-player restriction covers all 12 selected players,
+  // including the Impact Player slot.
   const resolvedXI = startingXI.map((item) => toPlayer(item, playerCatalog)).filter(Boolean);
-  const overseasInXI = resolvedXI.filter(isOverseasPlayer).length;
+  const resolvedImpactPlayer = toPlayer(impactPlayer, playerCatalog);
+  if (resolvedXI.length !== PLAYING_XI_SIZE || !resolvedImpactPlayer) return false;
+  const overseasInSelection = [...resolvedXI, resolvedImpactPlayer].filter(isOverseasPlayer).length;
   const allRoundersInXI = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
   // All-rounders count toward the five-player bowling group, as required by the game rules.
   const bowlingOptionsInXI = resolvedXI.filter((player) =>
     ['ar', 'bowl'].includes(normalizeRole(player))
   ).length;
 
-  return overseasInXI <= MAX_OVERSEAS_PLAYERS_IN_XI
+  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
     && allRoundersInXI >= MIN_ALL_ROUNDERS_IN_XI
     && bowlingOptionsInXI >= MIN_BOWLERS_IN_XI;
 }
