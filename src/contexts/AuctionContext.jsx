@@ -90,7 +90,7 @@ export const AuctionProvider = ({ children }) => {
   // getServerTime() returns Date.now() + serverOffset, synced across all clients.
   const getSyncedTime = useCallback(() => {
     return getServerTime();
-  }, []);
+  }, [syncAuctionToServer]);
 
   // RTM actions can be clicked immediately after a room reconnects. Wait briefly
   // for Firebase's server-time metadata instead of rejecting the user's click
@@ -112,6 +112,33 @@ export const AuctionProvider = ({ children }) => {
       throw new Error('Auction server time is still connecting. Please try again in a moment.');
     }
   }, []);
+
+  const syncAuctionToServer = useCallback(async (roomId) => {
+    try {
+      if (!user?.getIdToken) {
+        console.warn('[Supabase sync] Skipped: signed-in Firebase user is unavailable.');
+        return false;
+      }
+      const token = await user.getIdToken();
+      const response = await fetch('/api/sync-auction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify({ roomId })
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        console.warn('[Supabase sync] Server rejected sync:', response.status, detail.error || 'Unknown error');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.warn('[Supabase sync] Could not reach sync endpoint:', error?.message || error);
+      return false;
+    }
+  }, [user]);
 
   // Create a new room in DB (RTDB + Supabase index, zero Firestore load)
   const createRoom = useCallback(async (roomId, userId, playerDetails, auctionType = 'mega', isPublic = true) => {
@@ -205,100 +232,15 @@ export const AuctionProvider = ({ children }) => {
       console.warn('Could not save room history entry:', historyError?.message || historyError);
     }
 
-    // Write to Supabase (primary database index, 0 Firestore cost)
-    try {
-      if (supabase) {
-        await supabase.from('auctions').upsert({
-          id: roomId,
-          host_id: userId,
-          host_name: playerDetails.name,
-          host_online: true,
-          is_public: !!isPublic,
-          status: 'waiting',
-          auction_type: auctionType,
-          squad_limit: squadLimit,
-          overseas_limit: overseasLimit,
-          players: [{
-            id: userId,
-            name: playerDetails.name,
-            team: playerDetails.team,
-            teamName: teamDetails?.name || 'Unknown',
-            isHost: true
-          }],
-          settings: { bidTimer: DEFAULT_BID_TIMER_SECONDS, budget }
-        });
-
-        if (playerDetails.team) {
-          await supabase.from('teams').upsert({
-            id: `${roomId}_${userId}`,
-            auction_id: roomId,
-            user_id: userId,
-            team_id: playerDetails.team,
-            team_name: teamDetails?.name || 'Unknown',
-            budget_remaining: budget,
-            spent: 0,
-            squad: []
-          });
-        }
-      }
-    } catch (sErr) {
-      // Non-blocking Supabase fallback
-    }
+    // Sync through Render using Firebase identity; the server reads the
+    // authoritative room/team data from RTDB and writes with its service key.
+    await syncAuctionToServer(roomId);
   }, []);
   
-  // Helper to flush complete room & teams data from RTDB to Supabase in single batch call
+  // Sync the authoritative RTDB snapshot through the authenticated Render endpoint.
   const flushAuctionToFirestore = useCallback(async (roomId) => {
-    try {
-      const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
-      const teamsSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
-
-      if (!roomSnap.exists()) return;
-
-      const roomData = roomSnap.val();
-      const teamsData = teamsSnap.exists() ? teamsSnap.val() : {};
-
-      // Flush to Supabase (0 Firestore cost)
-      if (supabase) {
-        await supabase.from('auctions').upsert({
-          id: roomId,
-          host_id: roomData.hostId || '',
-          host_name: roomData.hostName || 'Manager',
-          is_public: roomData.isPublic !== false,
-          status: roomData.status || 'waiting',
-          auction_type: roomData.auctionType || 'mega',
-          players: roomData.players || [],
-          settings: {
-            ...(roomData.settings || {}),
-            ...(roomData.winnerRankings ? {
-              winnerRankings: roomData.winnerRankings,
-              winnerAnalysisStatus: roomData.winnerAnalysisStatus || 'completed',
-              winnerAnalysisModel: roomData.winnerAnalysisModel || 'AI',
-              winnerAnalysisCompletedAt: roomData.winnerAnalysisCompletedAt || null
-            } : {})
-          },
-          banned_players: roomData.bannedPlayers || [],
-          ...(roomData.playerOrder ? { player_order: roomData.playerOrder } : {})
-        });
-
-        const supabaseTeams = Object.entries(teamsData).map(([docId, teamVal]) => ({
-          id: docId,
-          auction_id: roomId,
-          user_id: teamVal.userId,
-          team_id: teamVal.teamId || '',
-          team_name: teamVal.teamName || 'Unknown',
-          budget_remaining: teamVal.budgetRemaining ?? 120.0,
-          spent: teamVal.spent ?? 0,
-          squad: teamVal.squad || []
-        }));
-
-        if (supabaseTeams.length > 0) {
-          await supabase.from('teams').upsert(supabaseTeams);
-        }
-      }
-    } catch (err) {
-      // Graceful error handling
-    }
-  }, []);
+    await syncAuctionToServer(roomId);
+  }, [syncAuctionToServer]);
 
   const startAuction = useCallback(async (roomId) => {
     // Fetch room data to determine auction type
@@ -369,12 +311,6 @@ export const AuctionProvider = ({ children }) => {
       const publicRoomSnap = await get(ref(rtdb, `publicRooms/${roomId}`));
       if (publicRoomSnap.exists()) await updateRtdb(ref(rtdb, `publicRooms/${roomId}`), { status: 'active' });
     } catch (directoryError) { console.warn('Public room status sync failed:', directoryError); }
-
-    if (supabase) {
-      try {
-        await supabase.from('auctions').update({ status: 'active' }).eq('id', roomId);
-      } catch (sErr) {}
-    }
 
     try {
       await set(playerOrderRef, randomizedIndices);
