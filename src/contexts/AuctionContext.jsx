@@ -1076,7 +1076,7 @@ export const AuctionProvider = ({ children }) => {
 
     // Refresh the inactivity heartbeat separately; do not let it block history.
     try {
-      await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+      await set(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now());
     } catch (activityError) {
       console.warn('Could not refresh room activity after joining:', activityError?.message || activityError);
     }
