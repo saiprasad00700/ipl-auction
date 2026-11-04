@@ -247,6 +247,26 @@ function startRoomCleanup() {
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (pathname === '/health') return sendJson(res, 200, { ok: true });
+  if (pathname === '/api/ensure-supabase-claim') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      const userRecord = await auth.getUser(decoded.uid);
+      if (userRecord.customClaims?.role !== 'authenticated') {
+        await auth.setCustomUserClaims(decoded.uid, {
+          ...(userRecord.customClaims || {}),
+          role: 'authenticated'
+        });
+      }
+      return sendJson(res, 200, { ok: true, refreshToken: userRecord.customClaims?.role !== 'authenticated' });
+    } catch (error) {
+      console.warn('[Supabase auth] Could not assign authenticated role:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not prepare your account for sticker storage' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
