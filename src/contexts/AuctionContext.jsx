@@ -1882,6 +1882,11 @@ export const AuctionProvider = ({ children }) => {
     const roomSnap = await get(roomRef);
     if (!roomSnap.exists()) return;
     const roomData = roomSnap.val();
+
+    // Winner analysis updates the complete room document. Firebase rules reserve
+    // writes to that node for the host, so guests must observe the result rather
+    // than attempting the room-level transaction themselves.
+    if (!user || roomData.hostId !== user.uid) return;
     if (roomData.status !== 'awaiting_xi') return;
 
     // Let analysis begin as soon as every participating franchise has submitted,
@@ -1991,12 +1996,15 @@ export const AuctionProvider = ({ children }) => {
       await updateRtdb(roomRef, { status: 'analysis_failed', winnerAnalysisStatus: 'failed', winnerAnalysisError: String(error?.message || 'AI analysis failed') });
       throw error;
     }
-  }, [getSyncedTime, flushAuctionToFirestore]);
+  }, [user, getSyncedTime, flushAuctionToFirestore]);
 
-  // Allow a manager to retry a failed AI analysis after fixing the server API configuration.
-  // A transaction ensures only one connected client can reclaim the analysis phase.
+  // Only the host can retry because the retry transaction updates the complete
+  // room document and Firebase rules intentionally reserve that write for host.
   const retryWinnerAnalysis = useCallback(async (roomId) => {
+    if (!user) return;
     const roomRef = ref(rtdb, `auctions/${roomId}/room`);
+    const roomSnap = await get(roomRef);
+    if (!roomSnap.exists() || roomSnap.val()?.hostId !== user.uid) return;
     const retryClaim = await runTransactionRtdb(roomRef, (current) => {
       if (!current || current.status !== 'analysis_failed') return;
       return {
@@ -2008,7 +2016,7 @@ export const AuctionProvider = ({ children }) => {
     });
     if (!retryClaim.committed) return;
     await finalizeWinnerAnalysis(roomId);
-  }, [finalizeWinnerAnalysis]);
+  }, [user, finalizeWinnerAnalysis]);
 
 
 
