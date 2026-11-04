@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { TEAMS } from '../data/teams';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon, Smile, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { storage } from '../lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
 
@@ -40,6 +42,10 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const [gifSearchQuery, setGifSearchQuery] = useState('');
    const [searchedGifs, setSearchedGifs] = useState([]);
    const [isSearchingGifs, setIsSearchingGifs] = useState(false);
+   const [myStickers, setMyStickers] = useState([]);
+   const [isUploadingSticker, setIsUploadingSticker] = useState(false);
+   const [stickerError, setStickerError] = useState('');
+   const stickerFileInputRef = useRef(null);
    const scrollContainerRef = useRef(null);
 
    // Sticker messages are stored as ordinary chat records in Firebase RTDB.
@@ -47,6 +53,23 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const chatMessages = messages.filter(m =>
       m.type === 'text' || m.type === 'gif' || m.type === 'sticker' || !m.type
    );
+
+   useEffect(() => {
+      let cancelled = false;
+      const loadMyStickers = async () => {
+         if (!user?.uid) { setMyStickers([]); return; }
+         try {
+            const result = await listAll(storageRef(storage, `user-stickers/${user.uid}`));
+            const stickers = await Promise.all((result.items || []).map(async item => ({ id: item.fullPath, name: item.name, url: await getDownloadURL(item) })));
+            if (!cancelled) setMyStickers(stickers);
+         } catch (error) {
+            console.warn('[TextChat] Personal stickers could not be loaded:', error.message);
+            if (!cancelled) setStickerError('Personal stickers are not configured yet.');
+         }
+      };
+      loadMyStickers();
+      return () => { cancelled = true; };
+   }, [user?.uid]);
 
    useEffect(() => {
       if (scrollContainerRef.current) {
@@ -68,10 +91,33 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const handleSendSticker = async (sticker) => {
       if (!roomId) return;
       try {
-         await sendMessage(roomId, sticker.emoji, 'sticker');
+         await sendMessage(roomId, sticker.url || sticker.emoji, 'sticker');
          setShowStickerPicker(false);
       } catch (err) {
          console.error('[TextChat] Sticker could not be sent:', err);
+      }
+   };
+
+   const handleStickerUpload = async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file || !user?.uid) return;
+      if (!file.type.startsWith('image/')) { setStickerError('Please choose an image file.'); return; }
+      if (file.size > 2 * 1024 * 1024) { setStickerError('Sticker images must be 2 MB or smaller.'); return; }
+      setIsUploadingSticker(true);
+      setStickerError('');
+      try {
+         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'sticker.png';
+         const path = `user-stickers/${user.uid}/${Date.now()}-${safeName}`;
+         const uploaded = await uploadBytes(storageRef(storage, path), file, { contentType: file.type, cacheControl: 'public,max-age=31536000' });
+         const url = await getDownloadURL(uploaded.ref);
+         setMyStickers(current => [{ id: path, name: path.split('/').pop(), url }, ...current]);
+         setActiveStickerPack('My Stickers');
+      } catch (error) {
+         console.error('[TextChat] Sticker upload failed:', error);
+         setStickerError('Upload failed. Please check sticker storage setup and try again.');
+      } finally {
+         setIsUploadingSticker(false);
       }
    };
 
@@ -163,7 +209,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
 
                               {msg.type === 'sticker' ? (
                                  <div className="px-2 py-1" title="Sticker">
-                                    <span role="img" aria-label="Chat sticker" className="block text-[58px] sm:text-[66px] leading-none drop-shadow-[0_5px_12px_rgba(0,0,0,0.35)]">{msg.text}</span>
+                                    {String(msg.text || '').startsWith('http') ? <img src={msg.text} alt="Chat sticker" className="max-w-[150px] max-h-[150px] object-contain drop-shadow-[0_5px_12px_rgba(0,0,0,0.35)]" loading="lazy" /> : <span role="img" aria-label="Chat sticker" className="block text-[58px] sm:text-[66px] leading-none drop-shadow-[0_5px_12px_rgba(0,0,0,0.35)]">{msg.text}</span>}
                                  </div>
                               ) : (
                                  <div className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden ${
@@ -230,20 +276,26 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                            <X size={15} />
                         </button>
                      </div>
-                     <div className="grid grid-cols-2 gap-2">
-                        {Object.keys(STICKER_PACKS).map(pack => (
+                     <div className="grid grid-cols-3 gap-2">
+                        {[...Object.keys(STICKER_PACKS), 'My Stickers'].map(pack => (
                            <button
                               key={pack}
                               type="button"
                               onClick={() => setActiveStickerPack(pack)}
                               className={`rounded-xl py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${activeStickerPack === pack ? 'bg-emerald-400/15 text-emerald-200 border border-emerald-300/30' : 'bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10'}`}
                            >
-                              {pack === 'WhatsApp' ? '💬 WhatsApp style' : '🏏 Cricket pack'}
+                              {pack === 'WhatsApp' ? '💬 WhatsApp' : pack === 'Cricket' ? '🏏 Cricket' : `⭐ My Stickers (${myStickers.length})`}
                            </button>
                         ))}
                      </div>
+                     <div className="flex items-center justify-between gap-2">
+                        <button type="button" onClick={() => stickerFileInputRef.current?.click()} disabled={isUploadingSticker} className="px-3 py-2 rounded-lg bg-emerald-400/15 border border-emerald-300/25 text-emerald-200 text-[9px] font-black uppercase tracking-wider disabled:opacity-50">{isUploadingSticker ? 'Uploading...' : '+ Add your sticker'}</button>
+                        <input ref={stickerFileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleStickerUpload} />
+                        <span className="text-[8px] text-gray-500">PNG, JPG, WEBP or GIF · max 2 MB</span>
+                     </div>
+                     {stickerError && <p role="alert" className="text-[9px] text-amber-300">{stickerError}</p>}
                      <div className="grid grid-cols-4 gap-2 max-h-[210px] overflow-y-auto custom-scrollbar">
-                        {STICKER_PACKS[activeStickerPack].map((sticker, index) => (
+                        {(activeStickerPack === 'My Stickers' ? myStickers : STICKER_PACKS[activeStickerPack]).map((sticker, index) => (
                            <button
                               key={`${activeStickerPack}-${sticker.label}-${index}`}
                               type="button"
@@ -251,8 +303,8 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               className="min-h-[76px] rounded-xl border border-white/5 bg-white/[0.035] hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 p-2"
                               title={sticker.label}
                            >
-                              <span className="text-[34px] leading-none" role="img" aria-label={sticker.label}>{sticker.emoji}</span>
-                              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wide text-center">{sticker.label}</span>
+                              {sticker.url ? <img src={sticker.url} alt="My sticker" className="w-12 h-12 object-contain" /> : <span className="text-[34px] leading-none" role="img" aria-label={sticker.label}>{sticker.emoji}</span>}
+                              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wide text-center">{sticker.label || 'My sticker'}</span>
                            </button>
                         ))}
                      </div>
