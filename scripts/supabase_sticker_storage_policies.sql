@@ -13,7 +13,7 @@ drop policy if exists "Users can delete own personal stickers" on storage.object
 
 create policy "Users can list own personal stickers"
 on storage.objects for select to authenticated
-using (bucket_id = 'user-stickers' and (storage.foldername(name))[1] = (select auth.uid()::text));
+using (bucket_id = 'user-stickers' and (storage.foldername(name))[1] = (select auth.jwt() ->> 'sub'));
 
 create policy "Users can upload own personal stickers"
 on storage.objects for insert to authenticated
