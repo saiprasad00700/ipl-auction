@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { IPL_PLAYERS } from '../data/players';
 import { TEAMS } from '../data/teams';
 import { toPng } from 'html-to-image';
-import { supabase } from '../lib/supabase';
 import { db } from '../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import {
@@ -102,45 +101,24 @@ const AuctionSummary = () => {
     let isMounted = true;
 
     const fetchSummaryFromPersistentStore = async () => {
+      // The live room and squads are already streamed from Firebase RTDB by
+      // AuctionContext. Do not issue duplicate Supabase REST reads on the
+      // summary page; a bad/expired Supabase project key otherwise produces
+      // 401 errors even when the authoritative RTDB data is available.
+      if (currentAuction?.id === id) {
+        setSummaryLoading(false);
+        return;
+      }
+
+      // Wait for the RTDB room/team listeners before using the legacy
+      // Firestore fallback. This prevents a race with the live room load.
+      if (loading) {
+        setSummaryLoading(true);
+        return;
+      }
+
       setSummaryLoading(true);
       try {
-        if (supabase) {
-          const { data: aData } = await supabase.from('auctions').select('*').eq('id', id).maybeSingle();
-          const { data: tData } = await supabase.from('teams').select('*').eq('auction_id', id);
-
-          if (aData && isMounted) {
-            setDbAuction({
-              id: aData.id,
-              hostId: aData.host_id,
-              hostName: aData.host_name,
-              status: aData.status || 'completed',
-              auctionType: aData.auction_type || 'mega',
-              squadLimit: aData.squad_limit || 25,
-              overseasLimit: aData.overseas_limit || 8,
-              players: aData.players || [],
-              settings: aData.settings || { budget: 120, bidTimer: 10 },
-              winnerRankings: aData.settings?.winnerRankings || [],
-              winnerAnalysisStatus: aData.settings?.winnerAnalysisStatus || null,
-              winnerAnalysisModel: aData.settings?.winnerAnalysisModel || null
-            });
-
-            if (tData && tData.length > 0) {
-              setDbTeams(tData.map(t => ({
-                id: t.id,
-                auctionId: t.auction_id,
-                userId: t.user_id,
-                teamId: t.team_id,
-                teamName: t.team_name,
-                budgetRemaining: t.budget_remaining ?? 120,
-                spent: t.spent || 0,
-                squad: t.squad || []
-              })));
-            }
-            setSummaryLoading(false);
-            return;
-          }
-        }
-
         const roomDoc = await getDoc(doc(db, 'auctions', id));
         if (roomDoc.exists() && isMounted) {
           setDbAuction({ id: roomDoc.id, ...roomDoc.data() });
@@ -152,7 +130,7 @@ const AuctionSummary = () => {
           }
         }
       } catch (err) {
-        // Fallback error handling
+        console.error('[AuctionSummary] Failed to load legacy Firestore fallback:', err);
       } finally {
         if (isMounted) setSummaryLoading(false);
       }
@@ -161,7 +139,7 @@ const AuctionSummary = () => {
     fetchSummaryFromPersistentStore();
 
     return () => { isMounted = false; };
-  }, [id]);
+  }, [id, currentAuction?.id, loading]);
 
   const activeAuction = currentAuction || dbAuction;
   const winnerRankings = activeAuction?.winnerRankings || activeAuction?.settings?.winnerRankings || [];
