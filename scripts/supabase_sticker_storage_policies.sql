@@ -19,7 +19,7 @@ create policy "Users can upload own personal stickers"
 on storage.objects for insert to authenticated
 with check (
   bucket_id = 'user-stickers'
-  and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and (storage.foldername(name))[1] = (select auth.jwt() ->> 'sub')
   and (storage.extension(name) in ('png','jpg','jpeg','webp','gif'))
 );
 
