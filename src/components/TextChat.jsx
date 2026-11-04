@@ -4,8 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TEAMS } from '../data/teams';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon, Smile, X } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { storage } from '../lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
+import { supabase } from '../lib/supabase';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
 
@@ -59,8 +58,14 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
       const loadMyStickers = async () => {
          if (!user?.uid) { setMyStickers([]); return; }
          try {
-            const result = await listAll(storageRef(storage, `user-stickers/${user.uid}`));
-            const stickers = await Promise.all((result.items || []).map(async item => ({ id: item.fullPath, name: item.name, url: await getDownloadURL(item) })));
+            const { data: result, error } = await supabase.storage.from('user-stickers').list(user.uid, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+            if (error) throw error;
+            const stickers = await Promise.all((result || []).map(async item => {
+               const path = `${user.uid}/${item.name}`;
+               const { data, error: urlError } = await supabase.storage.from('user-stickers').createSignedUrl(path, 60 * 60 * 24 * 365);
+               if (urlError) throw urlError;
+               return { id: path, name: item.name, url: data.signedUrl };
+            }));
             if (!cancelled) setMyStickers(stickers);
          } catch (error) {
             console.warn('[TextChat] Personal stickers could not be loaded:', error.message);
@@ -108,10 +113,12 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
       setStickerError('');
       try {
          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'sticker.png';
-         const path = `user-stickers/${user.uid}/${Date.now()}-${safeName}`;
-         const uploaded = await uploadBytes(storageRef(storage, path), file, { contentType: file.type, cacheControl: 'public,max-age=31536000' });
-         const url = await getDownloadURL(uploaded.ref);
-         setMyStickers(current => [{ id: path, name: path.split('/').pop(), url }, ...current]);
+         const path = `${user.uid}/${Date.now()}-${safeName}`;
+         const { error: uploadError } = await supabase.storage.from('user-stickers').upload(path, file, { contentType: file.type, cacheControl: '31536000', upsert: false });
+         if (uploadError) throw uploadError;
+         const { data, error: urlError } = await supabase.storage.from('user-stickers').createSignedUrl(path, 60 * 60 * 24 * 365);
+         if (urlError) throw urlError;
+         setMyStickers(current => [{ id: path, name: path.split('/').pop(), url: data.signedUrl }, ...current]);
          setActiveStickerPack('My Stickers');
       } catch (error) {
          console.error('[TextChat] Sticker upload failed:', error);
