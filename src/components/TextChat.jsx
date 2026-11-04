@@ -2,69 +2,100 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuction } from '../contexts/AuctionContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TEAMS } from '../data/teams';
-import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
+import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon, Smile, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
+
+const STICKER_PACKS = {
+   WhatsApp: [
+      { emoji: '😂', label: 'ROFL' }, { emoji: '😭', label: 'Crying' },
+      { emoji: '❤️', label: 'Love' }, { emoji: '😍', label: 'Lovely' },
+      { emoji: '😎', label: 'Cool' }, { emoji: '🔥', label: 'Fire' },
+      { emoji: '👍', label: 'Good one' }, { emoji: '🙏', label: 'Please' },
+      { emoji: '👏', label: 'Clap' }, { emoji: '🤯', label: 'Mind blown' },
+      { emoji: '🥳', label: 'Celebration' }, { emoji: '🤝', label: 'Deal' },
+      { emoji: '💯', label: 'Perfect' }, { emoji: '😴', label: 'Sleepy' },
+      { emoji: '🤡', label: 'Clown' }, { emoji: '😤', label: 'Angry' }
+   ],
+   Cricket: [
+      { emoji: '🏏', label: 'Cricket' }, { emoji: '🏆', label: 'Champion' },
+      { emoji: '🔥', label: 'What a shot' }, { emoji: '💥', label: 'Six!' },
+      { emoji: '🎯', label: 'Perfect yorker' }, { emoji: '🙌', label: 'What a catch' },
+      { emoji: '🦁', label: 'King' }, { emoji: '👑', label: 'GOAT' },
+      { emoji: '💸', label: 'Big money' }, { emoji: '😱', label: 'Unbelievable' },
+      { emoji: '🫡', label: 'Respect' }, { emoji: '🚀', label: 'To the moon' },
+      { emoji: '🥶', label: 'Ice cold' }, { emoji: '🤌', label: 'Masterclass' },
+      { emoji: '📢', label: 'Howzat!' }, { emoji: '🧤', label: 'Safe hands' }
+   ]
+};
 
 const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const { messages, sendMessage } = useAuction();
    const { user } = useAuth();
    const [text, setText] = useState('');
+   const [showGifPicker, setShowGifPicker] = useState(false);
+   const [showStickerPicker, setShowStickerPicker] = useState(false);
+   const [activeStickerPack, setActiveStickerPack] = useState('WhatsApp');
+   const [gifSearchQuery, setGifSearchQuery] = useState('');
+   const [searchedGifs, setSearchedGifs] = useState([]);
+   const [isSearchingGifs, setIsSearchingGifs] = useState(false);
    const scrollContainerRef = useRef(null);
 
-   // Filter only text and gif chat messages
-   const chatMessages = messages.filter(m => m.type === 'text' || m.type === 'gif' || !m.type);
+   // Sticker messages are stored as ordinary chat records in Firebase RTDB.
+   // Existing message rules already allow the "sticker" type; no schema migration is needed.
+   const chatMessages = messages.filter(m =>
+      m.type === 'text' || m.type === 'gif' || m.type === 'sticker' || !m.type
+   );
 
-   const scrollToBottom = () => {
+   useEffect(() => {
       if (scrollContainerRef.current) {
          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
       }
-   };
-
-
-   useEffect(() => {
-      scrollToBottom();
    }, [chatMessages.length]);
 
    const handleSend = async (e) => {
       e.preventDefault();
       if (!text.trim() || !roomId) return;
-      
       try {
          await sendMessage(roomId, text.trim(), 'text');
          setText('');
       } catch (err) {
-         // Send failed silently or handled by context
+         console.error('[TextChat] Message could not be sent:', err);
       }
    };
 
-   const [showGifPicker, setShowGifPicker] = useState(false);
-   const [gifSearchQuery, setGifSearchQuery] = useState('');
-   const [searchedGifs, setSearchedGifs] = useState([]);
-   const [isSearchingGifs, setIsSearchingGifs] = useState(false);
+   const handleSendSticker = async (sticker) => {
+      if (!roomId) return;
+      try {
+         await sendMessage(roomId, sticker.emoji, 'sticker');
+         setShowStickerPicker(false);
+      } catch (err) {
+         console.error('[TextChat] Sticker could not be sent:', err);
+      }
+   };
 
    const fetchGifs = async (query = '') => {
+      if (!GIPHY_API_KEY) {
+         setSearchedGifs([]);
+         return;
+      }
       setIsSearchingGifs(true);
       try {
          const url = query.trim()
             ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query.trim())}&limit=16&rating=g`
             : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=16&rating=g`;
-            
          const res = await fetch(url);
+         if (!res.ok) throw new Error(`GIPHY request failed (${res.status})`);
          const json = await res.json();
-         if (json && json.data) {
-            const list = json.data.map(item => ({
-               id: item.id,
-               name: item.title || 'GIF',
-               url: item.images?.fixed_height?.url || item.images?.original?.url
-            }));
-            setSearchedGifs(list);
-         } else {
-            setSearchedGifs([]);
-         }
+         const list = (json?.data || []).map(item => ({
+            id: item.id,
+            name: item.title || 'GIF',
+            url: item.images?.fixed_height?.url || item.images?.original?.url
+         })).filter(item => item.url);
+         setSearchedGifs(list);
       } catch (err) {
+         console.warn('[TextChat] GIF search unavailable:', err.message);
          setSearchedGifs([]);
       } finally {
          setIsSearchingGifs(false);
@@ -72,15 +103,18 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    };
 
    const handleSearchGifs = async (e) => {
-      if (e) e.preventDefault();
+      e.preventDefault();
       await fetchGifs(gifSearchQuery);
    };
 
    useEffect(() => {
-      if (showGifPicker) {
-         fetchGifs('');
-      }
+      if (showGifPicker) fetchGifs('');
    }, [showGifPicker]);
+
+   const closePickers = () => {
+      setShowGifPicker(false);
+      setShowStickerPicker(false);
+   };
 
    return (
       <div className="relative flex flex-col h-full bg-transparent w-full">
@@ -90,7 +124,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   type="button"
                   onClick={onToggleCollapse}
                   className="p-1 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"
-                  title={isCollapsed ? "Expand Chat" : "Collapse Chat"}
+                  title={isCollapsed ? 'Expand Chat' : 'Collapse Chat'}
                >
                   {isCollapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                </button>
@@ -99,21 +133,18 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
 
          {!isCollapsed && (
             <>
-               {/* Messages Scroll Area */}
                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar flex flex-col min-h-0">
                   {chatMessages.length === 0 ? (
                      <div className="flex-1 flex flex-col items-center justify-center opacity-30 p-8 text-center my-auto">
                         <MessageSquare size={24} className="text-gray-500 mb-2 animate-pulse" />
                         <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">No banter yet</p>
-                        <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest mt-1">Start the conversation</p>
+                        <p className="text-[8px] text-gray-600 font-bold uppercase tracking-widest mt-1">Send a message or sticker</p>
                      </div>
                   ) : (
                      chatMessages.map((msg, index) => {
                         const isMe = msg.userId === user?.uid;
-                        
-                        // Find bidder's team logo
                         const userTeamId = TEAMS.find(t => t.id === msg.teamId || t.name === msg.teamId)?.logo;
-
+                        const isGif = msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif'));
                         return (
                            <motion.div
                               key={msg.id || index}
@@ -121,49 +152,52 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               animate={{ opacity: 1, y: 0 }}
                               className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'ml-auto' : 'mr-auto'}`}
                            >
-                              {/* Name and Team Header (only for other users) */}
                               {!isMe && (
                                  <div className="flex items-center gap-1.5 mb-1 px-1">
-                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">
-                                       {msg.userName}
-                                    </span>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">{msg.userName}</span>
                                     {msg.teamId && (
-                                       <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-[7px] font-black text-gray-400 uppercase tracking-widest">
-                                          {msg.teamId}
-                                       </span>
+                                       <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-[7px] font-black text-gray-400 uppercase tracking-widest">{msg.teamId}</span>
                                     )}
                                  </div>
                               )}
 
-                              {/* Speech Bubble */}
-                              <div
-                                 className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden ${
-                                    msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif'))
+                              {msg.type === 'sticker' ? (
+                                 <div className="px-2 py-1" title="Sticker">
+                                    <span role="img" aria-label="Chat sticker" className="block text-[58px] sm:text-[66px] leading-none drop-shadow-[0_5px_12px_rgba(0,0,0,0.35)]">{msg.text}</span>
+                                 </div>
+                              ) : (
+                                 <div className={`rounded-2xl text-[11px] leading-relaxed break-words shadow-lg overflow-hidden ${
+                                    isGif
                                        ? 'border border-white/10 max-w-[200px]'
                                        : isMe
                                           ? 'px-4 py-3 bg-white/10 border border-white/10 text-white rounded-tr-none'
                                           : 'px-4 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-tl-none'
-                                 }`}
-                              >
-                                 {msg.type === 'gif' || (msg.text?.startsWith('http') && msg.text?.includes('.gif')) ? (
-                                    <img src={msg.text} alt="gif" className="w-full h-auto object-cover block" />
-                                 ) : (
-                                    msg.text
-                                 )}
-                              </div>
+                                 }`}>
+                                    {isGif ? <img src={msg.text} alt="GIF" className="w-full h-auto object-cover block" /> : msg.text}
+                                 </div>
+                              )}
                            </motion.div>
                         );
                      })
                   )}
                </div>
 
-               {/* Message Input Box */}
                <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-white/[0.01] flex gap-2 relative">
                   <button
                      type="button"
-                     onClick={() => setShowGifPicker(!showGifPicker)}
+                     onClick={() => { setShowStickerPicker(!showStickerPicker); setShowGifPicker(false); }}
+                     className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 ${showStickerPicker ? 'bg-emerald-400/15 border-emerald-300/40 text-emerald-200' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'}`}
+                     title="Send stickers"
+                     aria-label="Open sticker picker"
+                  >
+                     <Smile size={17} />
+                  </button>
+                  <button
+                     type="button"
+                     onClick={() => { setShowGifPicker(!showGifPicker); setShowStickerPicker(false); }}
                      className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 ${showGifPicker ? 'bg-white/10 border-white/20 text-white shadow-inner' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'}`}
                      title="Send a GIF"
+                     aria-label="Open GIF picker"
                   >
                      <ImageIcon size={14} />
                   </button>
@@ -172,35 +206,65 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                      value={text}
                      onChange={(e) => setText(e.target.value)}
                      placeholder="Type a message..."
-                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-[11px] text-white focus:outline-none focus:border-white/30 transition-colors placeholder:text-gray-700"
+                     className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-[11px] text-white focus:outline-none focus:border-white/30 transition-colors placeholder:text-gray-700"
                      maxLength={150}
                   />
                   <button
                      type="submit"
                      disabled={!text.trim()}
                      className="w-10 h-10 bg-white disabled:opacity-40 hover:bg-white/90 text-black rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:scale-100 cursor-pointer shrink-0"
+                     aria-label="Send message"
                   >
                      <Send size={14} fill="currentColor" />
                   </button>
                </form>
 
+               {showStickerPicker && (
+                  <div className="absolute bottom-[72px] left-3 right-3 bg-[#101114]/[.98] border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-xl z-[60] flex flex-col gap-3">
+                     <div className="flex items-center justify-between">
+                        <div>
+                           <p className="text-[9px] font-black text-white uppercase tracking-widest">Sticker gallery</p>
+                           <p className="text-[8px] text-gray-500 mt-1">Tap a sticker to send it to everyone</p>
+                        </div>
+                        <button type="button" onClick={closePickers} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10" aria-label="Close sticker picker">
+                           <X size={15} />
+                        </button>
+                     </div>
+                     <div className="grid grid-cols-2 gap-2">
+                        {Object.keys(STICKER_PACKS).map(pack => (
+                           <button
+                              key={pack}
+                              type="button"
+                              onClick={() => setActiveStickerPack(pack)}
+                              className={`rounded-xl py-2 text-[9px] font-black uppercase tracking-widest transition-colors ${activeStickerPack === pack ? 'bg-emerald-400/15 text-emerald-200 border border-emerald-300/30' : 'bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10'}`}
+                           >
+                              {pack === 'WhatsApp' ? '💬 WhatsApp style' : '🏏 Cricket pack'}
+                           </button>
+                        ))}
+                     </div>
+                     <div className="grid grid-cols-4 gap-2 max-h-[210px] overflow-y-auto custom-scrollbar">
+                        {STICKER_PACKS[activeStickerPack].map((sticker, index) => (
+                           <button
+                              key={`${activeStickerPack}-${sticker.label}-${index}`}
+                              type="button"
+                              onClick={() => handleSendSticker(sticker)}
+                              className="min-h-[76px] rounded-xl border border-white/5 bg-white/[0.035] hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 p-2"
+                              title={sticker.label}
+                           >
+                              <span className="text-[34px] leading-none" role="img" aria-label={sticker.label}>{sticker.emoji}</span>
+                              <span className="text-[7px] text-gray-500 font-bold uppercase tracking-wide text-center">{sticker.label}</span>
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+               )}
+
                {showGifPicker && (
                   <div className="absolute bottom-16 right-3 left-3 bg-[#0d0d0e]/98 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl z-[60] flex flex-col gap-3">
                      <div className="flex justify-between items-center px-1">
                         <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Global GIF Search</span>
-                        <button
-                           type="button"
-                           onClick={() => {
-                              setShowGifPicker(false);
-                              setGifSearchQuery('');
-                           }}
-                           className="text-[8px] font-black text-gray-500 hover:text-white uppercase tracking-widest transition-colors cursor-pointer"
-                        >
-                           Close
-                        </button>
+                        <button type="button" onClick={closePickers} className="text-[8px] font-black text-gray-500 hover:text-white uppercase tracking-widest transition-colors cursor-pointer">Close</button>
                      </div>
-
-                     {/* Search input field */}
                      <form onSubmit={handleSearchGifs} className="flex gap-2">
                         <input
                            type="text"
@@ -209,25 +273,19 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                            placeholder="Search any GIF (e.g. Dhoni, Kohli...)"
                            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white focus:outline-none focus:border-white/30 transition-colors placeholder:text-gray-700"
                         />
-                        <button
-                           type="submit"
-                           className="px-3 bg-white hover:bg-white/90 text-black font-black text-[9px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer shrink-0"
-                        >
-                           Search
-                        </button>
+                        <button type="submit" className="px-3 bg-white hover:bg-white/90 text-black font-black text-[9px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer shrink-0">Search</button>
                      </form>
-
                      <div className="grid grid-cols-4 gap-2 overflow-y-auto max-h-[160px] custom-scrollbar min-h-[80px]">
                         {isSearchingGifs ? (
                            <div className="col-span-4 flex items-center justify-center py-8 opacity-50">
-                              <span className="text-[9px] font-black text-white uppercase tracking-widest animate-pulse">Searching Giphy...</span>
+                              <span className="text-[9px] font-black text-white uppercase tracking-widest animate-pulse">Searching GIPHY...</span>
                            </div>
                         ) : searchedGifs.length === 0 ? (
                            <div className="col-span-4 flex items-center justify-center py-8 opacity-50">
-                              <span className="text-[9px] font-black text-white uppercase tracking-widest">No GIFs Found</span>
+                              <span className="text-[9px] font-black text-white uppercase tracking-widest text-center">{GIPHY_API_KEY ? 'No GIFs found' : 'GIF search is not configured. Stickers work without it.'}</span>
                            </div>
                         ) : (
-                           searchedGifs.map((gif) => (
+                           searchedGifs.map(gif => (
                               <button
                                  key={gif.id}
                                  type="button"
@@ -236,11 +294,13 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                        await sendMessage(roomId, gif.url, 'gif');
                                        setShowGifPicker(false);
                                        setGifSearchQuery('');
-                                    } catch (e) {}
+                                    } catch (err) {
+                                       console.error('[TextChat] GIF could not be sent:', err);
+                                    }
                                  }}
                                  className="relative rounded-lg overflow-hidden border border-white/5 hover:border-white/30 aspect-video group cursor-pointer transition-all active:scale-95 bg-white/5"
                               >
-                                 <img src={gif.url} alt={gif.name} className="w-full h-full object-cover animate-pulse" />
+                                 <img src={gif.url} alt={gif.name} className="w-full h-full object-cover" />
                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                     <span className="text-[7px] font-black text-white uppercase tracking-tight truncate max-w-[90%] px-1">{gif.name}</span>
                                  </div>
