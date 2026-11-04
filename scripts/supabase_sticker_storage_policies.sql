@@ -25,4 +25,4 @@ with check (
 
 create policy "Users can delete own personal stickers"
 on storage.objects for delete to authenticated
-using (bucket_id = 'user-stickers' and (storage.foldername(name))[1] = (select auth.uid()::text));
+using (bucket_id = 'user-stickers' and (storage.foldername(name))[1] = (select auth.jwt() ->> 'sub'));
