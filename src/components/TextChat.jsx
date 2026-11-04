@@ -59,9 +59,8 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
       const loadMyStickers = async () => {
          if (!user?.uid) { setMyStickers([]); return; }
          try {
-            const { data, error } = await listAll(storageRef(storage, `user-stickers/${user.uid}`));
-            if (error) throw error;
-            const stickers = await Promise.all((data?.items || []).map(async item => ({ id: item.fullPath, name: item.name, url: await getDownloadURL(item) })));
+            const result = await listAll(storageRef(storage, `user-stickers/${user.uid}`));
+            const stickers = await Promise.all((result.items || []).map(async item => ({ id: item.fullPath, name: item.name, url: await getDownloadURL(item) })));
             if (!cancelled) setMyStickers(stickers);
          } catch (error) {
             console.warn('[TextChat] Personal stickers could not be loaded:', error.message);
