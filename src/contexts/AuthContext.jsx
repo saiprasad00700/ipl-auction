@@ -49,12 +49,27 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
-      const isLandingPage = typeof window !== 'undefined' && window.location.pathname === '/';
-      if (!isLandingPage) {
-        setTimeout(markLoaderSeen, 1500);
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch('/api/ensure-supabase-claim', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (response.ok) {
+            const result = await response.json();
+            if (result.refreshToken) await user.getIdToken(true);
+          } else {
+            console.warn('[Auth] Supabase sticker access could not be initialized.');
+          }
+        } catch (error) {
+          console.warn('[Auth] Supabase sticker access setup failed:', error?.message || error);
+        }
       }
+      const isLandingPage = typeof window !== 'undefined' && window.location.pathname === '/';
+      if (!isLandingPage) setTimeout(markLoaderSeen, 1500);
     });
 
     return unsubscribe;
