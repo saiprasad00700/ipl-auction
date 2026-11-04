@@ -360,6 +360,14 @@ const AuctionRoom = () => {
       }
    }, [currentAuction?.status, id, navigate]);
 
+   // Redirect unauthenticated visitors after the component has mounted.
+   // Calling navigate() during render triggers React Router's warning.
+   useEffect(() => {
+      if (!user && !loading) {
+         navigate(`/lobby/${id}`, { replace: true });
+      }
+   }, [user, loading, id, navigate]);
+
    const TEAM_SONGS = {
       'csk': '/CSK.mp3',
       'mi': '/MI.mp3',
@@ -948,7 +956,6 @@ const AuctionRoom = () => {
    }
 
    if (!user && !loading) {
-      navigate(`/lobby/${id}`, { replace: true });
       return <PageLoader />;
    }
 
