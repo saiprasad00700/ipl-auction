@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
+import { trackAnalyticsEvent } from '../lib/insights';
 import { IPL_PLAYERS } from '../data/players';
 import { evaluateBotBid } from '../lib/botEngine';
 import { 
@@ -401,6 +402,7 @@ export const AuctionProvider = ({ children }) => {
       type: 'log',
       timestamp: serverTimestampRtdb()
     });
+    void trackAnalyticsEvent('auction_start', roomId);
 
   }, [getSyncedTime]);
 
@@ -1117,7 +1119,8 @@ export const AuctionProvider = ({ children }) => {
         }
       }
     }
-  }, []);
+    if (user && user.uid === userId) void trackAnalyticsEvent('room_join', roomId);
+  }, [user]);
 
   // Kick a player from the room
   const kickPlayer = useCallback(async (roomId, playerObj) => {
@@ -1507,6 +1510,7 @@ export const AuctionProvider = ({ children }) => {
     });
     // Members may write the dedicated heartbeat child, not the host-only /room parent.
     await set(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now());
+    if (type === 'text') void trackAnalyticsEvent('chat_message', roomId);
   }, [user]);
 
   const placeBid = useCallback(async (amount) => {
@@ -1581,6 +1585,7 @@ export const AuctionProvider = ({ children }) => {
     if (!txResult.committed) {
       throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
     }
+    void trackAnalyticsEvent('bid', currentAuction.id);
   }, [currentAuction, user, team, getSyncedTime]);
 
   const decideRetention = useCallback(async (roomId, decision) => {
