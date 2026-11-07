@@ -40,7 +40,13 @@ export async function ensureAnalyticsSession() {
     sessionId = null;
   }
   if (!startPromise) {
-    startPromise = post('session_start').catch((error) => {
+    startPromise = post('session_start').then((response) => {
+      if (response && !response.ok) {
+        startPromise = null;
+        console.warn('[Insights] Session start was rejected:', response.status);
+      }
+      return response;
+    }).catch((error) => {
       console.warn('[Insights] Session start skipped:', error?.message || error);
       startPromise = null;
       return null;
