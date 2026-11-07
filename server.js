@@ -300,6 +300,127 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 500, { error: 'Could not load live analytics right now' });
     }
   }
+  if (pathname === '/api/insights/track') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts are not tracked' });
+
+      const body = await readBody(req);
+      const sessionId = String(body.sessionId || '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+        return sendJson(res, 400, { error: 'Invalid analytics session' });
+      }
+      const action = String(body.action || '');
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceKey) return sendJson(res, 503, { error: 'Analytics storage is not configured on the server' });
+
+      const baseUrl = supabaseUrl.replace(/\/$/, '') + '/rest/v1/';
+      const headers = {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      };
+      const sessionUrl = baseUrl + 'analytics_sessions';
+      const sessionRow = {
+        session_id: sessionId,
+        firebase_uid: decoded.uid,
+        is_anonymous: decoded.firebase?.sign_in_provider === 'anonymous',
+        last_seen_at: new Date().toISOString()
+      };
+
+      if (action === 'session_start') {
+        const response = await fetch(sessionUrl + '?on_conflict=session_id', {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(sessionRow)
+        });
+        if (!response.ok) {
+          console.warn('[Insights] Session insert failed:', response.status, (await response.text()).slice(0, 300));
+          return sendJson(res, 502, { error: 'Could not create analytics session' });
+        }
+        return sendJson(res, 200, { ok: true });
+      }
+
+      // Every later action must belong to the authenticated Firebase user.
+      const sessionLookup = new URL(sessionUrl, 'http://localhost');
+      sessionLookup.searchParams.set('session_id', 'eq.' + sessionId);
+      sessionLookup.searchParams.set('firebase_uid', 'eq.' + decoded.uid);
+      sessionLookup.searchParams.set('select', 'session_id');
+      const lookup = await fetch(sessionLookup, { headers });
+      if (!lookup.ok) return sendJson(res, 502, { error: 'Could not verify analytics session' });
+      const sessions = await lookup.json();
+      if (!Array.isArray(sessions) || sessions.length === 0) return sendJson(res, 404, { error: 'Analytics session not found' });
+
+      if (action === 'session_end') {
+        const response = await fetch(sessionLookup, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ ended_at: new Date().toISOString(), last_seen_at: new Date().toISOString() })
+        });
+        if (!response.ok) return sendJson(res, 502, { error: 'Could not close analytics session' });
+        return sendJson(res, 200, { ok: true });
+      }
+
+      if (action === 'heartbeat') {
+        const response = await fetch(sessionLookup, {
+          method: 'PATCH', headers,
+          body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+        });
+        if (!response.ok) return sendJson(res, 502, { error: 'Could not update analytics session' });
+        return sendJson(res, 200, { ok: true });
+      }
+
+      const allowedEvents = new Set(['page_view', 'room_join', 'room_leave', 'auction_start', 'bid', 'chat_message', 'voice_join', 'voice_leave']);
+      const eventName = String(body.eventName || '');
+      if (action !== 'event' || !allowedEvents.has(eventName)) return sendJson(res, 400, { error: 'Invalid analytics event' });
+      const roomId = body.roomId == null ? null : String(body.roomId).trim();
+      if (roomId && !/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+
+      if (roomId) {
+        const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
+        if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+        const roomData = roomSnapshot.val() || {};
+        const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
+        const isMember = roomData.hostId === decoded.uid || roster.some((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
+        if (!isMember) return sendJson(res, 403, { error: 'You are not a member of this room' });
+      }
+
+      const metadata = {};
+      if (eventName === 'page_view' && typeof body.metadata?.path === 'string') {
+        const safePath = body.metadata.path.split('?')[0].slice(0, 160);
+        if (safePath.startsWith('/')) metadata.path = safePath;
+      }
+      const eventResponse = await fetch(baseUrl + 'analytics_events', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session_id: sessionId,
+          firebase_uid: decoded.uid,
+          event_name: eventName,
+          room_id: roomId,
+          metadata
+        })
+      });
+      if (!eventResponse.ok) {
+        console.warn('[Insights] Event insert failed:', eventResponse.status, (await eventResponse.text()).slice(0, 300));
+        return sendJson(res, 502, { error: 'Could not record analytics event' });
+      }
+      await fetch(sessionLookup, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+      }).catch(() => {});
+      return sendJson(res, 200, { ok: true });
+    } catch (error) {
+      console.warn('[Insights] Tracking request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not record analytics activity' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
