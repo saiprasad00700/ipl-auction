@@ -13,6 +13,9 @@ export default function InsightsTracker() {
   const location = useLocation();
   const previousRoomId = useRef(null);
   const previousPath = useRef('');
+  const countryEstimate = (() => {
+    try { return new Intl.Locale(navigator.language).region || null; } catch { return null; }
+  })();
 
   useEffect(() => {
     let stopHeartbeat = null;
@@ -21,7 +24,7 @@ export default function InsightsTracker() {
       stopHeartbeat = null;
       if (!user) return;
       void ensureAnalyticsSession();
-      void trackAnalyticsEvent('page_view', null, { path: window.location.pathname || '/' });
+      void trackAnalyticsEvent('page_view', null, { path: window.location.pathname || '/', countryEstimate });
       stopHeartbeat = setInterval(() => {
         void heartbeatAnalyticsSession();
       }, 60_000);
@@ -52,7 +55,7 @@ export default function InsightsTracker() {
       void trackAnalyticsEvent('room_leave', previousRoomId.current);
       previousRoomId.current = null;
     }
-    void trackAnalyticsEvent('page_view', null, { path });
+    void trackAnalyticsEvent('page_view', null, { path, countryEstimate });
   }, [location.pathname]);
 
   return null;
