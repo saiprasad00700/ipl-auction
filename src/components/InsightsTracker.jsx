@@ -17,11 +17,10 @@ export default function InsightsTracker() {
   useEffect(() => {
     let stopHeartbeat = null;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (stopHeartbeat) clearInterval(stopHeartbeat);
+      stopHeartbeat = null;
       if (!user) return;
       void ensureAnalyticsSession();
-      void trackAnalyticsEvent('page_view', null, {
-        path: location.pathname || '/'
-      });
       stopHeartbeat = setInterval(() => {
         void heartbeatAnalyticsSession();
       }, 60_000);
@@ -46,7 +45,6 @@ export default function InsightsTracker() {
         void trackAnalyticsEvent('room_leave', previousRoomId.current);
       }
       previousRoomId.current = nextRoomId;
-      void trackAnalyticsEvent('room_join', nextRoomId);
     } else if (!nextRoomId && previousRoomId.current) {
       void trackAnalyticsEvent('room_leave', previousRoomId.current);
       previousRoomId.current = null;
