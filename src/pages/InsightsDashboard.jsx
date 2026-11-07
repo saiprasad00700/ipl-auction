@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Activity, ArrowLeft, BarChart3, Clock3, RefreshCw, Users, UserRoundCheck, Gavel, MessageCircle, Mic, CalendarDays, TrendingUp } from 'lucide-react';
+import { Activity, ArrowLeft, CheckCircle2, BarChart3, Clock3, RefreshCw, Users, UserRoundCheck, Gavel, MessageCircle, Mic, CalendarDays, TrendingUp } from 'lucide-react';
 
 const ADMIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
 const number = (value) => new Intl.NumberFormat('en-IN').format(Number(value || 0));
@@ -121,6 +121,34 @@ export default function InsightsDashboard() {
           <MetricCard icon={Clock3} label="Avg session" value={number(report?.totals.averageSessionMinutes) + ' min'} detail={number(report?.totals.sessions) + ' recorded sessions'} />
           <MetricCard icon={UserRoundCheck} label="Registered players" value={number(report?.totals.registeredPlayers)} detail="Distinct non-anonymous accounts" />
           <MetricCard icon={Users} label="Guest players" value={number(report?.totals.guestPlayers)} detail="Distinct anonymous accounts" />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-slate-300">Platform growth · phase 2</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MetricCard icon={Users} label="Peak simultaneous" value={number(report?.phaseTwo?.concurrency?.peakOnlinePlayers)} detail="Highest sampled online players · 1-minute samples" />
+          <MetricCard icon={Gavel} label="Peak active players" value={number(report?.phaseTwo?.concurrency?.peakActivePlayers)} detail="Highest sampled players in active auctions" />
+          <MetricCard icon={Activity} label="Rooms created" value={number(report?.phaseTwo?.rooms?.created)} detail="Tracked room creation events" />
+          <MetricCard icon={CheckCircle2} label="Auctions completed" value={number(report?.phaseTwo?.rooms?.completed)} detail="Tracked completed auction events" />
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className={cardClass}>
+            <h3 className="mb-3 font-black">Player retention</h3>
+            <p className="mb-4 text-xs text-slate-500">Percentage of players returning on the specified day after their first recorded session. Only mature cohorts are included.</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(report?.phaseTwo?.retention || []).map((item) => <div key={item.days} className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                <div className="text-xs text-slate-400">{item.days}-day</div>
+                <div className="mt-1 text-2xl font-black">{item.rate}%</div>
+                <div className="mt-1 text-[10px] text-slate-500">{number(item.returnedPlayers)} / {number(item.eligiblePlayers)} players</div>
+              </div>)}
+            </div>
+          </div>
+          <div className={cardClass}>
+            <h3 className="mb-3 font-black">Players by estimated country</h3>
+            <p className="mb-3 text-xs text-slate-500">Approximate browser language/region only · not GPS or IP location.</p>
+            {(report?.phaseTwo?.countries || []).length ? <div className="space-y-2">{report.phaseTwo.countries.slice(0, 8).map((item) => <div key={item.country} className="flex items-center justify-between text-sm"><span className="text-slate-300">{item.country}</span><strong>{number(item.players)}</strong></div>)}</div> : <p className="text-sm text-slate-500">Country estimates will appear as visitors generate new page-view events.</p>}
+          </div>
         </div>
       </section>
 
