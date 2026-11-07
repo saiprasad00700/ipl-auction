@@ -114,11 +114,13 @@ export default function InsightsDashboard() {
 
       <section>
         <h2 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-slate-300">Player activity · {days} days</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MetricCard icon={Users} label="Unique players" value={number(report?.totals.uniquePlayers)} detail="Distinct real accounts with activity" />
           <MetricCard icon={CalendarDays} label="Played today" value={number(report?.totals.playersToday)} detail="Unique players today · India time" />
           <MetricCard icon={TrendingUp} label="Returning players" value={number(report?.totals.returningPlayers)} detail="Active on multiple days" />
           <MetricCard icon={Clock3} label="Avg session" value={number(report?.totals.averageSessionMinutes) + ' min'} detail={number(report?.totals.sessions) + ' recorded sessions'} />
+          <MetricCard icon={UserRoundCheck} label="Registered players" value={number(report?.totals.registeredPlayers)} detail="Distinct non-anonymous accounts" />
+          <MetricCard icon={Users} label="Guest players" value={number(report?.totals.guestPlayers)} detail="Distinct anonymous accounts" />
         </div>
       </section>
 
@@ -134,14 +136,14 @@ export default function InsightsDashboard() {
           <div className="mt-3 flex justify-between text-[10px] text-slate-500"><span>{report?.daily?.[0]?.label || '—'}</span><span>{report?.daily?.at(-1)?.label || '—'}</span></div>
         </div>
         <div className={cardClass}>
-          <div className="mb-5 flex items-center justify-between"><h3 className="font-black">Peak active hours</h3><span className="text-[10px] text-slate-500">IST · all selected days</span></div>
+          <div className="mb-5 flex items-center justify-between"><h3 className="font-black">Peak active hours</h3><span className="text-[10px] text-slate-500">IST · unique users per hour</span></div>
           <div className="flex h-44 items-end gap-1">
             {(report?.hourly || []).map((item) => <div key={item.hour} className="group flex h-full min-w-0 flex-1 flex-col justify-end" title={item.label + ': ' + item.users + ' players'}>
               <div className="mb-1 text-center text-[8px] text-slate-400 opacity-0 group-hover:opacity-100">{item.users}</div>
               <div className="w-full rounded-t-sm bg-sky-400/80" style={{ height: Math.max(item.users ? 5 : 1, item.users / maxHourly * 125) + 'px' }} />
             </div>)}
           </div>
-          <p className="mt-3 text-xs text-slate-400">Peak: <strong className="text-white">{report?.peakHour?.label || '—'}</strong> · {number(report?.peakHour?.players)} active players in that hour</p>
+          <p className="mt-3 text-xs text-slate-400">Peak: <strong className="text-white">{report?.peakHour?.label || '—'}</strong> · {number(report?.peakHour?.players)} unique players across the selected days. This is not a simultaneous live-player count.</p>
         </div>
       </section>
 
