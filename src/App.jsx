@@ -19,6 +19,7 @@ const GameGuide       = lazy(() => import('./pages/GameGuide'))
 const PrivacyPolicy   = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsConditions = lazy(() => import('./pages/TermsConditions'))
 const AdminPanel      = lazy(() => import('./pages/AdminPanel'))
+const InsightsDashboard = lazy(() => import('./pages/InsightsDashboard'))
 const NotFound        = lazy(() => import('./pages/NotFound'))
 
 // ── Lazy-loaded heavy modals (defer until after first paint) ──────────────────
@@ -59,6 +60,9 @@ function App() {
                   {/* All other routes are code-split into separate chunks */}
                   <Route path="/cinematic-preview" element={
                     <Suspense fallback={<PageFallback />}><CinematicPreview /></Suspense>
+                  } />
+                  <Route path="/admin/insights" element={
+                    <Suspense fallback={<PageFallback />}><InsightsDashboard /></Suspense>
                   } />
                   <Route path="/admin" element={
                     <Suspense fallback={<PageFallback />}><AdminPanel /></Suspense>
