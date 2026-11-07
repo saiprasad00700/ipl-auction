@@ -571,7 +571,7 @@ const AuctionRoom = () => {
 
    const isAdmin = currentAuction?.hostId === user?.uid;
    const currentBid = displayAuctionState?.currentBid || 0;
-   const nextBidAmount = getNextBidAmount(currentBid, currentPlayer?.basePrice || 0);
+   const nextBidAmount = getNextBidAmount(currentBid, currentPlayer?.basePrice || 0, currentPlayer?.set);
    const playerCategories = useMemo(() => {
       const soldIds = new Set();
       const soldWithBids = {};
