@@ -21,6 +21,7 @@ export default function InsightsTracker() {
       stopHeartbeat = null;
       if (!user) return;
       void ensureAnalyticsSession();
+      void trackAnalyticsEvent('page_view', null, { path: window.location.pathname || '/' });
       stopHeartbeat = setInterval(() => {
         void heartbeatAnalyticsSession();
       }, 60_000);
@@ -37,7 +38,9 @@ export default function InsightsTracker() {
   useEffect(() => {
     const path = location.pathname || '/';
     if (path === previousPath.current) return;
+    const isInitialPath = previousPath.current === '';
     previousPath.current = path;
+    if (isInitialPath) return;
     const match = path.match(/^\/(?:lobby|auction)\/([a-zA-Z0-9_-]{1,80})/);
     const nextRoomId = match ? match[1] : null;
     if (nextRoomId && nextRoomId !== previousRoomId.current) {
