@@ -60,6 +60,26 @@ function allowAnalysis(ip) {
   return true;
 }
 
+const analyticsRequestsByUid = new Map();
+const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
+
+function allowAnalyticsRequest(uid) {
+  const now = Date.now();
+  const recent = (analyticsRequestsByUid.get(uid) || []).filter((time) => now - time < WINDOW_MS);
+  if (recent.length >= MAX_ANALYTICS_REQUESTS_PER_MINUTE) {
+    analyticsRequestsByUid.set(uid, recent);
+    return false;
+  }
+  recent.push(now);
+  analyticsRequestsByUid.set(uid, recent);
+  if (analyticsRequestsByUid.size > 5000) {
+    for (const [key, values] of analyticsRequestsByUid) {
+      if (!values.some((time) => now - time < WINDOW_MS)) analyticsRequestsByUid.delete(key);
+    }
+  }
+  return true;
+}
+
 async function serveStatic(req, res, pathname) {
   let decodedPathname;
   try {
@@ -265,6 +285,274 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       console.warn('[Supabase auth] Could not assign authenticated role:', error?.message || error);
       return sendJson(res, 500, { error: 'Could not prepare your account for sticker storage' });
+    }
+  }
+  if (pathname === '/api/insights/live') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in with the authorized Google account' });
+
+      const expectedAdminEmail = String(process.env.ANALYTICS_ADMIN_EMAIL || '').trim().toLowerCase();
+      if (!expectedAdminEmail) return sendJson(res, 503, { error: 'Analytics administrator is not configured on the server' });
+
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      const tokenEmail = String(decoded.email || '').trim().toLowerCase();
+      const signInProvider = decoded.firebase?.sign_in_provider;
+      if (
+        tokenEmail !== expectedAdminEmail ||
+        decoded.email_verified !== true ||
+        signInProvider !== 'google.com'
+      ) {
+        return sendJson(res, 403, { error: 'You are not authorized to view SS AUCTION INSIGHTS' });
+      }
+
+      const { buildLiveAnalyticsSnapshot } = await import('./api/analytics.js');
+      const auctionsSnapshot = await database.ref('auctions').get();
+      const snapshot = buildLiveAnalyticsSnapshot(
+        auctionsSnapshot.exists() ? auctionsSnapshot.val() : {},
+        Date.now()
+      );
+      return sendJson(res, 200, snapshot);
+    } catch (error) {
+      console.warn('[Insights] Could not load live analytics:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not load live analytics right now' });
+    }
+  }
+  if (pathname === '/api/insights/report') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in with the authorized Google account' });
+      const expectedAdminEmail = String(process.env.ANALYTICS_ADMIN_EMAIL || '').trim().toLowerCase();
+      if (!expectedAdminEmail) return sendJson(res, 503, { error: 'Analytics administrator is not configured on the server' });
+      const { auth } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (
+        String(decoded.email || '').trim().toLowerCase() !== expectedAdminEmail ||
+        decoded.email_verified !== true ||
+        decoded.firebase?.sign_in_provider !== 'google.com'
+      ) return sendJson(res, 403, { error: 'You are not authorized to view SS AUCTION INSIGHTS' });
+
+      const days = Math.min(90, Math.max(1, Number(new URL(req.url || '/', 'http://localhost').searchParams.get('days')) || 30));
+      const now = new Date();
+      const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceKey) return sendJson(res, 503, { error: 'Analytics storage is not configured on the server' });
+
+      const baseUrl = supabaseUrl.replace(/\/$/, '') + '/rest/v1/';
+      const headers = { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey };
+      const readRows = async (table, select, filterColumn) => {
+        const rows = [];
+        for (let offset = 0; offset < 50_000; offset += 1000) {
+          const url = new URL(table, baseUrl);
+          url.searchParams.set('select', select);
+          url.searchParams.set(filterColumn, 'gte.' + start.toISOString());
+          url.searchParams.set('order', filterColumn + '.desc');
+          const response = await fetch(url, { headers: { ...headers, Range: offset + '-' + (offset + 999) } });
+          if (!response.ok) throw new Error('Could not read analytics ' + table + ': ' + response.status);
+          const batch = await response.json();
+          if (!Array.isArray(batch)) throw new Error('Invalid analytics response for ' + table);
+          rows.push(...batch);
+          if (batch.length < 1000) break;
+        }
+        return rows;
+      };
+
+      const [events, sessions] = await Promise.all([
+        readRows('analytics_events', 'firebase_uid,event_name,room_id,occurred_at', 'occurred_at'),
+        readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at')
+      ]);
+      const distinctUsers = new Set(events.map((event) => event.firebase_uid).filter(Boolean));
+      const sessionUsers = new Set(sessions.map((session) => session.firebase_uid).filter(Boolean));
+      const userDays = new Map();
+      const eventCounts = {};
+      const daily = new Map();
+      const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, label: String(hour).padStart(2, '0') + ':00', events: 0, users: new Set() }));
+      const roomCounts = new Map();
+      const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const todayUsers = new Set();
+      const dateKey = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+
+      for (let offset = days - 1; offset >= 0; offset -= 1) {
+        const date = new Date(now.getTime() - offset * 86400000);
+        daily.set(dateKey(date), { date: dateKey(date), label: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' }).format(date), events: 0, users: new Set() });
+      }
+      for (const event of events) {
+        if (!event.firebase_uid || !event.occurred_at) continue;
+        const date = new Date(event.occurred_at);
+        if (!Number.isFinite(date.getTime())) continue;
+        const day = dateKey(date);
+        const bucket = daily.get(day);
+        if (bucket) { bucket.events += 1; bucket.users.add(event.firebase_uid); }
+        const hourParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hourCycle: 'h23' }).format(date);
+        const hour = Number(hourParts);
+        if (Number.isInteger(hour) && hourly[hour]) { hourly[hour].events += 1; hourly[hour].users.add(event.firebase_uid); }
+        eventCounts[event.event_name] = (eventCounts[event.event_name] || 0) + 1;
+        if (event.room_id) roomCounts.set(event.room_id, (roomCounts.get(event.room_id) || 0) + 1);
+        if (day === todayKey) todayUsers.add(event.firebase_uid);
+        if (!userDays.has(event.firebase_uid)) userDays.set(event.firebase_uid, new Set());
+        userDays.get(event.firebase_uid).add(day);
+      }
+      const durations = sessions.map((session) => {
+        const begin = new Date(session.started_at).getTime();
+        const end = new Date(session.ended_at || session.last_seen_at).getTime();
+        return Number.isFinite(begin) && Number.isFinite(end) && end >= begin ? Math.min(end - begin, 12 * 60 * 60 * 1000) : null;
+      }).filter((duration) => duration !== null);
+      const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
+      const registeredUsers = new Set(sessions.filter((session) => !session.is_anonymous).map((session) => session.firebase_uid));
+      const anonymousUsers = new Set(sessions.filter((session) => session.is_anonymous).map((session) => session.firebase_uid));
+      const dailyRows = [...daily.values()].map((item) => ({ ...item, users: item.users.size }));
+      const hourlyRows = hourly.map((item) => ({ ...item, users: item.users.size }));
+      const peakHour = [...hourlyRows].sort((a, b) => b.users - a.users || b.events - a.events)[0];
+      return sendJson(res, 200, {
+        days,
+        timezone: 'Asia/Kolkata',
+        generatedAt: now.toISOString(),
+        totals: {
+          uniquePlayers: distinctUsers.size,
+          playersToday: todayUsers.size,
+          sessions: sessions.length,
+          events: events.length,
+          returningPlayers: [...userDays.values()].filter((dates) => dates.size > 1).length,
+          registeredPlayers: registeredUsers.size,
+          guestPlayers: anonymousUsers.size,
+          averageSessionMinutes: durations.length ? Math.round(totalDuration / durations.length / 60000) : 0
+        },
+        daily: dailyRows,
+        hourly: hourlyRows,
+        peakHour: { label: peakHour.label, players: peakHour.users, events: peakHour.events },
+        eventCounts,
+        topRooms: [...roomCounts.entries()].map(([roomId, count]) => ({ roomId, events: count })).sort((a, b) => b.events - a.events).slice(0, 10)
+      });
+    } catch (error) {
+      console.warn('[Insights] Could not build analytics report:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not build analytics report right now' });
+    }
+  }
+  if (pathname === '/api/insights/track') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts are not tracked' });
+      if (!allowAnalyticsRequest(decoded.uid)) return sendJson(res, 429, { error: 'Analytics event limit reached. Try again shortly.' });
+
+      const body = await readBody(req);
+      const sessionId = String(body.sessionId || '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+        return sendJson(res, 400, { error: 'Invalid analytics session' });
+      }
+      const action = String(body.action || '');
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceKey) return sendJson(res, 503, { error: 'Analytics storage is not configured on the server' });
+
+      const baseUrl = supabaseUrl.replace(/\/$/, '') + '/rest/v1/';
+      const headers = {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      };
+      const sessionUrl = baseUrl + 'analytics_sessions';
+      const sessionRow = {
+        session_id: sessionId,
+        firebase_uid: decoded.uid,
+        is_anonymous: decoded.firebase?.sign_in_provider === 'anonymous',
+        last_seen_at: new Date().toISOString(),
+        ended_at: null
+      };
+
+      if (action === 'session_start') {
+        const response = await fetch(sessionUrl + '?on_conflict=session_id', {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(sessionRow)
+        });
+        if (!response.ok) {
+          console.warn('[Insights] Session insert failed:', response.status, (await response.text()).slice(0, 300));
+          return sendJson(res, 502, { error: 'Could not create analytics session' });
+        }
+        return sendJson(res, 200, { ok: true });
+      }
+
+      // Every later action must belong to the authenticated Firebase user.
+      const sessionLookup = new URL(sessionUrl, 'http://localhost');
+      sessionLookup.searchParams.set('session_id', 'eq.' + sessionId);
+      sessionLookup.searchParams.set('firebase_uid', 'eq.' + decoded.uid);
+      sessionLookup.searchParams.set('select', 'session_id');
+      const lookup = await fetch(sessionLookup, { headers });
+      if (!lookup.ok) return sendJson(res, 502, { error: 'Could not verify analytics session' });
+      const sessions = await lookup.json();
+      if (!Array.isArray(sessions) || sessions.length === 0) return sendJson(res, 404, { error: 'Analytics session not found' });
+
+      if (action === 'session_end') {
+        const response = await fetch(sessionLookup, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ ended_at: new Date().toISOString(), last_seen_at: new Date().toISOString() })
+        });
+        if (!response.ok) return sendJson(res, 502, { error: 'Could not close analytics session' });
+        return sendJson(res, 200, { ok: true });
+      }
+
+      if (action === 'heartbeat') {
+        const response = await fetch(sessionLookup, {
+          method: 'PATCH', headers,
+          body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+        });
+        if (!response.ok) return sendJson(res, 502, { error: 'Could not update analytics session' });
+        return sendJson(res, 200, { ok: true });
+      }
+
+      const allowedEvents = new Set(['page_view', 'room_join', 'room_leave', 'auction_start', 'bid', 'chat_message', 'voice_join', 'voice_leave']);
+      const eventName = String(body.eventName || '');
+      if (action !== 'event' || !allowedEvents.has(eventName)) return sendJson(res, 400, { error: 'Invalid analytics event' });
+      const roomId = body.roomId == null ? null : String(body.roomId).trim();
+      if (roomId && !/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+
+      if (roomId) {
+        const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
+        if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+        const roomData = roomSnapshot.val() || {};
+        const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
+        const isMember = roomData.hostId === decoded.uid || roster.some((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
+        if (!isMember) return sendJson(res, 403, { error: 'You are not a member of this room' });
+      }
+
+      const metadata = {};
+      if (eventName === 'page_view' && typeof body.metadata?.path === 'string') {
+        const safePath = body.metadata.path.split('?')[0].slice(0, 160);
+        if (safePath.startsWith('/')) metadata.path = safePath;
+      }
+      const eventResponse = await fetch(baseUrl + 'analytics_events', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session_id: sessionId,
+          firebase_uid: decoded.uid,
+          event_name: eventName,
+          room_id: roomId,
+          metadata
+        })
+      });
+      if (!eventResponse.ok) {
+        console.warn('[Insights] Event insert failed:', eventResponse.status, (await eventResponse.text()).slice(0, 300));
+        return sendJson(res, 502, { error: 'Could not record analytics event' });
+      }
+      await fetch(sessionLookup, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+      }).catch(() => {});
+      return sendJson(res, 200, { ok: true });
+    } catch (error) {
+      console.warn('[Insights] Tracking request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not record analytics activity' });
     }
   }
   if (pathname === '/api/room-activity') {

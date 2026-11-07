@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ref, update } from 'firebase/database';
 import { rtdb } from '../lib/firebase';
+import { trackAnalyticsEvent } from '../lib/insights';
 
 const VoiceChat = ({ roomId }) => {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ const VoiceChat = ({ roomId }) => {
   useEffect(() => {
     let cancelled = false;
     let room;
+    let didConnect = false;
     const start = async () => {
       if (!roomId || !user || user.isAnonymous === undefined) return;
       try {
@@ -76,8 +78,10 @@ const VoiceChat = ({ roomId }) => {
         room.on(RoomEvent.Disconnected, () => { setConnected(false); setMicOn(false); });
         await room.connect(data.url, data.token);
         if (cancelled) { await room.disconnect(); return; }
+        didConnect = true;
         setConnected(true);
         syncParticipants(room);
+        void trackAnalyticsEvent('voice_join', roomId);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Voice chat could not connect');
       }
@@ -85,6 +89,7 @@ const VoiceChat = ({ roomId }) => {
     start();
     return () => {
       cancelled = true;
+      if (didConnect) void trackAnalyticsEvent('voice_leave', roomId);
       room?.disconnect();
       roomRef.current = null;
       audioElementsRef.current.forEach((audio) => audio.remove());

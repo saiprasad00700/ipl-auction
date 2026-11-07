@@ -815,6 +815,7 @@ const AdminPanel = () => {
               { id: 'feedbacks', label: `Feedbacks (${feedbacks.length})`, icon: MessageSquare },
               { id: 'auctions', label: `Supabase Auctions`, icon: Gavel },
               { id: 'players', label: `Players (${IPL_PLAYERS.length})`, icon: Users },
+              { id: 'insights', label: 'Insights', icon: Activity },
             ].map((tabItem) => {
               const Icon = tabItem.icon;
               const isActive = activeTab === tabItem.id;
