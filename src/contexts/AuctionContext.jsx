@@ -163,6 +163,7 @@ export const AuctionProvider = ({ children }) => {
         budget
       }
     });
+    if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
 
 
     // Publish only minimal metadata for public rooms; never expose auction state.
@@ -1986,6 +1987,7 @@ export const AuctionProvider = ({ children }) => {
         winnerAnalysisModel: analysisModel,
         winnerAnalysisCompletedAt: getSyncedTime()
       });
+      void trackAnalyticsEvent('auction_completed', roomId);
       // Completed auctions should no longer appear in the public lobby.
       try { await remove(ref(rtdb, `publicRooms/${roomId}`)); }
       catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
