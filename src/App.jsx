@@ -6,6 +6,7 @@ import { AuctionProvider } from './contexts/AuctionContext'
 import { QuotaProvider } from './contexts/QuotaContext'
 import { ConnectionAlertProvider } from './contexts/ConnectionAlertContext'
 import ScrollToTop from './components/ScrollToTop'
+import InsightsTracker from './components/InsightsTracker'
 import LandingPage from './pages/LandingPage'
 import './index.css'
 
@@ -37,6 +38,7 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+      <InsightsTracker />
       <QuotaProvider>
         <ConnectionAlertProvider>
           <AuthProvider>
