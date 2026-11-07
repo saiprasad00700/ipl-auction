@@ -1549,7 +1549,7 @@ export const AuctionProvider = ({ children }) => {
     // inside it reads a stale React closure each retry, not the live DB value. We do the check here
     // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
     const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0);
+    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0, player?.set);
     const myBudget = team.budgetRemaining || 0;
     if (myBudget < nextBidSnapshot) {
       throw new Error('Insufficient budget to place this bid.');
@@ -1568,7 +1568,7 @@ export const AuctionProvider = ({ children }) => {
       }
 
       const cBid = currentData.currentBid || 0;
-      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0);
+      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
 
       // Guard: Abort retried transaction if updated bid exceeds user's budget
       if (nAmount > myBudget) return;
@@ -2043,7 +2043,7 @@ export const AuctionProvider = ({ children }) => {
       if (currentData.timerEndsAt && now >= currentData.timerEndsAt) return;
       
       const cBid = currentData.currentBid || 0;
-      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0);
+      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
 
       // Guard: Abort retried transaction if updated bid exceeds bot's max valuation or remaining budget
       if (nAmount > maxValuation || nAmount > botBudget) return;
