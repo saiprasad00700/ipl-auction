@@ -275,7 +275,7 @@ async function recordAnalyticsPresenceSnapshot() {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) return;
-    const response = await fetch(supabaseUrl.replace(/\\/$/, '') + '/rest/v1/analytics_presence_snapshots', {
+    const response = await fetch(supabaseUrl.replace(/\/$/, '') + '/rest/v1/analytics_presence_snapshots', {
       method: 'POST',
       headers: {
         apikey: serviceKey,
