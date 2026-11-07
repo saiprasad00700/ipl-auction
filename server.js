@@ -350,7 +350,7 @@ const server = http.createServer(async (req, res) => {
           const url = new URL(table, baseUrl);
           url.searchParams.set('select', select);
           url.searchParams.set(filterColumn, 'gte.' + start.toISOString());
-          url.searchParams.set('order', filterColumn + '.asc');
+          url.searchParams.set('order', filterColumn + '.desc');
           const response = await fetch(url, { headers: { ...headers, Range: offset + '-' + (offset + 999) } });
           if (!response.ok) throw new Error('Could not read analytics ' + table + ': ' + response.status);
           const batch = await response.json();
