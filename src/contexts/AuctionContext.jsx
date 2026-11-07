@@ -661,31 +661,48 @@ export const AuctionProvider = ({ children }) => {
           return currentData;
         });
         if (!settleTx.committed) {
-          const failedState = settleTx.snapshot?.val() || null;
-          const failedOffer = failedState?.retentionOffer || null;
-          console.error('[Auction] RTM settlement transaction was not committed.', {
-            roomId,
-            liveStatus: failedState?.status ?? null,
-            offerPhase: failedOffer?.phase ?? null,
-            offerStatus: failedOffer?.status ?? null,
-            offerDecision: failedOffer?.decision ?? null,
-            offerExpiresAt: failedOffer?.expiresAt ?? null,
-            offerDecidedAt: failedOffer?.decidedAt ?? null,
-            hasCounterBid: failedOffer?.counterBid != null,
-            serverTimeSynced: isServerTimeSynced(),
-            serverTime: getSyncedTime(),
-            liveState: failedState
-          });
-          endingPlayerRef.current = false;
-          // Keep recovering if the lot is still awaiting RTM settlement. Another
-          // connected client may have raced this transaction or its clock may
-          // have reached the expiry boundary slightly later.
-          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending') {
-            setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+          // Multiple connected clients can reach this point together. One client
+          // may commit the RTM settlement while another receives committed=false
+          // because the live record has already changed. Always inspect fresh
+          // server state before reporting a failure or retrying.
+          const freshSnap = await get(liveRef);
+          const freshState = freshSnap.exists() ? freshSnap.val() : null;
+          const freshOffer = freshState?.retentionOffer || null;
+
+          // Another client may even have advanced to the next player already.
+          // In that case this settlement has been completed; do not process the
+          // next lot using this stale handler.
+          if (freshState && freshState.playerId !== auctionState.playerId) {
+            endingPlayerRef.current = false;
+            return;
           }
-          return;
+
+          if (freshState && ['sold', 'unsold'].includes(freshState.status)
+            && freshOffer?.status !== 'pending') {
+            auctionState = freshState;
+          } else {
+            console.error('[Auction] RTM settlement transaction was not committed.', {
+              roomId,
+              liveStatus: freshState?.status ?? null,
+              offerPhase: freshOffer?.phase ?? null,
+              offerStatus: freshOffer?.status ?? null,
+              offerDecision: freshOffer?.decision ?? null,
+              offerExpiresAt: freshOffer?.expiresAt ?? null,
+              offerDecidedAt: freshOffer?.decidedAt ?? null,
+              hasCounterBid: freshOffer?.counterBid != null,
+              serverTimeSynced: isServerTimeSynced(),
+              serverTime: getSyncedTime(),
+              liveState: freshState
+            });
+            endingPlayerRef.current = false;
+            if (freshState?.status === 'processing_sale' && freshOffer?.status === 'pending') {
+              setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+            }
+            return;
+          }
+        } else {
+          auctionState = settleTx.snapshot.val();
         }
-        auctionState = settleTx.snapshot.val();
         if (auctionState.retentionOffer?.status === 'accepted') {
           await push(ref(rtdb, `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
