@@ -93,7 +93,9 @@ ${JSON.stringify(normalized)}`;
     // Gemini can temporarily return 503 during demand spikes. Retry transient failures,
     // then fall back to a widely supported Flash model instead of failing immediately.
     // Use the current stable Gemini Flash model. Do not fall back to retired Gemini 2.5 Flash.
-    const models = ["gemini-3.8-flash"];
+    // Keep a lower-demand Flash-Lite fallback so a temporary 503 on the primary
+    // model does not make the entire auction ranking fail.
+    const models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"];
     let response = null;
     let activeModel = models[0];
     let lastDetail = "";
@@ -110,6 +112,30 @@ ${JSON.stringify(normalized)}`;
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                   responseMimeType: "application/json",
+                  // Structured output reduces missing IDs, duplicate ranks, and malformed JSON.
+                  responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                      rankings: {
+                        type: "ARRAY",
+                        items: {
+                          type: "OBJECT",
+                          properties: {
+                            franchiseId: { type: "STRING" },
+                            rank: { type: "INTEGER" },
+                            score: { type: "NUMBER" },
+                            summary: { type: "STRING" },
+                            strengths: { type: "ARRAY", items: { type: "STRING" } },
+                            risks: { type: "ARRAY", items: { type: "STRING" } },
+                          },
+                          required: ["franchiseId", "rank", "score", "summary", "strengths", "risks"],
+                        },
+                      },
+                    },
+                    required: ["rankings"],
+                  },
+                  temperature: 0.1,
+                  maxOutputTokens: 12000,
                 },
               }),
             },
@@ -184,6 +210,13 @@ ${JSON.stringify(normalized)}`;
     ) && new Set(received.map((item) => item.rank)).size === expectedIds.length;
 
     if (!validIds || !validRanks) {
+      console.error("Gemini returned invalid franchise rankings", {
+        expectedFranchiseIds: expectedIds,
+        receivedFranchiseIds: received.map((item) => getText(item?.franchiseId)),
+        expectedCount: expectedIds.length,
+        receivedCount: received.length,
+        receivedRanks: received.map((item) => item?.rank),
+      });
       throw new Error("AI response failed ranking validation");
     }
 
