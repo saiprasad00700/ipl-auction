@@ -4,6 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import analyzeWinner from './api/analyze-winner.js';
+import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -264,6 +265,44 @@ function startRoomCleanup() {
   setInterval(() => { void cleanupAbandonedRooms(); }, ROOM_CLEANUP_INTERVAL_MS);
 }
 
+let analyticsSnapshotTimerStarted = false;
+async function recordAnalyticsPresenceSnapshot() {
+  try {
+    const { database } = await getFirebaseAdminServices();
+    const snapshot = await database.ref('auctions').get();
+    const { buildLiveAnalyticsSnapshot } = await import('./api/analytics.js');
+    const live = buildLiveAnalyticsSnapshot(snapshot.exists() ? snapshot.val() : {}, Date.now());
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) return;
+    const response = await fetch(supabaseUrl.replace(/\\/$/, '') + '/rest/v1/analytics_presence_snapshots', {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({
+        sampled_at: new Date().toISOString(),
+        online_players: live.onlinePlayers,
+        active_players: live.activePlayers,
+        active_rooms: live.activeRooms
+      })
+    });
+    if (!response.ok) console.warn('[Insights] Presence snapshot failed:', response.status);
+  } catch (error) {
+    console.warn('[Insights] Presence snapshot skipped:', error?.message || error);
+  }
+}
+
+function startAnalyticsPresenceSnapshots() {
+  if (analyticsSnapshotTimerStarted) return;
+  analyticsSnapshotTimerStarted = true;
+  void recordAnalyticsPresenceSnapshot();
+  setInterval(() => { void recordAnalyticsPresenceSnapshot(); }, 60_000);
+}
+
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url || '/', 'http://localhost').pathname;
   if (pathname === '/health') return sendJson(res, 200, { ok: true });
@@ -361,10 +400,21 @@ const server = http.createServer(async (req, res) => {
         return rows;
       };
 
-      const [events, sessions] = await Promise.all([
-        readRows('analytics_events', 'firebase_uid,event_name,room_id,occurred_at', 'occurred_at'),
-        readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at')
+      const [events, sessions, presenceSnapshots] = await Promise.all([
+        readRows('analytics_events', 'firebase_uid,event_name,room_id,occurred_at,metadata', 'occurred_at'),
+        readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at'),
+        (async () => {
+          const url = new URL('analytics_presence_snapshots', baseUrl);
+          url.searchParams.set('select', 'sampled_at,online_players,active_players,active_rooms');
+          url.searchParams.set('sampled_at', 'gte.' + start.toISOString());
+          url.searchParams.set('order', 'sampled_at.desc');
+          const response = await fetch(url, { headers: { ...headers, Range: '0-49999' } });
+          if (!response.ok) throw new Error('Could not read analytics presence snapshots: ' + response.status);
+          const rows = await response.json();
+          return Array.isArray(rows) ? rows : [];
+        })()
       ]);
+      const phaseTwo = buildPhaseTwoMetrics({ sessions, events, snapshots: presenceSnapshots, now });
       const distinctUsers = new Set(events.map((event) => event.firebase_uid).filter(Boolean));
       const sessionUsers = new Set(sessions.map((session) => session.firebase_uid).filter(Boolean));
       const userDays = new Map();
@@ -425,7 +475,8 @@ const server = http.createServer(async (req, res) => {
         hourly: hourlyRows,
         peakHour: { label: peakHour.label, players: peakHour.users, events: peakHour.events },
         eventCounts,
-        topRooms: [...roomCounts.entries()].map(([roomId, count]) => ({ roomId, events: count })).sort((a, b) => b.events - a.events).slice(0, 10)
+        topRooms: [...roomCounts.entries()].map(([roomId, count]) => ({ roomId, events: count })).sort((a, b) => b.events - a.events).slice(0, 10),
+        phaseTwo
       });
     } catch (error) {
       console.warn('[Insights] Could not build analytics report:', error?.message || error);
@@ -510,7 +561,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true });
       }
 
-      const allowedEvents = new Set(['page_view', 'room_join', 'room_leave', 'auction_start', 'bid', 'chat_message', 'voice_join', 'voice_leave']);
+      const allowedEvents = new Set(['page_view', 'room_join', 'room_leave', 'auction_start', 'bid', 'chat_message', 'voice_join', 'voice_leave', 'room_created', 'auction_completed']);
       const eventName = String(body.eventName || '');
       if (action !== 'event' || !allowedEvents.has(eventName)) return sendJson(res, 400, { error: 'Invalid analytics event' });
       const roomId = body.roomId == null ? null : String(body.roomId).trim();
@@ -529,6 +580,10 @@ const server = http.createServer(async (req, res) => {
       if (eventName === 'page_view' && typeof body.metadata?.path === 'string') {
         const safePath = body.metadata.path.split('?')[0].slice(0, 160);
         if (safePath.startsWith('/')) metadata.path = safePath;
+      }
+      // Browser locale provides only a rough country estimate. No IP address is stored or queried.
+      if (typeof body.metadata?.countryEstimate === 'string' && /^[A-Z]{2}$/.test(body.metadata.countryEstimate)) {
+        metadata.countryEstimate = body.metadata.countryEstimate;
       }
       const eventResponse = await fetch(baseUrl + 'analytics_events', {
         method: 'POST',
@@ -652,4 +707,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Crick Auction server listening on port ${PORT}`);
   startRoomCleanup();
+  startAnalyticsPresenceSnapshots();
 });
