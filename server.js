@@ -383,12 +383,12 @@ const server = http.createServer(async (req, res) => {
 
       const baseUrl = supabaseUrl.replace(/\/$/, '') + '/rest/v1/';
       const headers = { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey };
-      const readRows = async (table, select, filterColumn) => {
+      const readRows = async (table, select, filterColumn, since = start) => {
         const rows = [];
         for (let offset = 0; offset < 50_000; offset += 1000) {
           const url = new URL(table, baseUrl);
           url.searchParams.set('select', select);
-          url.searchParams.set(filterColumn, 'gte.' + start.toISOString());
+          url.searchParams.set(filterColumn, 'gte.' + since.toISOString());
           url.searchParams.set('order', filterColumn + '.desc');
           const response = await fetch(url, { headers: { ...headers, Range: offset + '-' + (offset + 999) } });
           if (!response.ok) throw new Error('Could not read analytics ' + table + ': ' + response.status);
@@ -400,9 +400,9 @@ const server = http.createServer(async (req, res) => {
         return rows;
       };
 
-      const [events, sessions, presenceSnapshots] = await Promise.all([
+      const [events, allSessions, presenceSnapshots] = await Promise.all([
         readRows('analytics_events', 'firebase_uid,event_name,room_id,occurred_at,metadata', 'occurred_at'),
-        readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at'),
+        readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at', new Date(now.getTime() - 90 * 86400000)),
         (async () => {
           const url = new URL('analytics_presence_snapshots', baseUrl);
           url.searchParams.set('select', 'sampled_at,online_players,active_players,active_rooms');
@@ -414,7 +414,8 @@ const server = http.createServer(async (req, res) => {
           return Array.isArray(rows) ? rows : [];
         })()
       ]);
-      const phaseTwo = buildPhaseTwoMetrics({ sessions, events, snapshots: presenceSnapshots, now });
+      const sessions = allSessions.filter((session) => new Date(session.started_at).getTime() >= start.getTime());
+      const phaseTwo = buildPhaseTwoMetrics({ sessions: allSessions, events, snapshots: presenceSnapshots, now });
       const distinctUsers = new Set(events.map((event) => event.firebase_uid).filter(Boolean));
       const sessionUsers = new Set(sessions.map((session) => session.firebase_uid).filter(Boolean));
       const userDays = new Map();
