@@ -403,16 +403,7 @@ const server = http.createServer(async (req, res) => {
       const [events, allSessions, presenceSnapshots] = await Promise.all([
         readRows('analytics_events', 'firebase_uid,event_name,room_id,occurred_at,metadata', 'occurred_at'),
         readRows('analytics_sessions', 'firebase_uid,is_anonymous,started_at,last_seen_at,ended_at', 'started_at', new Date(now.getTime() - 90 * 86400000)),
-        (async () => {
-          const url = new URL('analytics_presence_snapshots', baseUrl);
-          url.searchParams.set('select', 'sampled_at,online_players,active_players,active_rooms');
-          url.searchParams.set('sampled_at', 'gte.' + start.toISOString());
-          url.searchParams.set('order', 'sampled_at.desc');
-          const response = await fetch(url, { headers: { ...headers, Range: '0-49999' } });
-          if (!response.ok) throw new Error('Could not read analytics presence snapshots: ' + response.status);
-          const rows = await response.json();
-          return Array.isArray(rows) ? rows : [];
-        })()
+readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_players,active_rooms', 'sampled_at')
       ]);
       const sessions = allSessions.filter((session) => new Date(session.started_at).getTime() >= start.getTime());
       const phaseTwo = buildPhaseTwoMetrics({ sessions: allSessions, events, snapshots: presenceSnapshots, now });
