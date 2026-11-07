@@ -27,16 +27,15 @@ export function normalizeCountryEstimate(value) {
 
 export function buildPhaseTwoMetrics({ sessions = [], events = [], snapshots = [], now = new Date() }) {
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
-  const sessionDaysByUser = new Map();
+  const sessionTimesByUser = new Map();
   const firstSeenByUser = new Map();
 
   for (const session of sessions) {
     if (!session?.firebase_uid) continue;
     const started = validDate(session.started_at);
     if (!started) continue;
-    const day = istDay(started);
-    if (!sessionDaysByUser.has(session.firebase_uid)) sessionDaysByUser.set(session.firebase_uid, new Set());
-    sessionDaysByUser.get(session.firebase_uid).add(day);
+    if (!sessionTimesByUser.has(session.firebase_uid)) sessionTimesByUser.set(session.firebase_uid, []);
+    sessionTimesByUser.get(session.firebase_uid).push(started.getTime());
     const previous = firstSeenByUser.get(session.firebase_uid);
     if (!previous || started < previous) firstSeenByUser.set(session.firebase_uid, started);
   }
@@ -45,11 +44,9 @@ export function buildPhaseTwoMetrics({ sessions = [], events = [], snapshots = [
   const retention = [1, 7, 30].map((days) => {
     const eligible = cohortUsers.filter(([, firstSeen]) => nowMs - firstSeen.getTime() >= days * DAY_MS);
     const returned = eligible.filter(([uid, firstSeen]) => {
-      const activeDays = sessionDaysByUser.get(uid) || new Set();
-      return [...activeDays].some((day) => {
-        const activeDate = validDate(day);
-        if (!activeDate) return false;
-        const delta = activeDate.getTime() - firstSeen.getTime();
+      const activeTimes = sessionTimesByUser.get(uid) || [];
+      return activeTimes.some((timestamp) => {
+        const delta = timestamp - firstSeen.getTime();
         return delta >= days * DAY_MS && delta < (days + 1) * DAY_MS;
       });
     }).length;
