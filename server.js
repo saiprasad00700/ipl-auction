@@ -267,6 +267,39 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 500, { error: 'Could not prepare your account for sticker storage' });
     }
   }
+  if (pathname === '/api/insights/live') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in with the authorized Google account' });
+
+      const expectedAdminEmail = String(process.env.ANALYTICS_ADMIN_EMAIL || '').trim().toLowerCase();
+      if (!expectedAdminEmail) return sendJson(res, 503, { error: 'Analytics administrator is not configured on the server' });
+
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      const tokenEmail = String(decoded.email || '').trim().toLowerCase();
+      const signInProvider = decoded.firebase?.sign_in_provider;
+      if (
+        tokenEmail !== expectedAdminEmail ||
+        decoded.email_verified !== true ||
+        signInProvider !== 'google.com'
+      ) {
+        return sendJson(res, 403, { error: 'You are not authorized to view SS AUCTION INSIGHTS' });
+      }
+
+      const { buildLiveAnalyticsSnapshot } = await import('./api/analytics.js');
+      const auctionsSnapshot = await database.ref('auctions').get();
+      const snapshot = buildLiveAnalyticsSnapshot(
+        auctionsSnapshot.exists() ? auctionsSnapshot.val() : {},
+        Date.now()
+      );
+      return sendJson(res, 200, snapshot);
+    } catch (error) {
+      console.warn('[Insights] Could not load live analytics:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not load live analytics right now' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
