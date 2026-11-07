@@ -60,6 +60,26 @@ function allowAnalysis(ip) {
   return true;
 }
 
+const analyticsRequestsByUid = new Map();
+const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
+
+function allowAnalyticsRequest(uid) {
+  const now = Date.now();
+  const recent = (analyticsRequestsByUid.get(uid) || []).filter((time) => now - time < WINDOW_MS);
+  if (recent.length >= MAX_ANALYTICS_REQUESTS_PER_MINUTE) {
+    analyticsRequestsByUid.set(uid, recent);
+    return false;
+  }
+  recent.push(now);
+  analyticsRequestsByUid.set(uid, recent);
+  if (analyticsRequestsByUid.size > 5000) {
+    for (const [key, values] of analyticsRequestsByUid) {
+      if (!values.some((time) => now - time < WINDOW_MS)) analyticsRequestsByUid.delete(key);
+    }
+  }
+  return true;
+}
+
 async function serveStatic(req, res, pathname) {
   let decodedPathname;
   try {
@@ -308,6 +328,7 @@ const server = http.createServer(async (req, res) => {
       const { auth, database } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts are not tracked' });
+      if (!allowAnalyticsRequest(decoded.uid)) return sendJson(res, 429, { error: 'Analytics event limit reached. Try again shortly.' });
 
       const body = await readBody(req);
       const sessionId = String(body.sessionId || '');
