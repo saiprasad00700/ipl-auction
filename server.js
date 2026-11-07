@@ -331,7 +331,8 @@ const server = http.createServer(async (req, res) => {
         session_id: sessionId,
         firebase_uid: decoded.uid,
         is_anonymous: decoded.firebase?.sign_in_provider === 'anonymous',
-        last_seen_at: new Date().toISOString()
+        last_seen_at: new Date().toISOString(),
+        ended_at: null
       };
 
       if (action === 'session_start') {
