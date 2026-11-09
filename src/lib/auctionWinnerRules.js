@@ -46,23 +46,63 @@ const toPlayer = (squadItem, playerCatalog) => {
  * Role-balanced XI fallback. Uses only the actual franchise squad and role metadata;
  * it does not depend on artificial player ratings.
  */
+const numericStat = (player, keys) => {
+  for (const key of keys) {
+    const value = Number(player?.recentStats?.[key] ?? player?.stats?.[key] ?? player?.[key]);
+    if (Number.isFinite(value) && value >= 0) return value;
+  }
+  return null;
+};
+
+// Use only explicitly supplied recent performance statistics. The legacy
+// artificial "rating" field is deliberately ignored.
+const performanceScore = (player) => {
+  const runs = numericStat(player, ['runsLast3Years', 'recentRuns', 'runs']);
+  const wickets = numericStat(player, ['wicketsLast3Years', 'recentWickets', 'wickets']);
+  const strikeRate = numericStat(player, ['strikeRateLast3Years', 'recentStrikeRate', 'strikeRate']);
+  const economy = numericStat(player, ['economyLast3Years', 'recentEconomy', 'economy']);
+  const average = numericStat(player, ['averageLast3Years', 'recentAverage', 'average']);
+  const scores = [];
+  if (runs !== null) scores.push(Math.min(runs / 100, 100));
+  if (wickets !== null) scores.push(Math.min(wickets * 2, 100));
+  if (strikeRate !== null) scores.push(Math.min(strikeRate / 2, 100));
+  if (economy !== null) scores.push(Math.max(0, 100 - economy * 8));
+  if (average !== null) scores.push(Math.min(average * 2, 100));
+  return scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
+};
+
+const roleValue = (player) => {
+  const role = normalizeRole(player);
+  return role === 'wk' ? 4 : role === 'ar' ? 3 : role === 'bat' ? 2 : role === 'bowl' ? 1 : 0;
+};
+
+/**
+ * Select a valid, role-balanced XI and Impact Player from the actual squad.
+ * Recent performance fields are used only when explicitly present. Artificial
+ * player ratings and squad ordering are never treated as performance evidence.
+ */
 export function autoSelectBestXI(squad, playerCatalog = []) {
   const players = (Array.isArray(squad) ? squad : [])
     .map((item) => toPlayer(item, playerCatalog))
     .filter(Boolean);
   const unique = [...new Map(players.map((p) => [p.id, p])).values()];
   const selected = [];
-  const overseasCount = (playersToCheck) => playersToCheck.filter(isOverseasPlayer).length;
+  const overseasCount = (items) => items.filter(isOverseasPlayer).length;
+  const ordered = (items) => [...items].sort((a, b) => {
+    const aScore = performanceScore(a);
+    const bScore = performanceScore(b);
+    if (aScore !== null || bScore !== null) {
+      if (aScore === null) return 1;
+      if (bScore === null) return -1;
+      if (bScore !== aScore) return bScore - aScore;
+    }
+    return roleValue(b) - roleValue(a) || String(a.name || a.id).localeCompare(String(b.name || b.id));
+  });
   const addBest = (predicate, categoryLimit) => {
-    const alreadySelected = selected.filter(predicate).length;
-    let needed = Math.max(0, categoryLimit - alreadySelected);
-    const candidates = unique
-      .filter((p) => !selected.some((s) => s.id === p.id) && predicate(p))
-      .sort((a, b) => unique.indexOf(a) - unique.indexOf(b));
-    for (const candidate of candidates) {
+    let needed = Math.max(0, categoryLimit - selected.filter(predicate).length);
+    for (const candidate of ordered(unique.filter((p) => !selected.some((s) => s.id === p.id) && predicate(p)))) {
       if (needed <= 0 || selected.length >= PLAYING_XI_SIZE) break;
-      if (isOverseasPlayer(candidate)
-        && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
+      if (isOverseasPlayer(candidate) && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
       selected.push(candidate);
       needed -= 1;
     }
@@ -70,18 +110,17 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
 
   addBest((p) => normalizeRole(p) === 'wk', 1);
   addBest((p) => normalizeRole(p) === 'bat', 4);
-  addBest((p) => normalizeRole(p) === 'ar', 2);
-  addBest((p) => normalizeRole(p) === 'bowl', 4);
+  addBest((p) => normalizeRole(p) === 'ar', MIN_ALL_ROUNDERS_IN_XI);
+  addBest((p) => normalizeRole(p) === 'bowl', MIN_BOWLERS_IN_XI - MIN_ALL_ROUNDERS_IN_XI);
   addBest(() => true, PLAYING_XI_SIZE);
-  const startingXI = selected.slice(0, PLAYING_XI_SIZE);
-  // The four-player overseas restriction applies to all 12 selected players,
-  // including the Impact Player, not only the starting XI.
-  const impact = unique
-    .filter((p) => !startingXI.some((s) => s.id === p.id))
-    .find((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION)
-    || null;
 
-  return { startingXI, impactPlayer: impact, autoSelected: true };
+  const startingXI = selected.slice(0, PLAYING_XI_SIZE);
+  const impactPlayer = ordered(unique
+    .filter((p) => !startingXI.some((s) => s.id === p.id))
+    .filter((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION))[0] || null;
+
+  const valid = validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog);
+  return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayer : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
 }
 
 export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog = []) {
