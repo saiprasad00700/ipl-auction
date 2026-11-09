@@ -36,8 +36,9 @@ export default async function handler(req, res) {
   const franchises = Array.isArray(body.franchises) ? body.franchises : [];
   const auctionType = getText(body.auctionType) || "mega";
   const usesSquadBalanceAnalysis = ["sprint5", "sprint11"].includes(auctionType);
-  if (!roomId || franchises.length < 2 || franchises.length > 20) {
-    const error = { error: "Provide a roomId and between 2 and 20 franchises." };
+  const minimumFranchises = usesSquadBalanceAnalysis ? 1 : 2;
+  if (!roomId || franchises.length < minimumFranchises || franchises.length > 20) {
+    const error = { error: `Provide a roomId and between ${minimumFranchises} and 20 franchises.` };
     if (res?.status) return res.status(400).json(error);
     return json(400, error);
   }
