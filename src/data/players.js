@@ -975,8 +975,8 @@ export const IPL_PLAYERS = [
     "role": "Batsman",
     "type": "Indian",
     "country": "IND",
-    "basePrice": 1,
-    "set": "Set 1",
+    "basePrice": 2,
+    "set": "Marquee",
     "image": "https://documents.iplt20.com/ipl/IPLHeadshot2025/976.png",
     "stats": {
       "matches": 57,

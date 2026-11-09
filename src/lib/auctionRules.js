@@ -5,6 +5,7 @@ export const BID_INCREMENT_CRORE = 0.5;
 export const MARQUEE_BID_INCREMENT_CRORE = 0.25;
 export const SET_1_BID_INCREMENT_CRORE = 0.25;
 export const SET_2_BID_INCREMENT_CRORE = 0.15;
+export const LOW_BASE_PRICE_BID_INCREMENT_CRORE = 0.15;
 
 export function getNextBidAmount(currentBid, basePrice = 0, playerSet = '') {
   const bid = Number(currentBid) || 0;
@@ -13,10 +14,15 @@ export function getNextBidAmount(currentBid, basePrice = 0, playerSet = '') {
   const setName = String(playerSet || '');
   let increment = BID_INCREMENT_CRORE;
 
+  // Players with a base price below ₹1 crore use a ₹15 lakh minimum increment.
+  if (Number(basePrice) > 0 && Number(basePrice) < 1) {
+    increment = LOW_BASE_PRICE_BID_INCREMENT_CRORE;
+  }
+
   // Marquee players keep the existing ₹25 lakh increment.
-  if (/\bMarquee\b/i.test(setName) || /\bSet\s*1\b/i.test(setName)) {
+  if (Number(basePrice) >= 1 && (/\bMarquee\b/i.test(setName) || /\bSet\s*1\b/i.test(setName))) {
     increment = SET_1_BID_INCREMENT_CRORE;
-  } else if (/\bSet\s*2\b/i.test(setName)) {
+  } else if (Number(basePrice) >= 1 && /\bSet\s*2\b/i.test(setName)) {
     increment = SET_2_BID_INCREMENT_CRORE;
   }
 
