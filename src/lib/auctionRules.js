@@ -20,9 +20,9 @@ export function getNextBidAmount(currentBid, basePrice = 0, playerSet = '') {
   }
 
   // Marquee players keep the existing ₹25 lakh increment.
-  if (/\bMarquee\b/i.test(setName) || /\bSet\s*1\b/i.test(setName)) {
+  if (Number(basePrice) >= 1 && (/\bMarquee\b/i.test(setName) || /\bSet\s*1\b/i.test(setName))) {
     increment = SET_1_BID_INCREMENT_CRORE;
-  } else if (/\bSet\s*2\b/i.test(setName)) {
+  } else if (Number(basePrice) >= 1 && /\bSet\s*2\b/i.test(setName)) {
     increment = SET_2_BID_INCREMENT_CRORE;
   }
 
