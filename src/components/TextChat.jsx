@@ -200,7 +200,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    };
 
    return (
-      <div className="relative flex flex-col h-full bg-transparent w-full">
+      <div className="relative flex flex-1 min-h-0 flex-col bg-transparent w-full">
          {onToggleCollapse && (
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
                <button
@@ -216,7 +216,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
 
          {!isCollapsed && (
             <>
-               <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar flex flex-col min-h-0">
+               <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 custom-scrollbar flex flex-col">
                   {chatMessages.length === 0 ? (
                      <div className="flex-1 flex flex-col items-center justify-center opacity-30 p-8 text-center my-auto">
                         <MessageSquare size={24} className="text-gray-500 mb-2 animate-pulse" />
