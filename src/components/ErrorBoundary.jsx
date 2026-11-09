@@ -1,5 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import React from 'react';
+import { reportGuardianError } from '../lib/guardian';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -17,6 +18,7 @@ class ErrorBoundary extends React.Component {
     // Keep production diagnostics available for mobile-only crashes too.
     // The fallback screen shows only the error message (not the component stack).
     console.error("[Auction ErrorBoundary] Uncaught render error:", error, errorInfo);
+    reportGuardianError({ operation: 'frontend', severity: 'critical', message: error?.message || String(error), fingerprint: 'react-render-error' });
     this.setState({
       error: error,
       errorInfo: errorInfo

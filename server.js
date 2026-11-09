@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import analyzeWinner from './api/analyze-winner.js';
 import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
+import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -61,6 +62,7 @@ function allowAnalysis(ip) {
   return true;
 }
 
+const guardianRequestsByIp = new Map();
 const analyticsRequestsByUid = new Map();
 const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
 
@@ -600,6 +602,51 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     } catch (error) {
       console.warn('[Insights] Tracking request failed:', error?.message || error);
       return sendJson(res, 500, { error: 'Could not record analytics activity' });
+    }
+  }
+  if (pathname === '/api/guardian/errors') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const expectedAdminEmail = String(process.env.ANALYTICS_ADMIN_EMAIL || '').trim().toLowerCase();
+      if (!expectedAdminEmail) return sendJson(res, 503, { error: 'Guardian administrator is not configured' });
+      const { auth } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (String(decoded.email || '').trim().toLowerCase() !== expectedAdminEmail || decoded.email_verified !== true || decoded.firebase?.sign_in_provider !== 'google.com') {
+        return sendJson(res, 403, { error: 'You are not authorized to view Guardian' });
+      }
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !serviceKey) return sendJson(res, 503, { error: 'Guardian storage is not configured' });
+      const url = new URL('/rest/v1/guardian_errors', supabaseUrl);
+      url.searchParams.set('select', 'id,operation,severity,message,room_id,source,status,created_at,resolved_at');
+      url.searchParams.set('order', 'created_at.desc');
+      url.searchParams.set('limit', '100');
+      const response = await fetch(url, { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } });
+      if (!response.ok) throw new Error('Guardian error query failed: ' + response.status);
+      return sendJson(res, 200, { errors: await response.json() });
+    } catch (error) {
+      console.warn('[Guardian] Could not load error history:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not load Guardian error history' });
+    }
+  }
+  if (pathname === '/api/guardian/report') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+    const now = Date.now();
+    const recent = (guardianRequestsByIp.get(ip) || []).filter((time) => now - time < WINDOW_MS);
+    if (recent.length >= 10) return sendJson(res, 429, { error: 'Guardian report limit reached' });
+    recent.push(now);
+    guardianRequestsByIp.set(ip, recent);
+    try {
+      const body = sanitizeGuardianInput(await readBody(req));
+      if (!body.message) return sendJson(res, 400, { error: 'Error message is required' });
+      const saved = await recordGuardianError({ ...body, source: 'browser' });
+      return sendJson(res, 202, { ok: true, id: saved?.id || null });
+    } catch (error) {
+      console.warn('[Guardian] Could not record browser error:', error?.message || error);
+      return sendJson(res, 503, { error: 'Guardian could not store this error' });
     }
   }
   if (pathname === '/api/room-activity') {

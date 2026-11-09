@@ -17,6 +17,8 @@ const json = (statusCode, body) => ({
 
 const getText = (value) => (typeof value === "string" ? value.trim() : "");
 
+import { recordGuardianError } from './guardian.js';
+
 export default async function handler(req, res) {
   // Supports both Vercel's Node request/response shape and API-gateway style.
   const method = req.method || req.httpMethod;
@@ -236,6 +238,8 @@ ${JSON.stringify(normalized)}`;
     return json(200, result);
   } catch (error) {
     const rawMessage = getText(error?.message);
+    try { await recordGuardianError({ operation: 'ai_analysis', severity: 'high', message: rawMessage || 'AI analysis failed', roomId, source: 'server', fingerprint: 'ai-analysis-failed' }); }
+    catch (guardianError) { console.warn('[Guardian] Could not record AI analysis failure:', guardianError?.message || guardianError); }
     console.error("Winner analysis error", error?.stack || rawMessage || error);
 
     // Return a safe, actionable diagnostic instead of hiding every failure behind
