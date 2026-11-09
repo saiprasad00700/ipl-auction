@@ -1,5 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { reportGuardianError } from '../lib/guardian';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuction } from '../contexts/AuctionContext';
@@ -235,6 +236,7 @@ const Lobby = () => {
       }
     } catch (e) {
       const message = e?.message || 'Could not select this team. Please try again.';
+      reportGuardianError({ operation: 'room_join', severity: 'high', message, roomId: id, fingerprint: 'lobby-team-selection-failed' });
       if (message.toLowerCase().includes('kicked')) setBanError(message);
       else {
         console.error('[Lobby] Team selection failed:', e);
