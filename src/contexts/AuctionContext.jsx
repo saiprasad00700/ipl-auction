@@ -847,16 +847,21 @@ export const AuctionProvider = ({ children }) => {
             });
           } else {
             // Natural end of bidding must enter the same shared XI phase as host-triggered end.
-            const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
+            const endedAt = getSyncedTime();
+            const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
+            const auctionType = roomSnapshot.val()?.auctionType || 'mega';
+            const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
             await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
               status: 'awaiting_xi',
-              xiSubmissionStartedAt: getSyncedTime(),
-              xiSubmissionDeadline: deadline,
+              xiSubmissionStartedAt: endedAt,
+              xiSubmissionDeadline: usesSquadBalanceAnalysis ? endedAt : endedAt + PLAYING_XI_DEADLINE_MS,
               winnerAnalysisStatus: 'collecting'
             });
             await push(ref(rtdb, `auctions/${roomId}/messages`), {
               userId: 'system', userName: 'System',
-              text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+              text: usesSquadBalanceAnalysis
+                ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
+                : 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
               type: 'log', timestamp: serverTimestampRtdb()
             });
           }
@@ -966,15 +971,20 @@ export const AuctionProvider = ({ children }) => {
       });
       if (!claim.committed) return;
       const now = getSyncedTime();
+      const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
+      const auctionType = roomSnapshot.val()?.auctionType || 'mega';
+      const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
       await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
         status: 'awaiting_xi',
         xiSubmissionStartedAt: now,
-        xiSubmissionDeadline: now + PLAYING_XI_DEADLINE_MS,
+        xiSubmissionDeadline: usesSquadBalanceAnalysis ? now : now + PLAYING_XI_DEADLINE_MS,
         winnerAnalysisStatus: 'collecting'
       });
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
-        text: 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+        text: usesSquadBalanceAnalysis
+          ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
+          : 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
       return;
@@ -1869,43 +1879,44 @@ export const AuctionProvider = ({ children }) => {
     const roomData = roomSnap.val();
     if (roomData.hostId !== user.uid) throw new Error('Only the host can end the auction');
     if (roomData.status === 'awaiting_xi' || roomData.status === 'analyzing' || roomData.status === 'completed') return;
-    // The 18-player minimum applies to the standard Mega Auction. Sprint modes
-    // intentionally have squad caps below 18, so they are exempt.
-    const minimumSquadRuleApplies = (roomData.auctionType || 'mega') === 'mega';
+    // Only Mega Auction keeps the 18-player minimum and manual Playing XI phase.
+    const isMegaAuction = (roomData.auctionType || 'mega') === 'mega';
+    const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(roomData.auctionType);
     const disqualifiedNames = [];
-    if (minimumSquadRuleApplies) {
-      const teamsRef = ref(rtdb, `auctions/${roomId}/teams`);
-      const teamsSnap = await get(teamsRef);
-      const teamsData = teamsSnap.val() || {};
-      const teamUpdates = {};
-      Object.entries(teamsData).forEach(([teamKey, teamData]) => {
-        if (!teamData?.teamId || teamData.teamId === 'NONE') return;
-        const squadCount = Array.isArray(teamData.squad) ? teamData.squad.length : 0;
-        const disqualified = squadCount < 18;
-        teamUpdates[`${teamKey}/disqualified`] = disqualified;
-        teamUpdates[`${teamKey}/disqualificationReason`] = disqualified
-          ? `Only ${squadCount} players bought; at least 18 are required.`
-          : null;
-        teamUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
-        if (disqualified) disqualifiedNames.push(`${teamData.teamName || teamData.teamId} (${squadCount}/18)`);
-      });
-      if (Object.keys(teamUpdates).length) await updateRtdb(teamsRef, teamUpdates);
-    }
+    const teamsRef = ref(rtdb, `auctions/${roomId}/teams`);
+    const teamsSnap = await get(teamsRef);
+    const teamsData = teamsSnap.val() || {};
+    const teamUpdates = {};
+    Object.entries(teamsData).forEach(([teamKey, teamData]) => {
+      if (!teamData?.teamId || teamData.teamId === 'NONE') return;
+      const squadCount = Array.isArray(teamData.squad) ? teamData.squad.length : 0;
+      const disqualified = isMegaAuction && squadCount < 18;
+      teamUpdates[`${teamKey}/disqualified`] = disqualified;
+      teamUpdates[`${teamKey}/disqualificationReason`] = disqualified
+        ? `Only ${squadCount} players bought; at least 18 are required.`
+        : null;
+      teamUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
+      if (disqualified) disqualifiedNames.push(`${teamData.teamName || teamData.teamId} (${squadCount}/18)`);
+    });
+    if (Object.keys(teamUpdates).length) await updateRtdb(teamsRef, teamUpdates);
 
-    const deadline = getSyncedTime() + PLAYING_XI_DEADLINE_MS;
+    const endedAt = getSyncedTime();
+    const deadline = usesSquadBalanceAnalysis ? endedAt : endedAt + PLAYING_XI_DEADLINE_MS;
     await updateRtdb(roomRef, {
       status: 'awaiting_xi',
-      xiSubmissionStartedAt: getSyncedTime(),
+      xiSubmissionStartedAt: endedAt,
       xiSubmissionDeadline: deadline,
       winnerAnalysisStatus: 'collecting',
-      minimumSquadSize: minimumSquadRuleApplies ? 18 : null
+      minimumSquadSize: isMegaAuction ? 18 : null
     });
-    const ruleMessage = minimumSquadRuleApplies
+    const ruleMessage = isMegaAuction
       ? ` Minimum squad size is 18; franchises below 18 are disqualified. ${disqualifiedNames.length ? `Disqualified: ${disqualifiedNames.join(', ')}.` : 'All franchises met the minimum squad size.'}`
       : '';
     await push(ref(rtdb, `auctions/${roomId}/messages`), {
       userId: 'system', userName: 'System',
-      text: `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
+      text: usesSquadBalanceAnalysis
+        ? 'Auction ended. AI is now analyzing every franchise squad for overall team balance.'
+        : `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
       type: 'log', timestamp: serverTimestampRtdb()
     });
   }, [user, currentAuction, getSyncedTime]);
@@ -1959,8 +1970,8 @@ export const AuctionProvider = ({ children }) => {
     if (!user || roomData.hostId !== user.uid) return;
     if (roomData.status !== 'awaiting_xi') return;
 
-    // Let analysis begin as soon as every participating franchise has submitted,
-    // while retaining the two-minute deadline as the fallback for late/missing teams.
+    // Classic/Sprint analyze the full squad immediately; Mega retains the XI window.
+    const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(roomData.auctionType);
     const readinessSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
     const readinessTeams = Object.values(readinessSnap.val() || {})
       .filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
@@ -1968,12 +1979,12 @@ export const AuctionProvider = ({ children }) => {
       t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
     );
     const deadlinePassed = getSyncedTime() >= Number(roomData.xiSubmissionDeadline || 0);
-    if (!deadlinePassed && !allSubmitted) return;
+    if (!usesSquadBalanceAnalysis && !deadlinePassed && !allSubmitted) return;
 
     const claim = await runTransactionRtdb(roomRef, (current) => {
       if (!current || current.status !== 'awaiting_xi') return;
       const stillBeforeDeadline = getSyncedTime() < Number(current.xiSubmissionDeadline || 0);
-      if (stillBeforeDeadline && !allSubmitted) return;
+      if (!usesSquadBalanceAnalysis && stillBeforeDeadline && !allSubmitted) return;
       return { ...current, status: 'analyzing', winnerAnalysisStatus: 'analyzing' };
     });
     if (!claim.committed) return;
@@ -1985,9 +1996,25 @@ export const AuctionProvider = ({ children }) => {
       const franchises = allFranchises.filter((t) => !t.disqualified);
       const disqualifiedFranchises = allFranchises.filter((t) => t.disqualified);
       const payload = [];
+      const toFullPlayer = (item) => {
+        const id = typeof item === 'string' ? item : item?.id;
+        const catalog = IPL_PLAYERS.find((p) => p.id === id) || {};
+        return { ...catalog, ...((typeof item === 'object' && item) || {}), id };
+      };
       for (const [teamKey, t] of Object.entries(teamsData)) {
         if (!t?.teamId || t.teamId === 'NONE' || t.disqualified) continue;
         const squad = Array.isArray(t.squad) ? t.squad : [];
+        const fullSquad = squad.map(toFullPlayer);
+        if (usesSquadBalanceAnalysis) {
+          payload.push({
+            franchiseId: t.teamId,
+            franchiseName: t.teamName || t.teamId,
+            submittedXI: [],
+            fullSquad,
+            autoSelected: false
+          });
+          continue;
+        }
         const savedXI = t.playingXI;
         const savedIsValid = savedXI?.startingXI?.length === 11
           && Boolean(savedXI?.impactPlayer)
@@ -2000,12 +2027,6 @@ export const AuctionProvider = ({ children }) => {
           throw new Error(`Could not automatically select an eligible Playing XI for ${t.teamName || t.teamId}. Please check that the franchise squad has enough eligible players.`);
         }
 
-        const toFullPlayer = (item) => {
-          const id = typeof item === 'string' ? item : item?.id;
-          const catalog = IPL_PLAYERS.find((p) => p.id === id) || {};
-          return { ...catalog, ...(typeof item === 'object' && item ? item : {}), id };
-        };
-        const fullSquad = squad.map(toFullPlayer);
         const autoSelected = !savedIsValid || Boolean(savedXI.autoSelected);
 
         // Persist the fallback selection so it survives refreshes/rejoins and
@@ -2040,7 +2061,7 @@ export const AuctionProvider = ({ children }) => {
         const response = await fetch('/api/analyze-winner', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId, franchises: payload })
+          body: JSON.stringify({ roomId, auctionType: roomData.auctionType || 'mega', franchises: payload })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'AI analysis failed');
@@ -2051,7 +2072,9 @@ export const AuctionProvider = ({ children }) => {
           franchiseId: payload[0].franchiseId,
           rank: 1,
           score: null,
-          summary: 'This is the only franchise that met the 18-player minimum and is therefore the sole eligible franchise.',
+          summary: usesSquadBalanceAnalysis
+            ? 'This is the only participating franchise. Its overall squad balance is recorded as the sole ranking.'
+            : 'This is the only franchise that met the 18-player minimum and is therefore the sole eligible franchise.',
           strengths: [],
           risks: []
         }];
@@ -2084,9 +2107,11 @@ export const AuctionProvider = ({ children }) => {
       catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
-        text: disqualifiedFranchises.length
-          ? `Auction rankings are ready. ${disqualifiedFranchises.length} franchise(s) disqualified for buying fewer than 18 players. Open Auction Summary to view the results.`
-          : 'AI franchise rankings are ready. Open Auction Summary to view the results.',
+        text: usesSquadBalanceAnalysis
+          ? 'Classic/Sprint AI squad-balance rankings are ready. Open Auction Summary to view the rankings and reasons.'
+          : disqualifiedFranchises.length
+            ? `Auction rankings are ready. ${disqualifiedFranchises.length} franchise(s) disqualified for buying fewer than 18 players. Open Auction Summary to view the results.`
+            : 'AI franchise rankings are ready. Open Auction Summary to view the results.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
       await flushAuctionToFirestore(roomId);
