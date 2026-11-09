@@ -1,5 +1,5 @@
 // SS AUCTION Guardian: server-side error storage and Telegram notifications.
-const MAX_MESSAGE_LENGTH = 500;
+const MAX_MESSAGE_LENGTH = 1800;
 const recentAlerts = new Map();
 const ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 const ALLOWED_OPERATIONS = new Set([
