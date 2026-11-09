@@ -5,6 +5,8 @@ import { TEAMS } from '../data/teams';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon, Smile, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabaseSticker } from '../lib/supabase';
+import { ref as databaseRef, set as setDatabaseValue } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
 
@@ -49,6 +51,31 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const roomPlayer = currentAuction?.players?.find((player) => player.id === user?.uid);
    const isBotUser = Boolean(user?.uid && (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || roomPlayer?.isBot));
    const canSendChat = Boolean(user && !isBotUser);
+
+   // Mark messages as seen when they are displayed in the open chat.
+   // Each member writes only their own read receipt under each message.
+   const markedSeenMessageIdsRef = useRef(new Set());
+   useEffect(() => {
+      if (!user?.uid || !roomId || isBotUser) return;
+      const seenBy = {
+         userId: user.uid,
+         teamId: roomPlayer?.team || null,
+         teamName: roomPlayer?.teamName || null,
+         isSpectator: !roomPlayer?.team,
+         seenAt: Date.now()
+      };
+      chatMessages.forEach((message) => {
+         if (!message.id || message.userId === user.uid || markedSeenMessageIdsRef.current.has(message.id)) return;
+         markedSeenMessageIdsRef.current.add(message.id);
+         setDatabaseValue(
+            databaseRef(rtdb, `auctions/${roomId}/messages/${message.id}/seenBy/${user.uid}`),
+            seenBy
+         ).catch((error) => {
+            markedSeenMessageIdsRef.current.delete(message.id);
+            console.warn('[TextChat] Read receipt could not be saved:', error?.message || error);
+         });
+      });
+   }, [chatMessages, roomId, user?.uid, isBotUser, roomPlayer?.team, roomPlayer?.teamName]);
 
    // Sticker messages are stored as ordinary chat records in Firebase RTDB.
    // Existing message rules already allow the "sticker" type; no schema migration is needed.
@@ -233,6 +260,27 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                           : 'px-4 py-3 bg-white/5 border border-white/10 text-gray-300 rounded-tl-none'
                                  }`}>
                                     {isGif ? <img src={msg.text} alt="GIF" className="w-full h-auto object-cover block" /> : msg.text}
+                                 </div>
+                              )}
+                              {Object.keys(msg.seenBy || {}).length > 0 && (
+                                 <div className={`mt-1 flex items-center gap-1.5 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                    <span className="text-[8px] font-semibold uppercase tracking-wider text-gray-500">Seen by</span>
+                                    <div className="flex items-center gap-1">
+                                       {Object.values(msg.seenBy || {}).map((viewer, viewerIndex) => {
+                                          const viewerTeam = TEAMS.find((teamItem) => teamItem.id === viewer?.teamId);
+                                          return viewerTeam?.logo ? (
+                                             <img
+                                                key={viewer?.userId || viewerIndex}
+                                                src={viewerTeam.logo}
+                                                alt={viewerTeam.name}
+                                                title={viewerTeam.name}
+                                                className="h-4 w-4 rounded-full object-contain bg-white/5"
+                                             />
+                                          ) : (
+                                             <span key={viewer?.userId || viewerIndex} title="Spectator" className="rounded bg-blue-500/10 px-1 py-0.5 text-[7px] font-bold text-blue-300">S</span>
+                                          );
+                                       })}
+                                    </div>
                                  </div>
                               )}
                            </motion.div>
