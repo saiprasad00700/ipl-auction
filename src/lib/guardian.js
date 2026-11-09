@@ -4,7 +4,7 @@ export function reportGuardianError({ operation = 'frontend', severity = 'high',
   const payload = {
     operation,
     severity,
-    message: String(message).slice(0, 500),
+    message: String(message).slice(0, 1800),
     roomId: roomId ? String(roomId).slice(0, 80) : null,
     fingerprint: fingerprint ? String(fingerprint).slice(0, 120) : null
   };
