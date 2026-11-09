@@ -1147,7 +1147,7 @@ const AuctionRoom = () => {
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
                {isAdmin && (
                   <div className="flex items-center gap-1 sm:gap-2">
-                     {displayAuctionState?.status === 'paused' ? (
+                     {(displayAuctionState?.status === 'paused' || displayAuctionState?.isPaused) ? (
                         <button
                            onClick={() => resumeAuction(id)}
                            className="p-1 sm:px-2.5 sm:py-1.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer flex items-center gap-1"
@@ -1589,7 +1589,7 @@ const AuctionRoom = () => {
                                              <span className="flex items-center gap-2 text-xs md:text-sm font-black uppercase tracking-widest text-blue-400">
                                                 <Eye size={18} /> Spectator View (Read Only)
                                              </span>
-                                          ) : displayAuctionState?.status === 'paused' ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
+                                          ) : (displayAuctionState?.status === 'paused' || displayAuctionState?.isPaused) ? 'PAUSED' : displayAuctionState?.highBidderId === user?.uid ? "LEADING BIDDER" : `PLACE BID: ₹${nextBidAmount.toFixed(2)} Cr`}
                                        </button>
                                        <button onClick={() => setShowPlayersOverlay(true)} className="w-12 h-12 sm:w-14 sm:h-14 md:w-18 md:h-18 bg-slate-900/65 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-all"><List size={20} /></button>
                                     </div>
