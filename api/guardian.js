@@ -1,14 +1,32 @@
 // SS AUCTION Guardian: server-side error storage and Telegram notifications.
 const MAX_MESSAGE_LENGTH = 1800;
 const recentAlerts = new Map();
-const ALERT_COOLDOWN_MS = 10 * 60 * 1000;
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 const ALLOWED_OPERATIONS = new Set([
   'frontend', 'auction', 'bidding', 'rtm', 'ai_analysis', 'room_join',
   'firebase', 'supabase', 'voice', 'unknown'
 ]);
 
+// Only verified, high-impact auction operations should interrupt the owner.
+const TELEGRAM_OPERATIONS = new Set([
+  'auction', 'bidding', 'rtm', 'ai_analysis', 'room_join', 'firebase', 'supabase'
+]);
+
 function safeText(value, limit = MAX_MESSAGE_LENGTH) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, limit);
+}
+
+function shouldSendAlert(row) {
+  if (row.severity !== 'critical') return false;
+  if (!TELEGRAM_OPERATIONS.has(row.operation)) return false;
+
+  const message = row.message.toLowerCase();
+  // A browser-side bid transaction can reject when the client temporarily
+  // disconnects. Store it in Guardian, but do not page the owner for it.
+  if (row.operation === 'bidding' && /\\bdisconnect(?:ed)?\\b|\\bnetwork error\\b|\\boffline\\b|failed to fetch|err_network/.test(message)) {
+    return false;
+  }
+  return true;
 }
 
 async function sendEmailAlert(error) {
@@ -60,10 +78,10 @@ export async function recordGuardianError(input) {
   const rows = await response.json();
   const saved = Array.isArray(rows) ? rows[0] : null;
 
-  // Avoid alert flooding: notify once per fingerprint in a 10-minute window.
+  // Keep every report in the dashboard, but notify only for actionable incidents.
   const alertKey = row.fingerprint || (row.operation + ':' + row.message);
   const lastAlertAt = recentAlerts.get(alertKey) || 0;
-  if (saved && severity !== 'medium' && Date.now() - lastAlertAt >= ALERT_COOLDOWN_MS) {
+  if (saved && shouldSendAlert(row) && Date.now() - lastAlertAt >= ALERT_COOLDOWN_MS) {
     recentAlerts.set(alertKey, Date.now());
     try {
       await Promise.allSettled([
@@ -71,7 +89,7 @@ export async function recordGuardianError(input) {
         sendEmailAlert({ ...row, id: saved.id, created_at: saved.created_at })
       ]);
     } catch (error) {
-      console.warn('[Guardian] Telegram delivery error:', error?.message || error);
+      console.warn('[Guardian] Alert delivery error:', error?.message || error);
     }
     if (recentAlerts.size > 2000) {
       const cutoff = Date.now() - ALERT_COOLDOWN_MS;
@@ -93,7 +111,7 @@ async function sendTelegramAlert(error) {
     error.room_id ? 'Room: ' + error.room_id : '',
     'Time: ' + new Date(error.created_at || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     'Error ID: ' + error.id
-  ].filter(Boolean).join('\n');
+  ].filter(Boolean).join('\\n');
   const response = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
