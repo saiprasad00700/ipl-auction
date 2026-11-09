@@ -32,7 +32,7 @@ const STICKER_PACKS = {
 };
 
 const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
-   const { messages, sendMessage } = useAuction();
+   const { messages, sendMessage, currentAuction } = useAuction();
    const { user } = useAuth();
    const [text, setText] = useState('');
    const [showGifPicker, setShowGifPicker] = useState(false);
@@ -46,6 +46,9 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const [stickerError, setStickerError] = useState('');
    const stickerFileInputRef = useRef(null);
    const scrollContainerRef = useRef(null);
+   const roomPlayer = currentAuction?.players?.find((player) => player.id === user?.uid);
+   const isBotUser = Boolean(user?.uid && (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || roomPlayer?.isBot));
+   const canSendChat = Boolean(user && !isBotUser);
 
    // Sticker messages are stored as ordinary chat records in Firebase RTDB.
    // Existing message rules already allow the "sticker" type; no schema migration is needed.
@@ -84,7 +87,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
 
    const handleSend = async (e) => {
       e.preventDefault();
-      if (!text.trim() || !roomId) return;
+      if (!text.trim() || !roomId || !canSendChat) return;
       try {
          await sendMessage(roomId, text.trim(), 'text');
          setText('');
@@ -94,7 +97,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    };
 
    const handleSendSticker = async (sticker) => {
-      if (!roomId) return;
+      if (!roomId || !canSendChat) return;
       try {
          await sendMessage(roomId, sticker.url || sticker.emoji, 'sticker');
          setShowStickerPicker(false);
@@ -208,6 +211,9 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                               {!isMe && (
                                  <div className="flex items-center gap-1.5 mb-1 px-1">
                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tight">{msg.userName}</span>
+                                    {(msg.isSpectator ?? Boolean(currentAuction?.players?.find((player) => player.id === msg.userId && !player.team))) && (
+                                       <span className="rounded bg-blue-500/10 border border-blue-400/20 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider text-blue-300">Spectator</span>
+                                    )}
                                     {msg.teamId && (
                                        <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-[7px] font-black text-gray-400 uppercase tracking-widest">{msg.teamId}</span>
                                     )}
@@ -235,6 +241,9 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   )}
                </div>
 
+               {!canSendChat ? (
+                  <div className="p-3 border-t border-white/5 text-center text-[9px] font-bold uppercase tracking-widest text-gray-500">Bots cannot send chat messages</div>
+               ) : (
                <form onSubmit={handleSend} className="p-3 border-t border-white/5 bg-white/[0.01] flex gap-2 relative">
                   <button
                      type="button"
@@ -271,8 +280,9 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                      <Send size={14} fill="currentColor" />
                   </button>
                </form>
+               )}
 
-               {showStickerPicker && (
+               {showStickerPicker && canSendChat && (
                   <div className="absolute bottom-[72px] left-3 right-3 bg-[#101114]/[.98] border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-xl z-[60] flex flex-col gap-3">
                      <div className="flex items-center justify-between">
                         <div>
@@ -318,7 +328,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                   </div>
                )}
 
-               {showGifPicker && (
+               {showGifPicker && canSendChat && (
                   <div className="absolute bottom-16 right-3 left-3 bg-[#0d0d0e]/98 border border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-xl z-[60] flex flex-col gap-3">
                      <div className="flex justify-between items-center px-1">
                         <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Global GIF Search</span>
