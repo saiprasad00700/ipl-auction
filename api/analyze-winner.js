@@ -22,7 +22,7 @@ async function reportAnalysisFailure(roomId, message) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) return;
-    await fetch(supabaseUrl.replace(/\\/$/, "") + "/rest/v1/guardian_errors", {
+    await fetch(supabaseUrl.replace(/\/$/, "") + "/rest/v1/guardian_errors", {
       method: "POST",
       headers: { apikey: serviceKey, Authorization: "Bearer " + serviceKey, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ operation: "ai_analysis", severity: "high", message: String(message).slice(0, 500), room_id: String(roomId || "").slice(0, 80) || null, source: "server", fingerprint: "ai-analysis-failed" })
