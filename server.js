@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import analyzeWinner from './api/analyze-winner.js';
 import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
+import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -61,6 +62,7 @@ function allowAnalysis(ip) {
   return true;
 }
 
+const guardianRequestsByIp = new Map();
 const analyticsRequestsByUid = new Map();
 const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
 
@@ -600,6 +602,24 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     } catch (error) {
       console.warn('[Insights] Tracking request failed:', error?.message || error);
       return sendJson(res, 500, { error: 'Could not record analytics activity' });
+    }
+  }
+  if (pathname === '/api/guardian/report') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+    const now = Date.now();
+    const recent = (guardianRequestsByIp.get(ip) || []).filter((time) => now - time < WINDOW_MS);
+    if (recent.length >= 10) return sendJson(res, 429, { error: 'Guardian report limit reached' });
+    recent.push(now);
+    guardianRequestsByIp.set(ip, recent);
+    try {
+      const body = sanitizeGuardianInput(await readBody(req));
+      if (!body.message) return sendJson(res, 400, { error: 'Error message is required' });
+      const saved = await recordGuardianError({ ...body, source: 'browser' });
+      return sendJson(res, 202, { ok: true, id: saved?.id || null });
+    } catch (error) {
+      console.warn('[Guardian] Could not record browser error:', error?.message || error);
+      return sendJson(res, 503, { error: 'Guardian could not store this error' });
     }
   }
   if (pathname === '/api/room-activity') {
