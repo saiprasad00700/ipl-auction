@@ -1454,7 +1454,10 @@ export const AuctionProvider = ({ children }) => {
       handleFirebaseError(error);
     });
 
-    const msgQuery = queryRtdb(ref(rtdb, `auctions/${auctionId}/messages`), limitToLast(10));
+    // Keep the complete room chat history available while this room exists.
+    // Do not cap this subscription with limitToLast(), which hides older messages
+    // as new messages arrive.
+    const msgQuery = ref(rtdb, `auctions/${auctionId}/messages`);
     const unsubMessages = onValue(msgQuery, (snapshot) => {
       messagesLoaded = true;
       if (snapshot.exists()) {
