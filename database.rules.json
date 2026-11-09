@@ -131,6 +131,7 @@
 
         "pauseRequests": {
           ".read": "auth != null",
+          ".write": "auth != null && auth.uid == root.child('auctions').child($roomId).child('room/hostId').val()",
           "$userId": {
             ".write": "auth != null && ((auth.uid == $userId && (!data.exists() || now - data.child('sentAt').val() >= 5000)) || auth.uid == root.child('auctions').child($roomId).child('room/hostId').val())",
             ".validate": "!newData.exists() || (newData.hasChildren(['userId', 'userName', 'sentAt']) && newData.child('userId').val() == $userId && newData.child('userName').isString() && newData.child('userName').val().length <= 80 && newData.child('sentAt').isNumber() && newData.child('sentAt').val() <= now)"
