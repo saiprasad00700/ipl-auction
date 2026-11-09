@@ -438,6 +438,9 @@ export const AuctionProvider = ({ children }) => {
       const initialLiveSnap = await get(liveRef);
       const initialLive = initialLiveSnap.exists() ? initialLiveSnap.val() : null;
       if (!initialLive) return;
+      // A host pause freezes both bidding and any in-progress RTM stage.
+      // Do not let timer-driven clients attempt settlement while paused.
+      if (initialLive.isPaused || initialLive.status === 'paused') return;
       if (initialLive.status === 'sold' || initialLive.status === 'unsold') return;
       if (initialLive.status === 'processing_sale') {
         const offer = initialLive.retentionOffer;
@@ -457,7 +460,7 @@ export const AuctionProvider = ({ children }) => {
       // Claim the lot atomically. If an eligible original franchise manager is present,
       // pause settlement for the five-second retention decision before charging anyone.
       const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData) return;
+        if (!currentData || currentData.isPaused || currentData.status === 'paused') return;
         const now = getSyncedTime();
 
         // Recovery path: if the client that opened a retention offer disconnected,
@@ -596,6 +599,8 @@ export const AuctionProvider = ({ children }) => {
             resolve();
           };
           const check = (latest) => {
+            // Keep the coordinator waiting while the host has frozen this RTM stage.
+            if (latest?.isPaused || latest?.status === 'paused') return;
             const offer = latest?.retentionOffer;
             if (latest?.status !== 'processing_sale' || !offer || offer.status !== 'pending') {
               finish();
@@ -623,7 +628,7 @@ export const AuctionProvider = ({ children }) => {
 
         // A decision is accepted only if it was made by the eligible manager before expiry.
         const settleTx = await runTransactionRtdb(liveRef, (currentData) => {
-          if (!currentData || currentData.status !== 'processing_sale') return;
+          if (!currentData || currentData.status !== 'processing_sale' || currentData.isPaused) return;
           const offer = currentData.retentionOffer;
           if (!offer || offer.status !== 'pending') return;
           const now = getSyncedTime();
@@ -681,7 +686,7 @@ export const AuctionProvider = ({ children }) => {
           // Keep recovering if the lot is still awaiting RTM settlement. Another
           // connected client may have raced this transaction or its clock may
           // have reached the expiry boundary slightly later.
-          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending') {
+          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending' && !failedState?.isPaused) {
             setTimeout(() => { void endPlayerAuction(roomId); }, 500);
           }
           return;
@@ -1794,40 +1799,65 @@ export const AuctionProvider = ({ children }) => {
 
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-    
-    // Fire both writes in parallel — no Firestore read needed
-    await Promise.all([
-      updateRtdb(liveRef, { status: 'paused' }),
-      push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `Auction PAUSED by Admin`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      })
-    ]);
-  }, [user, currentAuction]);
+    const now = getSyncedTime();
+
+    // Keep processing_sale intact during RTM. Changing its status to "paused"
+    // is rejected by the RTDB lifecycle validation while an RTM offer is pending.
+    // A separate pause flag freezes the RTM timers without losing the decision.
+    await runTransactionRtdb(liveRef, (live) => {
+      if (!live || live.isPaused || ['sold', 'unsold'].includes(live.status)) return;
+      live.isPaused = true;
+      live.pausedAt = now;
+      live.pausedFromStatus = live.status;
+      if (live.status === 'bidding') {
+        live.pausedTimerRemainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
+        live.status = 'paused';
+      }
+      return live;
+    });
+
+    await push(msgRef, {
+      userId: 'system',
+      userName: 'System',
+      text: `Auction PAUSED by Admin`,
+      type: 'log',
+      timestamp: serverTimestampRtdb()
+    });
+  }, [user, currentAuction, getSyncedTime]);
 
   const resumeAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-    
+
     const liveRef = ref(rtdb, `auctions/${roomId}/live`);
     const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
-    
-    // Use cached settings — no Firestore read needed
-    await Promise.all([
-      updateRtdb(liveRef, { 
-        status: 'bidding',
-        timerEndsAt: getSyncedTime() + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000
-      }),
-      push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `Auction RESUMED by Admin`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      })
-    ]);
+    const now = getSyncedTime();
+
+    await runTransactionRtdb(liveRef, (live) => {
+      if (!live || !live.isPaused) return;
+      const pausedDuration = Math.max(0, now - Number(live.pausedAt || now));
+
+      if (live.status === 'paused') {
+        live.status = live.pausedFromStatus || 'bidding';
+        live.timerEndsAt = now + Math.max(0, Number(live.pausedTimerRemainingMs || 0));
+      } else if (live.status === 'processing_sale' && live.retentionOffer?.status === 'pending') {
+        // Freeze the current RTM phase countdown for the entire pause duration.
+        live.retentionOffer.expiresAt = Number(live.retentionOffer.expiresAt || now) + pausedDuration;
+      }
+
+      delete live.isPaused;
+      delete live.pausedAt;
+      delete live.pausedFromStatus;
+      delete live.pausedTimerRemainingMs;
+      return live;
+    });
+
+    await push(msgRef, {
+      userId: 'system',
+      userName: 'System',
+      text: `Auction RESUMED by Admin`,
+      type: 'log',
+      timestamp: serverTimestampRtdb()
+    });
   }, [getSyncedTime, user, currentAuction]);
 
   // End the bidding phase and open the shared two-minute Playing XI window.
