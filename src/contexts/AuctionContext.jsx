@@ -1984,29 +1984,56 @@ export const AuctionProvider = ({ children }) => {
       const allFranchises = Object.values(teamsData).filter((t) => t?.teamId && t.teamId !== 'NONE');
       const franchises = allFranchises.filter((t) => !t.disqualified);
       const disqualifiedFranchises = allFranchises.filter((t) => t.disqualified);
-      const payload = franchises.map((t) => {
+      const payload = [];
+      for (const [teamKey, t] of Object.entries(teamsData)) {
+        if (!t?.teamId || t.teamId === 'NONE' || t.disqualified) continue;
         const squad = Array.isArray(t.squad) ? t.squad : [];
         const savedXI = t.playingXI;
-        const selection = savedXI?.startingXI?.length === 11 && savedXI?.impactPlayer
+        const savedIsValid = savedXI?.startingXI?.length === 11
+          && Boolean(savedXI?.impactPlayer)
+          && validatePlayingXI(savedXI.startingXI, savedXI.impactPlayer, squad, IPL_PLAYERS);
+        const selection = savedIsValid
           ? savedXI
           : autoSelectBestXI(squad, IPL_PLAYERS);
+        if (!selection.startingXI?.length || !selection.impactPlayer
+          || !validatePlayingXI(selection.startingXI, selection.impactPlayer, squad, IPL_PLAYERS)) {
+          throw new Error(`Could not automatically select an eligible Playing XI for ${t.teamName || t.teamId}. Please check that the franchise squad has enough eligible players.`);
+        }
+
         const toFullPlayer = (item) => {
           const id = typeof item === 'string' ? item : item?.id;
           const catalog = IPL_PLAYERS.find((p) => p.id === id) || {};
           return { ...catalog, ...(typeof item === 'object' && item ? item : {}), id };
         };
         const fullSquad = squad.map(toFullPlayer);
-        return {
+        const autoSelected = !savedIsValid || Boolean(savedXI.autoSelected);
+
+        // Persist the fallback selection so it survives refreshes/rejoins and
+        // the result shown to the franchise matches the XI sent to Gemini.
+        if (!savedIsValid) {
+          await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${teamKey}`), {
+            playingXI: {
+              startingXI: selection.startingXI.map(toFullPlayer),
+              impactPlayer: toFullPlayer(selection.impactPlayer),
+              autoSelected: true,
+              selectionStatus: 'auto_selected',
+              submittedAt: getSyncedTime(),
+              autoSelectedAt: getSyncedTime()
+            }
+          });
+        }
+
+        payload.push({
           franchiseId: t.teamId,
           franchiseName: t.teamName || t.teamId,
           submittedXI: [
-            ...(selection.startingXI || []).map(toFullPlayer),
+            ...selection.startingXI.map(toFullPlayer),
             { ...toFullPlayer(selection.impactPlayer), isImpactPlayer: true }
           ],
           fullSquad,
-          autoSelected: !savedXI?.startingXI?.length || Boolean(savedXI.autoSelected)
-        };
-      });
+          autoSelected
+        });
+      }
       let eligibleRankings = [];
       let analysisModel = 'Eligibility Rules';
       if (payload.length >= 2) {

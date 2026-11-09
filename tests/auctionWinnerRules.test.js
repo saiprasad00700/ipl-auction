@@ -35,6 +35,33 @@ test('auto-selection chooses 11 unique squad players and one distinct impact pla
   assert.equal(selection.autoSelected, true);
 });
 
+test('automatic XI selection ignores artificial ratings and prefers explicit recent performance data', () => {
+  const performanceCatalog = [
+    { id: 'wk', role: 'Wicketkeeper', rating: 1 },
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `bat${i}`, role: 'Batter', rating: 99 - i, recentStats: { runsLast3Years: i === 4 ? 900 : 100 } })),
+    { id: 'ar1', role: 'All-Rounder', rating: 1, recentStats: { wicketsLast3Years: 30 } },
+    { id: 'ar2', role: 'All-Rounder', rating: 1, recentStats: { wicketsLast3Years: 20 } },
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `bowl${i}`, role: 'Bowler', rating: 1, recentStats: { wicketsLast3Years: 5 + i } })),
+  ];
+  const performanceSquad = performanceCatalog.map((p) => ({ id: p.id }));
+  const selected = autoSelectBestXI(performanceSquad, performanceCatalog);
+  assert.equal(selected.startingXI.length, 11);
+  assert.ok(selected.startingXI.some((p) => p.id === 'bat4'));
+  assert.equal(validatePlayingXI(selected.startingXI, selected.impactPlayer, performanceSquad, performanceCatalog), true);
+});
+
+test('automatic XI selection returns an explicit ineligible status when the squad cannot satisfy rules', () => {
+  const ineligibleCatalog = [
+    { id: 'wk', role: 'Wicketkeeper', country: 'IND' },
+    ...Array.from({ length: 10 }, (_, i) => ({ id: `bat${i}`, role: 'Batter', country: 'IND' })),
+    { id: 'impact', role: 'Batter', country: 'IND' },
+  ];
+  const result = autoSelectBestXI(ineligibleCatalog.map((p) => ({ id: p.id })), ineligibleCatalog);
+  assert.equal(result.selectionStatus, 'ineligible_squad');
+  assert.deepEqual(result.startingXI, []);
+  assert.equal(result.impactPlayer, null);
+});
+
 test('XI validation rejects duplicate or out-of-squad selections', () => {
   const selection = autoSelectBestXI(squad, catalog);
   assert.equal(validatePlayingXI([...selection.startingXI.slice(1), selection.startingXI[0]], selection.startingXI[0], squad), false);
