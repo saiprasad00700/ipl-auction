@@ -34,8 +34,11 @@ export default async function handler(req, res) {
 
   const roomId = getText(body.roomId);
   const franchises = Array.isArray(body.franchises) ? body.franchises : [];
-  if (!roomId || franchises.length < 2 || franchises.length > 20) {
-    const error = { error: "Provide a roomId and between 2 and 20 franchises." };
+  const auctionType = getText(body.auctionType) || "mega";
+  const usesSquadBalanceAnalysis = ["sprint5", "sprint11"].includes(auctionType);
+  const minimumFranchises = usesSquadBalanceAnalysis ? 1 : 2;
+  if (!roomId || franchises.length < minimumFranchises || franchises.length > 20) {
+    const error = { error: `Provide a roomId and between ${minimumFranchises} and 20 franchises.` };
     if (res?.status) return res.status(400).json(error);
     return json(400, error);
   }
@@ -61,7 +64,26 @@ export default async function handler(req, res) {
     return json(503, error);
   }
 
-  const prompt = `You are an expert IPL/T20 analyst, cricket statistician, and franchise team strategist. Rank every franchise in this auction from 1 (strongest) to N (weakest), with exactly one unique integer rank per franchise and no ties.
+  const prompt = usesSquadBalanceAnalysis
+    ? `You are an expert IPL/T20 analyst and franchise squad strategist. This is a ${auctionType === "sprint5" ? "Sprint (5-player)" : "Classic (11-player)"} auction. Rank every franchise from 1 (strongest) to N (weakest), with one unique integer rank per franchise and no ties.
+
+MODE RULES:
+- Evaluate each franchise's COMPLETE purchased squad. Do not expect a submitted Playing XI or Impact Player; neither is used in Classic or Sprint.
+- There is NO minimum squad-size requirement. Never disqualify, exclude, or penalize a franchise simply because it bought fewer players.
+- Assess each squad as it stands. Compare wicketkeeping, batting roles, finishing, batting depth, all-rounders, pace, spin, death bowling, role flexibility, overseas/Indian balance, and depth relative to this format.
+- Sprint has a compact 5-player squad cap: prioritize versatility and coverage across the small squad. Classic has an 11-player squad cap: assess balance across the full 11-player squad.
+- Use reliable recent IPL performance from the last three years where known. Recent international T20/ODI evidence is a fallback when recent IPL evidence is too limited. Never invent statistics or claim live research. Unknown data must remain uncertain.
+- Ignore artificial catalogue ratings. Judge players by roles and reliable performance evidence.
+- For EVERY franchise, explain why it earned its exact rank compared with the other teams. Include specific strengths, weaknesses/gaps, and the decisive reason it ranks above/below the nearest team.
+- Return every franchise exactly once, with unique ranks 1..N.
+
+Return ONLY valid JSON:
+{"rankings":[{"franchiseId":"...","rank":1,"score":87,"summary":"Specific comparison-based explanation including strengths, weaknesses and decisive reason.","strengths":["..."],"risks":["..."]}]}
+
+Auction room: ${roomId}
+Franchises:
+${JSON.stringify(normalized)}`
+    : `You are an expert IPL/T20 analyst, cricket statistician, and franchise team strategist. Rank every franchise in this auction from 1 (strongest) to N (weakest), with exactly one unique integer rank per franchise and no ties.
 
 PERFORMANCE EVIDENCE — IPL FIRST, LAST THREE YEARS ONLY (ESSENTIAL):
 - Base each player's performance assessment primarily and strictly on IPL matches from the most recent three IPL seasons/years available. Do not use older IPL seasons, lifetime career totals, or general reputation to inflate or reduce a player's assessment.
