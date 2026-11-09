@@ -11,6 +11,26 @@ function safeText(value, limit = MAX_MESSAGE_LENGTH) {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, limit);
 }
 
+async function sendEmailAlert(error) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const recipient = process.env.GUARDIAN_EMAIL_TO;
+  const from = process.env.GUARDIAN_EMAIL_FROM;
+  if (!apiKey || !recipient || !from) return;
+  const subject = '[SS AUCTION Guardian] ' + error.severity.toUpperCase() + ': ' + error.operation;
+  const html = '<h2>SS AUCTION Guardian Alert</h2>' +
+    '<p><strong>Severity:</strong> ' + safeText(error.severity, 20) + '</p>' +
+    '<p><strong>Operation:</strong> ' + safeText(error.operation, 40) + '</p>' +
+    '<p><strong>Issue:</strong> ' + safeText(error.message).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' +
+    (error.room_id ? '<p><strong>Room:</strong> ' + safeText(error.room_id, 80) + '</p>' : '') +
+    '<p><strong>Error ID:</strong> ' + safeText(error.id, 30) + '</p>';
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to: [recipient], subject, html })
+  });
+  if (!response.ok) console.warn('[Guardian] Email delivery failed:', response.status);
+}
+
 export async function recordGuardianError(input) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -46,7 +66,10 @@ export async function recordGuardianError(input) {
   if (saved && severity !== 'medium' && Date.now() - lastAlertAt >= ALERT_COOLDOWN_MS) {
     recentAlerts.set(alertKey, Date.now());
     try {
-      await sendTelegramAlert({ ...row, id: saved.id, created_at: saved.created_at });
+      await Promise.allSettled([
+        sendTelegramAlert({ ...row, id: saved.id, created_at: saved.created_at }),
+        sendEmailAlert({ ...row, id: saved.id, created_at: saved.created_at })
+      ]);
     } catch (error) {
       console.warn('[Guardian] Telegram delivery error:', error?.message || error);
     }
