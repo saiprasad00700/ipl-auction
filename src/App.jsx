@@ -62,7 +62,10 @@ function App() {
                   <Route path="/cinematic-preview" element={
                     <Suspense fallback={<PageFallback />}><CinematicPreview /></Suspense>
                   } />
-                  <Route path="/admin/guardian" element={\n                    <Suspense fallback={<PageFallback />}><GuardianDashboard /></Suspense>\n                  } />\n                  <Route path="/admin/insights" element={
+                  <Route path="/admin/guardian" element={
+                    <Suspense fallback={<PageFallback />}><GuardianDashboard /></Suspense>
+                  } />
+                  <Route path="/admin/insights" element={
                     <Suspense fallback={<PageFallback />}><InsightsDashboard /></Suspense>
                   } />
                   <Route path="/admin" element={
