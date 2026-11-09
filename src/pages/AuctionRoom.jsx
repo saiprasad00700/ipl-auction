@@ -1136,7 +1136,8 @@ const AuctionRoom = () => {
                </div>
             </div>
 
-            <div className="hidden sm:flex flex-1 min-w-0 justify-center px-3 pointer-events-none">
+            {(currentAuction?.auctionType || 'mega') === 'mega' && (
+               <div className="hidden sm:flex flex-1 min-w-0 justify-center px-3 pointer-events-none">
                <div className="flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/[0.07] px-3 py-1 text-center">
                   <AlertCircle size={12} className="text-amber-300 shrink-0" />
                   <span className="text-[9px] md:text-[10px] font-black uppercase tracking-wide text-amber-100 whitespace-nowrap">
@@ -1144,6 +1145,7 @@ const AuctionRoom = () => {
                   </span>
                </div>
             </div>
+            )}
 
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
                {isAdmin && (
