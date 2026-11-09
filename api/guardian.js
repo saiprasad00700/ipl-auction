@@ -23,7 +23,7 @@ function shouldSendAlert(row) {
   const message = row.message.toLowerCase();
   // A browser-side bid transaction can reject when the client temporarily
   // disconnects. Store it in Guardian, but do not page the owner for it.
-  if (row.operation === 'bidding' && /\\bdisconnect(?:ed)?\\b|\\bnetwork error\\b|\\boffline\\b|failed to fetch|err_network/.test(message)) {
+  if (row.operation === 'bidding' && /\bdisconnect(?:ed)?\b|\bnetwork error\b|\boffline\b|failed to fetch|err_network/.test(message)) {
     return false;
   }
   return true;
@@ -111,7 +111,7 @@ async function sendTelegramAlert(error) {
     error.room_id ? 'Room: ' + error.room_id : '',
     'Time: ' + new Date(error.created_at || Date.now()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
     'Error ID: ' + error.id
-  ].filter(Boolean).join('\\n');
+  ].filter(Boolean).join('\n');
   const response = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
