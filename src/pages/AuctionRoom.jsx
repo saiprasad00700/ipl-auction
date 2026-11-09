@@ -1617,9 +1617,11 @@ const AuctionRoom = () => {
                   </button>
                   <button
                      onClick={() => setSidebarTab('chat')}
-                     className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${sidebarTab === 'chat'
-                        ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
-                        : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
+                     className={`h-full flex-1 flex items-center justify-center gap-2 transition-all cursor-pointer ${unreadChatCount > 0
+                        ? 'bg-red-500/[0.12] text-red-200 border-b-2 border-red-400 font-black shadow-[inset_0_-1px_18px_rgba(239,68,68,0.08)]'
+                        : sidebarTab === 'chat'
+                           ? 'bg-emerald-300/[0.08] text-emerald-100 border-b-2 border-emerald-300 font-black'
+                           : 'text-gray-500 hover:text-gray-400 hover:bg-white/[0.01] border-b-2 border-transparent font-bold'
                         }`}
                   >
                      <MessageSquare size={14} />
