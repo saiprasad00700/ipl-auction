@@ -262,7 +262,7 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
                                     {isGif ? <img src={msg.text} alt="GIF" className="w-full h-auto object-cover block" /> : msg.text}
                                  </div>
                               )}
-                              {msg.userId !== user?.uid && Object.keys(msg.seenBy || {}).length > 0 && (
+                              {Object.keys(msg.seenBy || {}).length > 0 && (
                                  <div className={`mt-1 flex items-center gap-1.5 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                                     <span className="text-[8px] font-semibold uppercase tracking-wider text-gray-500">Seen by</span>
                                     <div className="flex items-center gap-1">
