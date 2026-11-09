@@ -256,19 +256,20 @@ const AuctionRoom = () => {
 
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
+      const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(currentAuction.auctionType);
       const tick = () => {
          const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
             t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
          );
-         if (getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
+         if (usesSquadBalanceAnalysis || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
             finalizeWinnerAnalysis(id).catch((err) => console.error('Could not start winner analysis:', err));
          }
       };
       tick();
       const timer = setInterval(tick, 1000);
       return () => clearInterval(timer);
-   }, [currentAuction?.status, currentAuction?.xiSubmissionDeadline, roomTeams, finalizeWinnerAnalysis, getSyncedTime, id]);
+   }, [currentAuction?.status, currentAuction?.auctionType, currentAuction?.xiSubmissionDeadline, roomTeams, finalizeWinnerAnalysis, getSyncedTime, id]);
 
    const mySquadPlayers = useMemo(() => (team?.squad || []).map((item) => {
       const playerId = typeof item === 'string' ? item : item?.id;
@@ -2143,7 +2144,7 @@ const AuctionRoom = () => {
             )}
          </AnimatePresence>
 
-         {currentAuction?.status === 'awaiting_xi' && (
+         {currentAuction?.status === 'awaiting_xi' && !['sprint5', 'sprint11'].includes(currentAuction?.auctionType) && (
             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
                <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#0b1422] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
                   <p className="text-emerald-300 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
