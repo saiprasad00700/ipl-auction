@@ -18,7 +18,12 @@ class ErrorBoundary extends React.Component {
     // Keep production diagnostics available for mobile-only crashes too.
     // The fallback screen shows only the error message (not the component stack).
     console.error("[Auction ErrorBoundary] Uncaught render error:", error, errorInfo);
-    reportGuardianError({ operation: 'frontend', severity: 'critical', message: error?.message || String(error), fingerprint: 'react-render-error' });
+    const diagnosticMessage = [
+      error?.message || String(error),
+      error?.stack ? `JavaScript stack:\n${error.stack}` : '',
+      errorInfo?.componentStack ? `React component stack:\n${errorInfo.componentStack}` : ''
+    ].filter(Boolean).join('\n\n');
+    reportGuardianError({ operation: 'frontend', severity: 'critical', message: diagnosticMessage, fingerprint: 'react-render-error' });
     this.setState({
       error: error,
       errorInfo: errorInfo
