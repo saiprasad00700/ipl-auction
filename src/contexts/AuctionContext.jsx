@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { db, getServerTime, isServerTimeSynced, rtdb } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { trackAnalyticsEvent } from '../lib/insights';
+import { reportGuardianError } from '../lib/guardian';
 import { IPL_PLAYERS } from '../data/players';
 import { evaluateBotBid } from '../lib/botEngine';
 import { 
@@ -1584,6 +1585,7 @@ export const AuctionProvider = ({ children }) => {
     });
 
     if (!txResult.committed) {
+      reportGuardianError({ operation: 'bidding', severity: 'critical', message: 'Bid transaction was not committed', roomId: currentAuction.id, fingerprint: 'bid-transaction-not-committed' });
       throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
     }
     void trackAnalyticsEvent('bid', currentAuction.id);
@@ -1643,6 +1645,7 @@ export const AuctionProvider = ({ children }) => {
     if (!result.committed) {
       const latest = result.snapshot?.val();
       const offer = latest?.retentionOffer;
+      reportGuardianError({ operation: 'rtm', severity: 'critical', message: 'RTM decision transaction was not committed', roomId, fingerprint: 'rtm-decision-not-committed' });
       console.error('[RTM] Decision transaction not committed', {
         roomId, decision, uid: user.uid, status: latest?.status,
         phase: offer?.phase, offerStatus: offer?.status,
