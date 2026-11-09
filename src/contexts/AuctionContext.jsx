@@ -1501,11 +1501,23 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const sendMessage = useCallback(async (roomId, text, type = 'text') => {
-    if (!user) return;
+    if (!user || !roomId) return;
+    // Bot identities are auction placeholders, never real chat participants.
+    if (/^(bot[_-]|auctionbot[_-])/i.test(user.uid)) {
+      throw new Error('Bots are not allowed to send chat messages.');
+    }
+    const roomPlayer = currentAuction?.id === roomId
+      ? (currentAuction.players || []).find((player) => player.id === user.uid)
+      : null;
+    if (roomPlayer?.isBot) {
+      throw new Error('Bots are not allowed to send chat messages.');
+    }
     const msgRef = ref(rtdb, `auctions/${roomId}/messages`);
     await push(msgRef, {
       userId: user.uid,
       userName: user.displayName || 'Manager',
+      teamId: roomPlayer?.team || null,
+      isSpectator: !roomPlayer?.team,
       text,
       type,
       timestamp: serverTimestampRtdb()
@@ -1513,7 +1525,7 @@ export const AuctionProvider = ({ children }) => {
     // Members may write the dedicated heartbeat child, not the host-only /room parent.
     await set(ref(rtdb, `auctions/${roomId}/room/lastActivityAt`), Date.now());
     if (type === 'text') void trackAnalyticsEvent('chat_message', roomId);
-  }, [user]);
+  }, [user, currentAuction]);
 
   const placeBid = useCallback(async (amount) => {
     if (!currentAuction) throw new Error("Auction not found!");
