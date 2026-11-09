@@ -150,11 +150,7 @@ const AuctionRoom = () => {
       return onValue(requestsRef, (snapshot) => setPauseRequests(snapshot.val() || {}), (err) => console.warn('[AuctionRoom] Pause request listener failed:', err?.message || err));
    }, [id, user?.uid, currentAuction?.hostId]);
 
-   useEffect(() => {
-      if (!displayAuctionState?.isPaused && displayAuctionState?.status !== 'paused') return undefined;
-      const timer = window.setInterval(() => setPauseRequestClock(Date.now()), 250);
-      return () => window.clearInterval(timer);
-   }, [displayAuctionState?.isPaused, displayAuctionState?.status]);
+   
 
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
@@ -203,7 +199,12 @@ const AuctionRoom = () => {
       ? liveAuctionState
       : (optimisticState || liveAuctionState);
 
-   const retentionOffer = displayAuctionState?.retentionOffer;
+useEffect(() => {
+      if (!displayAuctionState?.isPaused && displayAuctionState?.status !== 'paused') return undefined;
+      const timer = window.setInterval(() => setPauseRequestClock(Date.now()), 250);
+      return () => window.clearInterval(timer);
+   }, [displayAuctionState?.isPaused, displayAuctionState?.status]);
+      const retentionOffer = displayAuctionState?.retentionOffer;
    // Block host pause during sold/unsold announcements, lot settlement, and every RTM stage.
    const pauseTemporarilyBlocked = ['sold', 'unsold', 'processing_sale'].includes(displayAuctionState?.status);
 
