@@ -5,6 +5,7 @@ import {
   MARQUEE_BID_INCREMENT_CRORE,
   SET_1_BID_INCREMENT_CRORE,
   SET_2_BID_INCREMENT_CRORE,
+  LOW_BASE_PRICE_BID_INCREMENT_CRORE,
   DEFAULT_BID_TIMER_SECONDS,
   MEGA_OVERSEAS_LIMIT,
   getNextBidAmount
@@ -46,6 +47,15 @@ test('players outside Marquee, Set 1 and Set 2 retain the default ₹50 lakh inc
   assert.equal(getNextBidAmount(0.5, 1, 'Set 3'), 1);
   assert.equal(getNextBidAmount(4.9, 1, 'Set 3'), 5.4);
   assert.equal(getNextBidAmount(12.25, 1, 'Set 3'), 12.75);
+});
+
+
+test('players with a base price below ₹1 crore use a ₹15 lakh increment regardless of set', () => {
+  assert.equal(LOW_BASE_PRICE_BID_INCREMENT_CRORE, 0.15);
+  assert.equal(getNextBidAmount(0.3, 0.5, 'Set 1'), 0.45);
+  assert.equal(getNextBidAmount(0.45, 0.5, 'Set 1'), 0.6);
+  assert.equal(getNextBidAmount(0.5, 0.75, 'Set 3'), 0.65);
+  assert.equal(getNextBidAmount(0.65, 0.75, 'Set 3'), 0.8);
 });
 
 test('rounds bid values to two decimal places', () => {
