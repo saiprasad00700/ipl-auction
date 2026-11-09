@@ -1861,6 +1861,7 @@ export const AuctionProvider = ({ children }) => {
       return live;
     });
 
+    await remove(ref(rtdb, `auctions/${roomId}/pauseRequests`));
     await push(msgRef, {
       userId: 'system',
       userName: 'System',
