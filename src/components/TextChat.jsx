@@ -52,6 +52,12 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
    const isBotUser = Boolean(user?.uid && (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || roomPlayer?.isBot));
    const canSendChat = Boolean(user && !isBotUser);
 
+   // Sticker messages are stored as ordinary chat records in Firebase RTDB.
+   // Existing message rules already allow the "sticker" type; no schema migration is needed.
+   const chatMessages = messages.filter(m =>
+      m.type === 'text' || m.type === 'gif' || m.type === 'sticker' || !m.type
+   );
+
    // Mark messages as seen when they are displayed in the open chat.
    // Each member writes only their own read receipt under each message.
    const markedSeenMessageIdsRef = useRef(new Set());
@@ -76,12 +82,6 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
          });
       });
    }, [chatMessages, roomId, user?.uid, isBotUser, roomPlayer?.team, roomPlayer?.teamName]);
-
-   // Sticker messages are stored as ordinary chat records in Firebase RTDB.
-   // Existing message rules already allow the "sticker" type; no schema migration is needed.
-   const chatMessages = messages.filter(m =>
-      m.type === 'text' || m.type === 'gif' || m.type === 'sticker' || !m.type
-   );
 
    useEffect(() => {
       let cancelled = false;
