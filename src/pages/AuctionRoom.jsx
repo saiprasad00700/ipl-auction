@@ -185,6 +185,8 @@ const AuctionRoom = () => {
       : (optimisticState || liveAuctionState);
 
    const retentionOffer = displayAuctionState?.retentionOffer;
+   // Block host pause during sold/unsold announcements, lot settlement, and every RTM stage.
+   const pauseTemporarilyBlocked = ['sold', 'unsold', 'processing_sale'].includes(displayAuctionState?.status);
 
    // Show a settlement announcement only once per player/status in this room view.
    // Keep seen keys even if a stale or competing client briefly changes the status
@@ -1161,8 +1163,9 @@ const AuctionRoom = () => {
                      ) : (
                         <button
                            onClick={() => pauseAuction(id)}
-                           className="p-1 sm:px-2.5 sm:py-1.5 bg-white/5 border border-white/10 rounded-lg text-gray-300 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all cursor-pointer flex items-center gap-1"
-                           title="Pause Auction"
+                           disabled={pauseTemporarilyBlocked}
+                           className={`p-1 sm:px-2.5 sm:py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${pauseTemporarilyBlocked ? 'text-gray-600 opacity-40 cursor-not-allowed' : 'text-gray-300 hover:bg-white/10 hover:text-white cursor-pointer'}`}
+                           title={pauseTemporarilyBlocked ? 'Pause unavailable during player announcements and RTM transactions' : 'Pause Auction'}
                         >
                            <Pause size={13} /> <span className="hidden md:inline">Pause</span>
                         </button>
