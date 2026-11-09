@@ -1557,35 +1557,51 @@ export const AuctionProvider = ({ children }) => {
     }
 
     const liveRef = ref(rtdb, `auctions/${currentAuction.id}/live`);
-    const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === user.uid) return; // abort
+    let txResult;
+    try {
+      txResult = await runTransactionRtdb(liveRef, (currentData) => {
+        if (!currentData) return currentData;
+        if (currentData.status !== 'bidding') return; // normal abort
+        if (currentData.highBidderId === user.uid) return; // normal abort
 
-      const now = getSyncedTime();
-      // Server-side guard: Reject late bids if timer has already expired
-      if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
-        return; // abort transaction
-      }
+        const now = getSyncedTime();
+        // Server-side guard: Reject late bids if timer has already expired
+        if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
+          return; // normal abort
+        }
 
-      const cBid = currentData.currentBid || 0;
-      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
+        const cBid = currentData.currentBid || 0;
+        const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
 
-      // Guard: Abort retried transaction if updated bid exceeds user's budget
-      if (nAmount > myBudget) return;
+        // Guard: Abort retried transaction if updated bid exceeds user's budget
+        if (nAmount > myBudget) return;
 
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = user.uid;
-      currentData.highBidderName = user.displayName || 'Manager';
-      currentData.highBidderTeamId = team.teamId;
-      currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000;
-      currentData.lastActivityAt = now;
+        currentData.currentBid = nAmount;
+        currentData.highBidderId = user.uid;
+        currentData.highBidderName = user.displayName || 'Manager';
+        currentData.highBidderTeamId = team.teamId;
+        currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000;
+        currentData.lastActivityAt = now;
 
-      return currentData;
-    });
+        return currentData;
+      });
+    } catch (error) {
+      const errorCode = error?.code || 'unknown';
+      const errorMessage = error?.message || String(error);
+      reportGuardianError({
+        operation: 'bidding',
+        severity: 'critical',
+        message: `Firebase bid transaction failed [${errorCode}]: ${errorMessage}`,
+        roomId: currentAuction.id,
+        fingerprint: `bid-transaction-error:${errorCode}`
+      });
+      throw error;
+    }
 
     if (!txResult.committed) {
-      reportGuardianError({ operation: 'bidding', severity: 'critical', message: 'Bid transaction was not committed', roomId: currentAuction.id, fingerprint: 'bid-transaction-not-committed' });
+      // Firebase uses committed=false for intentional aborts as well as
+      // transactions that do not write. These are normal bid-race/validation
+      // outcomes and must not be reported as critical infrastructure errors.
       throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
     }
     void trackAnalyticsEvent('bid', currentAuction.id);
