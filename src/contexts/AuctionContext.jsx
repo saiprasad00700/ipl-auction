@@ -2057,7 +2057,7 @@ export const AuctionProvider = ({ children }) => {
       }
       let eligibleRankings = [];
       let analysisModel = 'Eligibility Rules';
-      if (payload.length >= 2) {
+      if (payload.length >= 2 || (usesSquadBalanceAnalysis && payload.length === 1)) {
         const response = await fetch('/api/analyze-winner', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
