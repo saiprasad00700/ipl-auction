@@ -50,7 +50,7 @@ import TextChat from '../components/TextChat';
 import VoiceChat from '../components/VoiceChat';
 import PageLoader from '../components/PageLoader';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { ref, update } from 'firebase/database';
+import { ref, update, onValue, set, serverTimestamp as serverTimestampRtdb } from 'firebase/database';
 import { rtdb } from '../lib/firebase';
 import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount } from '../lib/auctionRules';
 
@@ -94,6 +94,10 @@ const AuctionRoom = () => {
    const [summaryTab, setSummaryTab] = useState('squads'); // squads, leaderboard
    const [showParticipantsOverlay, setShowParticipantsOverlay] = useState(false);
    const [showEndConfirm, setShowEndConfirm] = useState(false);
+   const [pauseRequests, setPauseRequests] = useState({});
+   const [dismissedPauseRequests, setDismissedPauseRequests] = useState({});
+   const [lastPauseRequestAt, setLastPauseRequestAt] = useState(0);
+   const [pauseRequestClock, setPauseRequestClock] = useState(Date.now());
    const [isEnding, setIsEnding] = useState(false);
    const [selectedXIIds, setSelectedXIIds] = useState([]);
    const [selectedImpactId, setSelectedImpactId] = useState('');
@@ -137,6 +141,21 @@ const AuctionRoom = () => {
          });
       }
    }, [sidebarTab, messages]);
+   useEffect(() => {
+      if (!id || !user?.uid || currentAuction?.hostId !== user.uid) {
+         setPauseRequests({});
+         return undefined;
+      }
+      const requestsRef = ref(rtdb, `auctions/${id}/pauseRequests`);
+      return onValue(requestsRef, (snapshot) => setPauseRequests(snapshot.val() || {}), (err) => console.warn('[AuctionRoom] Pause request listener failed:', err?.message || err));
+   }, [id, user?.uid, currentAuction?.hostId]);
+
+   useEffect(() => {
+      if (!displayAuctionState?.isPaused && displayAuctionState?.status !== 'paused') return undefined;
+      const timer = window.setInterval(() => setPauseRequestClock(Date.now()), 250);
+      return () => window.clearInterval(timer);
+   }, [displayAuctionState?.isPaused, displayAuctionState?.status]);
+
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS);
@@ -953,6 +972,19 @@ const AuctionRoom = () => {
       }
    };
 
+   const handleRequestResume = async () => {
+      if (!id || !user?.uid || isAdmin) return;
+      const now = Date.now();
+      if (now - lastPauseRequestAt < 5000) return;
+      try {
+         await set(ref(rtdb, `auctions/${id}/pauseRequests/${user.uid}`), { userId: user.uid, userName: user.displayName || 'A room member', sentAt: serverTimestampRtdb() });
+         setLastPauseRequestAt(now);
+      } catch (err) {
+         setError(err?.message || 'Could not send resume request. Please try again.');
+         window.setTimeout(() => setError(''), 3000);
+      }
+   };
+
    const copyRoomId = () => {
       navigator.clipboard.writeText(id);
       setCopied(true);
@@ -1113,7 +1145,40 @@ const AuctionRoom = () => {
    return (
       <div className="h-screen-safe relative bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.12),_transparent_45%),linear-gradient(145deg,#071521_0%,#050914_48%,#02040a_100%)] text-white font-sans flex flex-col items-center overflow-hidden">
 
-         <header className="w-full h-14 bg-[#050914]/85 backdrop-blur-xl border-b border-emerald-300/15 shadow-[0_8px_32px_rgba(0,0,0,0.25)] flex flex-row items-center justify-between px-2.5 sm:px-4 md:px-6 z-50 gap-2 shrink-0">
+             {(displayAuctionState?.isPaused || displayAuctionState?.status === 'paused') && (
+             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+                <div className="w-full max-w-md rounded-3xl border border-amber-400/30 bg-[#0b1420] shadow-2xl p-6 sm:p-8 text-center">
+                   <div className="mx-auto mb-4 h-16 w-16 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-300"><Pause size={30} /></div>
+                   <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider text-amber-300">Auction Paused</h2>
+                   <p className="mt-3 text-sm text-gray-300">The room creator has paused the auction. Please wait until the auction resumes.</p>
+                   {isAdmin ? (
+                      <div className="mt-6 space-y-3">
+                         <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Resume requests from members</p>
+                         {Object.entries(pauseRequests).filter(([uid, request]) => dismissedPauseRequests[uid] !== (request?.sentAt || true)).length ? (
+                            <div className="max-h-48 overflow-y-auto space-y-2">
+                               {Object.entries(pauseRequests).filter(([uid, request]) => dismissedPauseRequests[uid] !== (request?.sentAt || true)).map(([uid, request]) => (
+                                  <div key={uid} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left flex items-center justify-between gap-3">
+                                     <span className="text-sm font-semibold text-white">{request?.userName || 'A room member'} is asking to resume</span>
+                                     <button onClick={() => setDismissedPauseRequests((prev) => ({ ...prev, [uid]: request?.sentAt || true }))} className="text-xs font-black uppercase tracking-wider text-amber-300 hover:text-white">Got it</button>
+                                  </div>
+                               ))}
+                            </div>
+                         ) : <p className="text-xs text-gray-500">No new requests yet.</p>}
+                         <button onClick={() => resumeAuction(id)} className="w-full mt-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest py-3 flex items-center justify-center gap-2"><PlayCircle size={17} /> Resume Auction</button>
+                      </div>
+                   ) : (
+                      <div className="mt-6">
+                         <button onClick={handleRequestResume} disabled={pauseRequestClock - lastPauseRequestAt < 5000} className="w-full rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-white/10 disabled:text-gray-500 text-black font-black uppercase tracking-widest py-3 transition-colors">
+                            {pauseRequestClock - lastPauseRequestAt < 5000 ? `Request sent • ${Math.ceil((5000 - (pauseRequestClock - lastPauseRequestAt)) / 1000)}s` : 'Ask creator to resume'}
+                         </button>
+                         <p className="mt-3 text-[11px] text-gray-500">You can send another request once every 5 seconds.</p>
+                      </div>
+                   )}
+                </div>
+             </div>
+          )}
+
+      <header className="w-full h-14 bg-[#050914]/85 backdrop-blur-xl border-b border-emerald-300/15 shadow-[0_8px_32px_rgba(0,0,0,0.25)] flex flex-row items-center justify-between px-2.5 sm:px-4 md:px-6 z-50 gap-2 shrink-0">
             <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
                <div className="flex items-center gap-1">
                   <span className="text-gray-500 text-[8px] sm:text-[10px] font-black uppercase tracking-widest hidden xs:inline">ID:</span>
