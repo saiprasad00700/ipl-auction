@@ -102,6 +102,41 @@ const AuctionRoom = () => {
    const [xiSubmitSuccess, setXiSubmitSuccess] = useState(false);
    const [isRetryingAnalysis, setIsRetryingAnalysis] = useState(false);
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
+   const [unreadChatCount, setUnreadChatCount] = useState(0);
+   const chatNotificationSeenIdsRef = useRef(new Set());
+   const chatNotificationMountedAtRef = useRef(Date.now());
+
+   // Count incoming text messages while the chat panel is closed. Existing messages
+   // from before this page opened are treated as already seen.
+   useEffect(() => {
+      const incomingMessages = messages.filter((message) =>
+         (message.type === 'text' || !message.type)
+         && message.userId !== user?.uid
+         && message.userId !== 'system'
+      );
+      let newIncomingCount = 0;
+      incomingMessages.forEach((message) => {
+         const messageId = message.id;
+         if (!messageId || chatNotificationSeenIdsRef.current.has(messageId)) return;
+         chatNotificationSeenIdsRef.current.add(messageId);
+         const timestamp = typeof message.timestamp === 'number'
+            ? message.timestamp
+            : (message.timestamp?.toDate ? message.timestamp.toDate().getTime() : 0);
+         if (timestamp >= chatNotificationMountedAtRef.current && sidebarTab !== 'chat') {
+            newIncomingCount += 1;
+         }
+      });
+      if (newIncomingCount > 0) setUnreadChatCount((count) => count + newIncomingCount);
+   }, [messages, user?.uid, sidebarTab]);
+
+   useEffect(() => {
+      if (sidebarTab === 'chat') {
+         setUnreadChatCount(0);
+         messages.forEach((message) => {
+            if (message.id) chatNotificationSeenIdsRef.current.add(message.id);
+         });
+      }
+   }, [sidebarTab, messages]);
    const audioRef = useRef(null);
    const celebrationAudioRef = useRef(null);
    const [newTimerValue, setNewTimerValue] = useState(currentAuction?.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS);
@@ -1589,6 +1624,11 @@ const AuctionRoom = () => {
                   >
                      <MessageSquare size={14} />
                      <span className="text-[10px] uppercase tracking-widest">Voice Chat</span>
+                     {unreadChatCount > 0 && (
+                        <span className="ml-1 inline-flex min-w-[17px] h-[17px] items-center justify-center rounded-full border border-red-300/30 bg-red-500/20 px-1 text-[9px] font-black tabular-nums text-red-200 shadow-[0_0_12px_rgba(239,68,68,0.12)]">
+                           {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                        </span>
+                     )}
                   </button>
                </div>
 
