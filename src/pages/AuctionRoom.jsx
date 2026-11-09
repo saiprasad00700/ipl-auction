@@ -1740,7 +1740,9 @@ const AuctionRoom = () => {
                            exit={{ opacity: 0, y: -10 }}
                            className="flex-1 flex flex-col min-h-0 h-full p-2"
                         >
-                           <VoiceChat roomId={id} />
+                           <div className="shrink-0">
+                              <VoiceChat roomId={id} />
+                           </div>
                            <TextChat roomId={id} />
                         </motion.div>
                      )}
