@@ -1,5 +1,7 @@
 // SS AUCTION Guardian: server-side error storage and Telegram notifications.
 const MAX_MESSAGE_LENGTH = 500;
+const recentAlerts = new Map();
+const ALERT_COOLDOWN_MS = 10 * 60 * 1000;
 const ALLOWED_OPERATIONS = new Set([
   'frontend', 'auction', 'bidding', 'rtm', 'ai_analysis', 'room_join',
   'firebase', 'supabase', 'voice', 'unknown'
@@ -39,8 +41,19 @@ export async function recordGuardianError(input) {
   const saved = Array.isArray(rows) ? rows[0] : null;
 
   // Avoid alert flooding: notify once per fingerprint in a 10-minute window.
-  if (saved && severity !== 'medium') {
-    await sendTelegramAlert({ ...row, id: saved.id, created_at: saved.created_at });
+  const alertKey = row.fingerprint || (row.operation + ':' + row.message);
+  const lastAlertAt = recentAlerts.get(alertKey) || 0;
+  if (saved && severity !== 'medium' && Date.now() - lastAlertAt >= ALERT_COOLDOWN_MS) {
+    recentAlerts.set(alertKey, Date.now());
+    try {
+      await sendTelegramAlert({ ...row, id: saved.id, created_at: saved.created_at });
+    } catch (error) {
+      console.warn('[Guardian] Telegram delivery error:', error?.message || error);
+    }
+    if (recentAlerts.size > 2000) {
+      const cutoff = Date.now() - ALERT_COOLDOWN_MS;
+      for (const [key, timestamp] of recentAlerts) if (timestamp < cutoff) recentAlerts.delete(key);
+    }
   }
   return saved;
 }
