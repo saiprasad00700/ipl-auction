@@ -202,24 +202,103 @@ ${JSON.stringify(normalized)}`;
       throw new Error("AI returned invalid JSON");
     }
 
-    const received = Array.isArray(parsed.rankings) ? parsed.rankings : [];
     const expectedIds = normalized.map((team) => team.franchiseId);
-    const validIds = received.length === expectedIds.length &&
-      new Set(received.map((item) => item.franchiseId)).size === expectedIds.length &&
-      expectedIds.every((id) => received.some((item) => item.franchiseId === id));
-    const validRanks = received.every((item) =>
-      Number.isInteger(item.rank) && item.rank >= 1 && item.rank <= expectedIds.length
-    ) && new Set(received.map((item) => item.rank)).size === expectedIds.length;
+    const validateRankings = (items) => {
+      const rows = Array.isArray(items) ? items : [];
+      const validIds = rows.length === expectedIds.length &&
+        new Set(rows.map((item) => item.franchiseId)).size === expectedIds.length &&
+        expectedIds.every((id) => rows.some((item) => item.franchiseId === id));
+      const validRanks = rows.every((item) =>
+        Number.isInteger(item.rank) && item.rank >= 1 && item.rank <= expectedIds.length
+      ) && new Set(rows.map((item) => item.rank)).size === expectedIds.length;
+      return { rows, valid: validIds && validRanks };
+    };
 
-    if (!validIds || !validRanks) {
-      console.error("Gemini returned invalid franchise rankings", {
+    let validation = validateRankings(parsed.rankings);
+    let received = validation.rows;
+
+    // Gemini sometimes omits one franchise even with a JSON response schema.
+    // Ask the same model to repair the complete ranking once, explicitly listing
+    // every required franchise ID. Never invent a missing team's rank locally.
+    if (!validation.valid) {
+      const missingIds = expectedIds.filter((id) => !received.some((item) => item?.franchiseId === id));
+      console.warn("Gemini omitted or mis-ranked franchises; requesting one complete correction", {
+        expectedFranchiseIds: expectedIds,
+        receivedFranchiseIds: received.map((item) => getText(item?.franchiseId)),
+        missingFranchiseIds: missingIds,
+      });
+
+      const correctionPrompt = `${prompt}
+
+CORRECTION REQUIRED: Your previous answer was incomplete or invalid. Return a COMPLETE replacement JSON object, not a partial patch.
+You must include every franchise exactly once. Required franchise IDs, copied exactly:
+${JSON.stringify(expectedIds)}
+The previous response omitted or incorrectly ranked these IDs:
+${JSON.stringify(missingIds)}
+There must be exactly ${expectedIds.length} ranking objects and ranks must be the unique integers 1 through ${expectedIds.length}. Re-evaluate all franchises using the supplied squad data. Do not omit SRH or any other franchise. Return only the required JSON object.`;
+
+      const correctionResponse = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + activeModel + ":generateContent?key=" + encodeURIComponent(apiKey),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: correctionPrompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  rankings: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        franchiseId: { type: "STRING" },
+                        rank: { type: "INTEGER" },
+                        score: { type: "NUMBER" },
+                        summary: { type: "STRING" },
+                        strengths: { type: "ARRAY", items: { type: "STRING" } },
+                        risks: { type: "ARRAY", items: { type: "STRING" } },
+                      },
+                      required: ["franchiseId", "rank", "score", "summary", "strengths", "risks"],
+                    },
+                  },
+                },
+                required: ["rankings"],
+              },
+              temperature: 0.1,
+              maxOutputTokens: 12000,
+            },
+          }),
+        },
+      );
+
+      if (correctionResponse.ok) {
+        const correctionData = await correctionResponse.json();
+        const correctionText = correctionData?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "";
+        try {
+          const corrected = JSON.parse(correctionText);
+          validation = validateRankings(corrected.rankings);
+          received = validation.rows;
+        } catch {
+          console.error("Gemini correction response was not valid JSON");
+        }
+      } else {
+        const correctionDetail = await correctionResponse.text();
+        console.error("Gemini ranking correction request failed", correctionResponse.status, correctionDetail.slice(0, 800));
+      }
+    }
+
+    if (!validation.valid) {
+      console.error("Gemini ranking validation failed after correction attempt", {
         expectedFranchiseIds: expectedIds,
         receivedFranchiseIds: received.map((item) => getText(item?.franchiseId)),
         expectedCount: expectedIds.length,
         receivedCount: received.length,
         receivedRanks: received.map((item) => item?.rank),
       });
-      throw new Error("AI response failed ranking validation");
+      throw new Error("AI response failed ranking validation after automatic correction");
     }
 
     const rankings = received
