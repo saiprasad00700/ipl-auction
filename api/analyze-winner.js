@@ -17,6 +17,21 @@ const json = (statusCode, body) => ({
 
 const getText = (value) => (typeof value === "string" ? value.trim() : "");
 
+async function reportAnalysisFailure(roomId, message) {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) return;
+    await fetch(supabaseUrl.replace(/\\/$/, "") + "/rest/v1/guardian_errors", {
+      method: "POST",
+      headers: { apikey: serviceKey, Authorization: "Bearer " + serviceKey, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ operation: "ai_analysis", severity: "high", message: String(message).slice(0, 500), room_id: String(roomId || "").slice(0, 80) || null, source: "server", fingerprint: "ai-analysis-failed" })
+    });
+  } catch (reportError) {
+    console.warn("[Guardian] Could not record AI analysis failure:", reportError?.message || reportError);
+  }
+}
+
 export default async function handler(req, res) {
   // Supports both Vercel's Node request/response shape and API-gateway style.
   const method = req.method || req.httpMethod;
@@ -236,6 +251,7 @@ ${JSON.stringify(normalized)}`;
     return json(200, result);
   } catch (error) {
     const rawMessage = getText(error?.message);
+    await reportAnalysisFailure(roomId, rawMessage || "AI analysis failed");
     console.error("Winner analysis error", error?.stack || rawMessage || error);
 
     // Return a safe, actionable diagnostic instead of hiding every failure behind
