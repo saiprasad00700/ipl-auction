@@ -2355,7 +2355,7 @@ export const AuctionProvider = ({ children }) => {
   const lastBotBidCycleRef = React.useRef(null);
 
   // One host client coordinates bot RTM decisions, just like bot bidding.
-  // Bots only exercise retention cards for Marquee Set 1 players.
+  // Bots try to use both retention cards on eligible Set 1 and Set 2 players.
   const lastBotRtmActionRef = React.useRef(null);
 
   useEffect(() => {
@@ -2405,14 +2405,14 @@ export const AuctionProvider = ({ children }) => {
       const maxPerRole = squadLimit <= 5 ? 3 : squadLimit <= 11 ? 5 : 9;
       const canAddPlayer = slotsLeft > 0 && (!isOverseas || overseasCount < overseasLimit)
         && (roleCount < maxPerRole || slotsLeft <= 1);
-      const isMarquee = player.set === 'Marquee Set 1';
+      const isRtmPrioritySet = ['Marquee Set 1', 'Set 1', 'Set 2'].includes(String(player.set || '').trim());
       const cardsRemaining = Number.isFinite(Number(botTeam.retentionCardsRemaining))
         ? Number(botTeam.retentionCardsRemaining)
         : 2;
 
       try {
         if (phase === 'initial_decision' && offer.eligibleUserId === botId) {
-          const shouldUseRtm = isMarquee && cardsRemaining > 0 && canAddPlayer
+          const shouldUseRtm = isRtmPrioritySet && cardsRemaining > 0 && canAddPlayer
             && budget >= Number(offer.bid || 0);
           await runTransactionRtdb(liveRef, (current) => {
             const currentOffer = current?.retentionOffer;
@@ -2460,7 +2460,7 @@ export const AuctionProvider = ({ children }) => {
           const counterBid = Number(offer.counterBid);
           const slotsAfter = Math.max(0, slotsLeft - 1);
           const leavesEnoughPurse = slotsLeft <= 1 || (budget - counterBid) / slotsAfter >= 0.30;
-          const shouldMatch = isMarquee && cardsRemaining > 0 && canAddPlayer
+          const shouldMatch = isRtmPrioritySet && cardsRemaining > 0 && canAddPlayer
             && budget >= counterBid && leavesEnoughPurse;
           await runTransactionRtdb(liveRef, (current) => {
             const currentOffer = current?.retentionOffer;
