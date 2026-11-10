@@ -296,7 +296,14 @@ useEffect(() => {
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
             t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
          );
-         if (usesSquadBalanceAnalysis || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
+         const roomPlayers = Array.isArray(currentAuction.players) ? currentAuction.players : Object.values(currentAuction.players || {});
+         const botIds = new Set(roomPlayers.filter((player) => player?.isBot || /^(bot[_-]|auctionbot[_-])/i.test(String(player?.id || ''))).map((player) => player.id));
+         const botNeedsAutoXI = !usesSquadBalanceAnalysis && participatingTeams.some((entry) => {
+            const userId = String(entry.userId || '');
+            const isBot = botIds.has(userId) || /^(bot[_-]|auctionbot[_-])/i.test(userId);
+            return isBot && !(entry.playingXI?.startingXI?.length === 11 && Boolean(entry.playingXI?.impactPlayer));
+         });
+         if (usesSquadBalanceAnalysis || botNeedsAutoXI || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
             finalizeWinnerAnalysis(id).catch((err) => console.error('Could not start winner analysis:', err));
          }
       };
@@ -314,6 +321,9 @@ useEffect(() => {
    const savedPlayingXI = team?.playingXI;
    const hasSubmittedPlayingXI = Boolean(savedPlayingXI?.submittedAt
       && savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer);
+   const currentRoomPlayer = (Array.isArray(currentAuction?.players) ? currentAuction.players : Object.values(currentAuction?.players || {}))
+      .find((player) => player?.id === user?.uid);
+   const isCurrentUserBot = /^(bot[_-]|auctionbot[_-])/i.test(String(user?.uid || '')) || Boolean(currentRoomPlayer?.isBot);
    const feedbackPhaseOpen = ['awaiting_xi', 'analyzing', 'analysis_failed'].includes(currentAuction?.status)
       && currentAuction?.winnerAnalysisStatus !== 'completed'
       && !currentAuction?.winnerRankings;
@@ -374,7 +384,7 @@ useEffect(() => {
    };
 
    useEffect(() => {
-      const shouldShow = hasSubmittedPlayingXI && feedbackPhaseOpen && !feedbackStorageDismissed;
+      const shouldShow = !isCurrentUserBot && hasSubmittedPlayingXI && feedbackPhaseOpen && !feedbackStorageDismissed;
       if (!shouldShow) {
          setShowFeedbackPopup(false);
          if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
@@ -391,7 +401,7 @@ useEffect(() => {
          if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
          feedbackTimerRef.current = null;
       };
-   }, [hasSubmittedPlayingXI, feedbackPhaseOpen, feedbackStorageDismissed, id, user?.uid]);
+   }, [isCurrentUserBot, hasSubmittedPlayingXI, feedbackPhaseOpen, feedbackStorageDismissed, id, user?.uid]);
 
    useEffect(() => () => {
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);

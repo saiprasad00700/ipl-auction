@@ -656,6 +656,9 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
       const { auth, database } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(String(decoded.uid || ''))) {
+        return sendJson(res, 403, { error: 'Bots are not allowed to submit feedback' });
+      }
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
@@ -671,6 +674,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
       const member = roster.find((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
       const isHost = roomData.hostId === decoded.uid;
+      if (member?.isBot) return sendJson(res, 403, { error: 'Bots are not allowed to submit feedback' });
       if (!isHost && !member) return sendJson(res, 403, { error: 'You are not a member of this auction room' });
 
       const teamsSnapshot = await database.ref('auctions/' + roomId + '/teams').get();
