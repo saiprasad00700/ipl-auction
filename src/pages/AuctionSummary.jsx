@@ -354,7 +354,7 @@ const AuctionSummary = () => {
                 </div>
               )}
             </motion.section>
-           : activeTab === 'leaderboard' ? (
+          ) : activeTab === 'leaderboard' ? (
             <motion.section
               key="leaderboard"
               initial={{ opacity: 0, scale: 0.95 }}
