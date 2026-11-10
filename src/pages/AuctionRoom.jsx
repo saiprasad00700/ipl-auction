@@ -2368,7 +2368,7 @@ useEffect(() => {
                                           aria-label={player ? `Slot ${slot + 1}: ${player.name}. Tap to change player` : `Choose player for slot ${slot + 1}`}
                                           disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                           onClick={() => setActiveXISlot(slot)}
-                                          className={`relative block w-full aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                          className={`relative block w-full aspect-[2/3] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                        >
                                           {player ? (
                                              <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
@@ -2402,7 +2402,7 @@ useEffect(() => {
                                        aria-label={player ? `${slot.label}: ${player.name}. Tap to change player` : `Choose ${slot.label}`}
                                        disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                        onClick={() => setActiveXISlot(slot.label)}
-                                       className={`relative block w-full aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                       className={`relative block w-full aspect-[2/3] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                     >
                                        {player ? (
                                           <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
