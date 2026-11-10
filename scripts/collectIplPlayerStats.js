@@ -42,14 +42,15 @@ async function supabase(path, options = {}) {
 }
 
 async function findSeries(year) {
-  for (let offset = 0; offset < 2000; offset += 1) {
+  for (let offset = 0; offset < 2000; ) {
     const rows = await cricApi(`series?offset=${offset}`);
     const found = rows.find((item) => {
       const name = String(item.name || "").toLowerCase();
       return name.includes("indian premier league") && name.includes(String(year));
     });
     if (found) return found;
-    if (!rows.length) break;
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    offset += rows.length;
   }
   throw new Error(`IPL ${year} series not found in CricAPI.`);
 }
