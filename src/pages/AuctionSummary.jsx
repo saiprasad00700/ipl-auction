@@ -274,15 +274,17 @@ const AuctionSummary = () => {
                   const teamInfo = TEAMS.find((teamItem) => teamItem.id === teamDoc.teamId);
                   const savedXI = teamDoc.playingXI || {};
                   const starters = Array.isArray(savedXI.startingXI) ? savedXI.startingXI : [];
-                  const impactEntry = savedXI.impactPlayer;
+                  const chasingEntry = savedXI.impactPlayerChasing || savedXI.impactPlayer;
+                  const defendingEntry = savedXI.impactPlayerDefending || savedXI.impactPlayer;
                   const isExpanded = expandedFranchiseXI === teamDoc.teamId;
                   const resolveXIPlayer = (entry) => {
                     const playerId = typeof entry === 'string' ? entry : entry?.id;
                     return (playerId ? IPL_PLAYERS.find((player) => player.id === playerId) : null) || (typeof entry === 'object' ? entry : null);
                   };
                   const startingPlayers = starters.map(resolveXIPlayer).filter(Boolean);
-                  const impactPlayer = resolveXIPlayer(impactEntry);
-                  const hasSavedXI = startingPlayers.length === 11 && Boolean(impactPlayer);
+                  const chasingImpactPlayer = resolveXIPlayer(chasingEntry);
+                  const defendingImpactPlayer = resolveXIPlayer(defendingEntry);
+                  const hasSavedXI = startingPlayers.length === 11 && Boolean(chasingImpactPlayer) && Boolean(defendingImpactPlayer);
                   return (
                     <div key={teamDoc.id || teamDoc.teamId} className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
                       <button
@@ -330,12 +332,19 @@ const AuctionSummary = () => {
                                       </div>
                                     ))}
                                   </div>
-                                  <div className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/[0.07] p-3 flex items-center gap-3">
-                                    {impactPlayer.image && <img src={impactPlayer.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
-                                    <div>
-                                      <p className="text-[9px] font-black uppercase tracking-wider text-blue-300">Impact Player</p>
-                                      <p className="text-sm font-bold">{impactPlayer.name || 'Player'}</p>
-                                    </div>
+                                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {[
+                                      { label: 'Impact Player (Chasing)', player: chasingImpactPlayer },
+                                      { label: 'Impact Player (Defending)', player: defendingImpactPlayer }
+                                    ].map((impact) => (
+                                      <div key={impact.label} className="rounded-xl border border-blue-400/25 bg-blue-400/[0.07] p-3 flex items-center gap-3">
+                                        {impact.player.image && <img src={impact.player.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
+                                        <div>
+                                          <p className="text-[9px] font-black uppercase tracking-wider text-blue-300">{impact.label}</p>
+                                          <p className="text-sm font-bold">{impact.player.name || 'Player'}</p>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 </>
                               ) : (
