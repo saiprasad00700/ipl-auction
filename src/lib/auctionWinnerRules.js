@@ -1,4 +1,5 @@
 // Modified from the upstream project by saiprasad00700.
+import { PLAYER_BATTING_POSITIONS } from '../data/playerBattingPositions';
 /**
  * Pure helpers for the post-auction squad evaluation workflow.
  * Kept independent of React/Firebase so the rules can be unit-tested.
@@ -39,7 +40,7 @@ const toPlayer = (squadItem, playerCatalog) => {
   const id = playerId(squadItem);
   const catalogPlayer = playerCatalog.find((player) => player.id === id);
   if (!catalogPlayer) return null;
-  return { ...catalogPlayer, ...((typeof squadItem === 'object' && squadItem) || {}) , id };
+  return { ...catalogPlayer, ...(PLAYER_BATTING_POSITIONS[catalogPlayer.name] || {}), ...((typeof squadItem === 'object' && squadItem) || {}) , id };
 };
 
 /**
@@ -98,9 +99,11 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     }
     return roleValue(b) - roleValue(a) || String(a.name || a.id).localeCompare(String(b.name || b.id));
   });
-  const addBest = (predicate, categoryLimit) => {
-    let needed = Math.max(0, categoryLimit - selected.filter(predicate).length);
-    for (const candidate of ordered(unique.filter((p) => !selected.some((s) => s.id === p.id) && predicate(p)))) {
+  const addBest = (predicate, count) => {
+    let needed = count;
+    for (const candidate of ordered(unique.filter((p) =>
+      !selected.some((s) => s.id === p.id) && predicate(p)
+    ))) {
       if (needed <= 0 || selected.length >= PLAYING_XI_SIZE) break;
       if (isOverseasPlayer(candidate) && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
       selected.push(candidate);
@@ -108,11 +111,24 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     }
   };
 
-  addBest((p) => normalizeRole(p) === 'wk', 1);
-  addBest((p) => normalizeRole(p) === 'bat', 4);
+  // Preserve the manager's declared natural batting order:
+  // 1-3 openers, 4-7 middle order (including at least two all-rounders),
+  // 8-11 finishers and bowling options.
+  addBest((p) => p.battingPosition === 'OP', 3);
+  // If a squad has fewer than three declared openers, use top-order/middle
+  // batters before considering finishers or bowlers in the opening slots.
+  addBest((p) => ['MID'].includes(p.battingPosition) && normalizeRole(p) !== 'bowl', 3 - selected.length);
+
   addBest((p) => normalizeRole(p) === 'ar', MIN_ALL_ROUNDERS_IN_XI);
-  addBest((p) => normalizeRole(p) === 'bowl', MIN_BOWLERS_IN_XI - MIN_ALL_ROUNDERS_IN_XI);
-  addBest(() => true, PLAYING_XI_SIZE);
+  addBest((p) => p.battingPosition === 'MID' && normalizeRole(p) !== 'bowl', 2);
+  addBest((p) => p.battingPosition === 'MID' || normalizeRole(p) === 'ar', 4 - selected.length);
+
+  // Keep the lower order functional: prioritize one declared finisher and
+  // then three specialist bowling options (all-rounders count as bowling options).
+  addBest((p) => p.battingPosition === 'FIN', 1);
+  addBest((p) => normalizeRole(p) === 'bowl', MIN_BOWLERS_IN_XI - selected.filter((p) => ['ar', 'bowl'].includes(normalizeRole(p))).length);
+  addBest((p) => ['FIN', 'BOWL', 'AR'].includes(p.battingPosition) || ['ar', 'bowl'].includes(normalizeRole(p)), PLAYING_XI_SIZE - selected.length);
+  addBest(() => true, PLAYING_XI_SIZE - selected.length);
 
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
   const impactPlayer = ordered(unique
