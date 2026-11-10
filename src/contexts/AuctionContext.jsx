@@ -2431,11 +2431,10 @@ export const AuctionProvider = ({ children }) => {
             return current;
           });
         } else if (phase === 'counter_bid' && offer.buyerId === botId) {
-          // Bot RTM counter-prices must exceed the original bid. There is no
-          // artificial ₹20/₹25 Cr ceiling: the bot may counter up to its
-          // available purse, subject to squad and overseas eligibility.
+          // Keep bot RTM counter-prices strictly below ₹25 Cr while
+          // still requiring the counter to exceed the current bid.
           const minCounter = Math.max(5, Math.ceil((Number(offer.bid || 0) + 0.25) * 4) / 4);
-          const maxCounter = budget;
+          const maxCounter = Math.min(24.75, budget);
           if (canAddPlayer && maxCounter >= minCounter) {
             const steps = Math.floor((maxCounter - minCounter) * 4 + 0.0001);
             const counterBid = Number((minCounter + Math.floor(Math.random() * (steps + 1)) / 4).toFixed(2));
@@ -2446,6 +2445,7 @@ export const AuctionProvider = ({ children }) => {
                 || currentOffer.buyerId !== botId || currentOffer.decision !== 'accept'
                 || getSyncedTime() > Number(currentOffer.expiresAt)
                 || counterBid <= Number(currentOffer.bid)
+                || counterBid >= 25
                 || counterBid > Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
               currentOffer.counterBid = counterBid;
               currentOffer.phase = 'match_decision';
