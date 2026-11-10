@@ -676,6 +676,9 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const teamsSnapshot = await database.ref('auctions/' + roomId + '/teams').get();
       const teams = teamsSnapshot.val() || {};
       const franchise = Object.values(teams).find((entry) => entry && entry.userId === decoded.uid);
+      if (!franchise?.playingXI?.submittedAt) {
+        return sendJson(res, 403, { error: 'Submit your Playing XI before sending post-auction feedback' });
+      }
       const userName = String(member?.name || roomData.hostName || decoded.name || 'Guest').trim().slice(0, 80);
       const feedback = {
         roomId,
