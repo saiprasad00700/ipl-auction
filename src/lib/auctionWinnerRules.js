@@ -3,7 +3,7 @@
  * Pure helpers for the post-auction squad evaluation workflow.
  * Kept independent of React/Firebase so the rules can be unit-tested.
  */
-export const PLAYING_XI_DEADLINE_MS = 3 * 60 * 1000;
+export const PLAYING_XI_DEADLINE_MS = 30 * 60 * 1000;
 export const RETENTION_DECISION_MS = 10 * 1000;
 export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
