@@ -111,6 +111,10 @@ const AuctionRoom = () => {
    const [feedbackError, setFeedbackError] = useState('');
    const [feedbackTouched, setFeedbackTouched] = useState(false);
    const feedbackTimerRef = useRef(null);
+   const feedbackRatingRef = useRef(0);
+   const feedbackCommentRef = useRef('');
+   feedbackRatingRef.current = feedbackRating;
+   feedbackCommentRef.current = feedbackComment;
    const feedbackActivityAtRef = useRef(0);
    const feedbackDismissedKey = user?.uid ? `ssauction-feedback-dismissed:${id}:${user.uid}` : null;
    const [isRetryingAnalysis, setIsRetryingAnalysis] = useState(false);
@@ -334,8 +338,8 @@ useEffect(() => {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
                roomId: id,
-               rating: feedbackRating || null,
-               comment: feedbackComment.trim()
+               rating: feedbackRatingRef.current || null,
+               comment: feedbackCommentRef.current.trim()
             })
          });
          const result = await response.json().catch(() => ({}));
@@ -346,7 +350,7 @@ useEffect(() => {
          if (automatic) {
             feedbackActivityAtRef.current = Date.now();
             feedbackTimerRef.current = window.setTimeout(() => {
-               if (feedbackRating > 0 || feedbackComment.trim()) void submitGameFeedback(true);
+               if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) void submitGameFeedback(true);
                else closeFeedbackPopup(true);
             }, 20000);
          }
@@ -361,7 +365,7 @@ useEffect(() => {
       feedbackActivityAtRef.current = Date.now();
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = window.setTimeout(() => {
-         if (feedbackRating > 0 || feedbackComment.trim()) {
+         if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) {
             void submitGameFeedback(true);
          } else {
             closeFeedbackPopup(true);
