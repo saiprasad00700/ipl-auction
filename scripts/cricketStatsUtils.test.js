@@ -10,3 +10,17 @@ test("maps nested CricAPI batting and bowling names to auction player IDs", () =
   assert.equal(rows.find((row) => row.player_id === "p1").batting_innings[0].runs, 45);
   assert.equal(rows.find((row) => row.player_id === "p2").bowling_innings[0].wickets, 2);
 });
+
+
+test("preserves CricAPI dismissal text and converts cricket overs to balls", () => {
+  const players = [{ id: "p1", name: "Sanju Samson" }, { id: "p2", name: "Jamie Overton" }];
+  const scorecard = { scorecard: [{
+    batting: [{ batsman: { name: "Sanju Samson" }, r: 115, b: 56, "dismissal-text": "not out" }],
+    bowling: [{ bowler: { name: "Jamie Overton" }, o: "3.5", m: 0, r: 18, w: 4, eco: 4.5 }]
+  }] };
+  const rows = normalizeScorecard(scorecard, { id: "m2", name: "CSK vs DC" }, 2026, players);
+  assert.equal(rows.find((row) => row.player_id === "p1").batting_innings[0].dismissal, "not out");
+  const bowling = rows.find((row) => row.player_id === "p2").bowling_innings[0];
+  assert.equal(bowling.overs, "3.5");
+  assert.equal(bowling.overs_balls, 23);
+});
