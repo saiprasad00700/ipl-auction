@@ -2112,7 +2112,8 @@ export const AuctionProvider = ({ children }) => {
           impactPlayerChasing: toFullPlayer(selectedChasing),
           impactPlayerDefending: toFullPlayer(selectedDefending),
           fullSquad,
-          autoSelected
+          autoSelected,
+          selectionType: autoSelected ? 'automatic' : 'manual'
         });
       }
       let eligibleRankings = [];
