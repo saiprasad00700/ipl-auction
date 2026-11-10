@@ -33,11 +33,12 @@ Zak Foulkes`,
 
 export const PLAYER_BATTING_POSITIONS = Object.freeze(
   Object.fromEntries(
-    Object.entries(PLAYER_POSITION_GROUPS).flatMap(([position, names]) =>
+    Object.entries(PLAYER_POSITION_GROUPS).flatMap(([rawPosition, names]) => {
+      const position = rawPosition.replace(/_EXTRA$/, '');
       names.split('\\n').filter(Boolean).map((name) => [name, {
         battingPosition: position,
         canBatAtThree: ['Abishek Porel', 'Urvil Patel', 'Anmolpreet Singh', 'Josh Inglis'].includes(name)
-      }])
-    )
+      } ])
+    })
   )
 );
