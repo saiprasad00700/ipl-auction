@@ -2361,25 +2361,19 @@ useEffect(() => {
                                  const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
                                  const active = activeXISlot === slot;
                                  return (
-                                    <div key={slot} className="w-[240px] shrink-0">
+                                    <div key={slot} className="w-20 shrink-0 flex flex-col items-center">
                                        <div className="text-[10px] font-black tracking-wider text-gray-500 mb-1.5">SLOT {slot + 1}</div>
                                        <button
                                           type="button"
                                           aria-label={player ? `Slot ${slot + 1}: ${player.name}. Tap to change player` : `Choose player for slot ${slot + 1}`}
                                           disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                           onClick={() => setActiveXISlot(slot)}
-                                          className={`relative block w-full aspect-[4/5] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                          className={`relative block w-20 h-20 shrink-0 overflow-hidden rounded-full border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/25 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                        >
                                           {player?.image ? (
-                                             <span className="absolute inset-0 flex items-center justify-center">
-                                                <span className="block w-[76px] h-[114px] overflow-hidden rounded-[3px] border border-white/30 bg-white/[0.03]">
-                                                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
-                                                </span>
-                                             </span>
+                                             <img src={player.image} alt={player.name} className="w-full h-full object-cover rounded-full" />
                                           ) : (
-                                             <span className="absolute inset-0 flex items-center justify-center">
-                                                <span className="block w-[76px] h-[114px] rounded-[3px] border border-dashed border-white/30 bg-white/[0.03]" />
-                                             </span>
+                                             <span className="absolute inset-0 rounded-full border border-dashed border-white/30" />
                                           )}
                                           {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-emerald-300" />}
                                        </button>
@@ -2399,26 +2393,20 @@ useEffect(() => {
                               const player = mySquadPlayers.find((p) => p.id === slot.value);
                               const active = activeXISlot === slot.label;
                               return (
-                                 <div key={slot.key} className="w-[240px] shrink-0">
+                                 <div key={slot.key} className="w-20 shrink-0 flex flex-col items-center">
                                     <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-200 mb-1.5">{slot.label}</div>
                                     <button
                                        type="button"
                                        aria-label={player ? `${slot.label}: ${player.name}. Tap to change player` : `Choose ${slot.label}`}
                                        disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                        onClick={() => setActiveXISlot(slot.label)}
-                                       className={`relative block w-full aspect-[4/5] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                       className={`relative block w-20 h-20 shrink-0 overflow-hidden rounded-full border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/25 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                     >
                                        {player?.image ? (
-                                             <span className="absolute inset-0 flex items-center justify-center">
-                                                <span className="block w-[76px] h-[114px] overflow-hidden rounded-[3px] border border-white/30 bg-white/[0.03]">
-                                                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
-                                                </span>
-                                             </span>
-                                          ) : (
-                                             <span className="absolute inset-0 flex items-center justify-center">
-                                                <span className="block w-[76px] h-[114px] rounded-[3px] border border-dashed border-white/30 bg-white/[0.03]" />
-                                             </span>
-                                          )}
+                                          <img src={player.image} alt={player.name} className="w-full h-full object-cover rounded-full" />
+                                       ) : (
+                                          <span className="absolute inset-0 rounded-full border border-dashed border-white/30" />
+                                       )}
                                        {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-blue-300" />}
                                     </button>
                                  </div>
