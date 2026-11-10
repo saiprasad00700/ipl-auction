@@ -152,16 +152,17 @@ export default async function handler(req, res) {
     const bat = season.battingInnings;
     const bowl = season.bowlingInnings;
     const runs = sum(bat, "runs");
-    const balls = sum(bat, "balls");
+    const balls = sum(bat, "balls_faced") + sum(bat, "balls");
     const fours = sum(bat, "fours");
     const sixes = sum(bat, "sixes");
     const dismissals = bat.filter((inning) => {
-      const dismissal = getText(inning?.dismissal).toLowerCase();
-      return dismissal && !dismissal.includes("not out");
+      if (typeof inning?.dismissed === "boolean") return inning.dismissed;
+      const dismissal = getText(inning?.dismissal_kind ?? inning?.dismissal).toLowerCase();
+      return Boolean(dismissal && !dismissal.includes("not out"));
     }).length;
     const wickets = sum(bowl, "wickets");
     const conceded = sum(bowl, "runs_conceded");
-    const bowlingBalls = sum(bowl, "overs_balls");
+    const bowlingBalls = sum(bowl, "balls_bowled") + sum(bowl, "overs_balls");
     return {
       season: season.season,
       matches: season.matches,
