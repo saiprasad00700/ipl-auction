@@ -649,6 +649,81 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 503, { error: 'Guardian could not store this error' });
     }
   }
+  if (pathname === '/api/auction-feedback') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth, database } = await getFirebaseAdminServices();
+      const decoded = await auth.verifyIdToken(authorization.slice(7));
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+
+      const rating = body.rating == null || body.rating === '' ? null : Number(body.rating);
+      if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+        return sendJson(res, 400, { error: 'Rating must be between 1 and 5 stars' });
+      }
+      const comment = String(body.comment || '').trim().slice(0, 2000);
+      const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
+      const member = roster.find((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
+      const isHost = roomData.hostId === decoded.uid;
+      if (!isHost && !member) return sendJson(res, 403, { error: 'You are not a member of this auction room' });
+
+      const teamsSnapshot = await database.ref('auctions/' + roomId + '/teams').get();
+      const teams = teamsSnapshot.val() || {};
+      const franchise = Object.values(teams).find((entry) => entry && entry.userId === decoded.uid);
+      if (!franchise?.playingXI?.submittedAt) {
+        return sendJson(res, 403, { error: 'Submit your Playing XI before sending post-auction feedback' });
+      }
+      const userName = String(member?.name || roomData.hostName || decoded.name || 'Guest').trim().slice(0, 80);
+      const feedback = {
+        roomId,
+        userId: decoded.uid,
+        userName,
+        franchiseName: String(franchise?.teamName || franchise?.teamId || '').slice(0, 80),
+        rating,
+        comment,
+        submittedAt: Date.now(),
+        source: 'post-auction'
+      };
+      await database.ref('auctionFeedback/' + roomId + '/' + decoded.uid).set(feedback);
+
+      let emailSent = false;
+      const apiKey = process.env.RESEND_API_KEY;
+      const from = process.env.GUARDIAN_EMAIL_FROM || process.env.FEEDBACK_EMAIL_FROM;
+      const to = 'ssauctionforall@gmail.com';
+      if (apiKey && from) {
+        const escapeHtml = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const ratingText = rating === null ? 'Not provided' : rating + ' / 5';
+        const html = '<h2>New SS AUCTION feedback</h2>' +
+          '<p><strong>Room:</strong> ' + escapeHtml(roomId) + '</p>' +
+          '<p><strong>User:</strong> ' + escapeHtml(userName) + '</p>' +
+          '<p><strong>User ID:</strong> ' + escapeHtml(decoded.uid) + '</p>' +
+          '<p><strong>Franchise:</strong> ' + escapeHtml(feedback.franchiseName || 'Spectator / no franchise') + '</p>' +
+          '<p><strong>Rating:</strong> ' + ratingText + '</p>' +
+          '<p><strong>Suggestions:</strong><br>' + escapeHtml(comment || 'No comment provided').replace(/\n/g, '<br>') + '</p>' +
+          '<p><strong>Submitted:</strong> ' + new Date(feedback.submittedAt).toISOString() + '</p>';
+        const emailResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from, to: [to], subject: '[SS AUCTION] New game feedback - ' + roomId, html })
+        });
+        if (!emailResponse.ok) {
+          console.warn('[Feedback] Email delivery failed:', emailResponse.status, (await emailResponse.text()).slice(0, 300));
+        } else {
+          emailSent = true;
+        }
+      }
+      return sendJson(res, 200, { ok: true, emailSent });
+    } catch (error) {
+      console.warn('[Feedback] Could not save auction feedback:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not submit feedback right now' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {

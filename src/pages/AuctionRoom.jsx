@@ -104,6 +104,18 @@ const AuctionRoom = () => {
    const [isSubmittingXI, setIsSubmittingXI] = useState(false);
    const [xiSubmitError, setXiSubmitError] = useState('');
    const [xiSubmitSuccess, setXiSubmitSuccess] = useState(false);
+   const [feedbackRating, setFeedbackRating] = useState(0);
+   const [feedbackComment, setFeedbackComment] = useState('');
+   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+   const [feedbackBusy, setFeedbackBusy] = useState(false);
+   const [feedbackError, setFeedbackError] = useState('');
+   const feedbackTimerRef = useRef(null);
+   const feedbackRatingRef = useRef(0);
+   const feedbackCommentRef = useRef('');
+   feedbackRatingRef.current = feedbackRating;
+   feedbackCommentRef.current = feedbackComment;
+   const feedbackActivityAtRef = useRef(0);
+   const feedbackDismissedKey = user?.uid ? `ssauction-feedback-dismissed:${id}:${user.uid}` : null;
    const [isRetryingAnalysis, setIsRetryingAnalysis] = useState(false);
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -300,6 +312,90 @@ useEffect(() => {
    }).filter(Boolean), [team?.squad]);
 
    const savedPlayingXI = team?.playingXI;
+   const hasSubmittedPlayingXI = Boolean(savedPlayingXI?.submittedAt
+      && savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer);
+   const feedbackPhaseOpen = ['awaiting_xi', 'analyzing', 'analysis_failed'].includes(currentAuction?.status)
+      && currentAuction?.winnerAnalysisStatus !== 'completed'
+      && !currentAuction?.winnerRankings;
+   const feedbackStorageDismissed = feedbackDismissedKey
+      && window.localStorage.getItem(feedbackDismissedKey) === '1';
+
+   const closeFeedbackPopup = (remember = true) => {
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+      setShowFeedbackPopup(false);
+      if (remember && feedbackDismissedKey) window.localStorage.setItem(feedbackDismissedKey, '1');
+   };
+
+   const submitGameFeedback = async (automatic = false) => {
+      if (feedbackBusy || !user || !id) return;
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+      setFeedbackBusy(true);
+      setFeedbackError('');
+      try {
+         const token = await user.getIdToken();
+         const response = await fetch('/api/auction-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+               roomId: id,
+               rating: feedbackRatingRef.current || null,
+               comment: feedbackCommentRef.current.trim()
+            })
+         });
+         const result = await response.json().catch(() => ({}));
+         if (!response.ok) throw new Error(result.error || 'Could not submit feedback. Please try again.');
+         closeFeedbackPopup(true);
+      } catch (err) {
+         setFeedbackError(err?.message || 'Could not submit feedback.');
+         if (automatic) {
+            feedbackActivityAtRef.current = Date.now();
+            feedbackTimerRef.current = window.setTimeout(() => {
+               if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) void submitGameFeedback(true);
+               else closeFeedbackPopup(true);
+            }, 20000);
+         }
+      } finally {
+         setFeedbackBusy(false);
+      }
+   };
+
+   const resetFeedbackInactivityTimer = () => {
+      if (!showFeedbackPopup) return;
+      feedbackActivityAtRef.current = Date.now();
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = window.setTimeout(() => {
+         if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) {
+            void submitGameFeedback(true);
+         } else {
+            closeFeedbackPopup(true);
+         }
+      }, 20000);
+   };
+
+   useEffect(() => {
+      const shouldShow = hasSubmittedPlayingXI && feedbackPhaseOpen && !feedbackStorageDismissed;
+      if (!shouldShow) {
+         setShowFeedbackPopup(false);
+         if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+         return undefined;
+      }
+      setShowFeedbackPopup(true);
+      if (!feedbackTimerRef.current) {
+         feedbackTimerRef.current = window.setTimeout(() => {
+            if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) void submitGameFeedback(true);
+            else closeFeedbackPopup(true);
+         }, 20000);
+      }
+      return () => {
+         if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+         feedbackTimerRef.current = null;
+      };
+   }, [hasSubmittedPlayingXI, feedbackPhaseOpen, feedbackStorageDismissed, id, user?.uid]);
+
+   useEffect(() => () => {
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+   }, []);
    const xiAlreadySubmitted = xiSubmitSuccess || Boolean(
       savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer
    );
@@ -2284,6 +2380,51 @@ useEffect(() => {
          )}
          {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
          {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
+
+         {showFeedbackPopup && (
+            <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+               onPointerDown={resetFeedbackInactivityTimer} onKeyDown={resetFeedbackInactivityTimer}>
+               <motion.div initial={{ opacity: 0, scale: 0.94, y: 18 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="relative w-full max-w-md rounded-3xl border border-emerald-400/25 bg-[#0b1422] p-6 shadow-2xl sm:p-8">
+                  <button type="button" aria-label="Close feedback" onClick={() => closeFeedbackPopup(true)}
+                     className="absolute right-4 top-4 rounded-full p-2 text-gray-400 transition hover:bg-white/10 hover:text-white">
+                     <X size={20} />
+                  </button>
+                  <div className="mb-5 text-center">
+                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
+                        <Star size={24} />
+                     </div>
+                     <h2 className="text-xl font-black uppercase tracking-wide text-white">Rate This Auction</h2>
+                     <p className="mt-2 text-sm text-gray-400">How was your SS AUCTION experience?</p>
+                  </div>
+                  <div className="mb-5 flex justify-center gap-2" role="radiogroup" aria-label="Rate this game out of five stars">
+                     {[1, 2, 3, 4, 5].map((star) => (
+                        <button key={star} type="button" role="radio" aria-checked={feedbackRating === star}
+                           aria-label={`${star} out of 5 stars`}
+                           onClick={() => { setFeedbackRating(star); resetFeedbackInactivityTimer(); }}
+                           className="rounded-lg p-1 transition hover:scale-110 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                           <Star size={32} className={feedbackRating >= star ? 'fill-amber-400 text-amber-400' : 'text-gray-600'} />
+                        </button>
+                     ))}
+                  </div>
+                  <label htmlFor="auction-feedback-comment" className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-300">
+                     Suggestions or updates (optional)
+                  </label>
+                  <textarea id="auction-feedback-comment" value={feedbackComment}
+                     onChange={(event) => { setFeedbackComment(event.target.value.slice(0, 2000)); resetFeedbackInactivityTimer(); }}
+                     onFocus={resetFeedbackInactivityTimer}
+                     placeholder="Tell us what you liked or what you'd like us to improve..."
+                     rows={4} maxLength={2000}
+                     className="w-full resize-none rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-emerald-400/60" />
+                  {feedbackError && <p className="mt-2 text-xs text-red-300">{feedbackError}</p>}
+                  <button type="button" disabled={feedbackBusy} onClick={() => submitGameFeedback(false)}
+                     className="mt-5 w-full rounded-xl bg-emerald-400 px-5 py-3 text-xs font-black uppercase tracking-widest text-[#07111d] transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
+                     {feedbackBusy ? 'Submitting...' : 'Submit Feedback'}
+                  </button>
+                  <p className="mt-3 text-center text-[10px] text-gray-500">Optional feedback · Closes after 20 seconds of inactivity</p>
+               </motion.div>
+            </div>
+         )}
 
          <ConfirmDialog
             isOpen={showEndConfirm}
