@@ -3,11 +3,11 @@
  * Pure helpers for the post-auction squad evaluation workflow.
  * Kept independent of React/Firebase so the rules can be unit-tested.
  */
-export const PLAYING_XI_DEADLINE_MS = 2 * 60 * 1000;
+export const PLAYING_XI_DEADLINE_MS = 3 * 60 * 1000;
 export const RETENTION_DECISION_MS = 10 * 1000;
 export const RETENTION_CARDS_PER_FRANCHISE = 2;
 export const PLAYING_XI_SIZE = 11;
-export const IMPACT_PLAYER_COUNT = 1;
+export const IMPACT_PLAYER_COUNT = 2;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
 export const MAX_OVERSEAS_PLAYERS_IN_SELECTION = 4;
 export const MIN_ALL_ROUNDERS_IN_XI = 2;
@@ -120,7 +120,7 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     .filter((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION))[0] || null;
 
   const valid = validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog);
-  return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayer : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
+  return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayer : null, impactPlayerChasing: valid ? impactPlayer : null, impactPlayerDefending: valid ? impactPlayer : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
 }
 
 export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog = []) {
@@ -146,6 +146,33 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
   return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
     && allRoundersInXI >= MIN_ALL_ROUNDERS_IN_XI
     && bowlingOptionsInXI >= MIN_BOWLERS_IN_XI;
+}
+
+/**
+ * Validate 11 ordered starters and two Impact Player choices.
+ * The Impact slots may contain the same player, but neither may duplicate a starter.
+ */
+export function validatePlayingXIOptions(startingXI, impactPlayerChasing, impactPlayerDefending, squad, playerCatalog = []) {
+  if (!Array.isArray(startingXI) || startingXI.length !== PLAYING_XI_SIZE || !impactPlayerChasing || !impactPlayerDefending) return false;
+  const squadIds = new Set((squad || []).map(playerId).filter(Boolean));
+  const starterIds = startingXI.map(playerId);
+  const chasingId = playerId(impactPlayerChasing);
+  const defendingId = playerId(impactPlayerDefending);
+  if (!starterIds.every(Boolean) || new Set(starterIds).size !== PLAYING_XI_SIZE) return false;
+  if (!chasingId || !defendingId || starterIds.includes(chasingId) || starterIds.includes(defendingId)) return false;
+  if (![...starterIds, chasingId, defendingId].every((id) => squadIds.has(id))) return false;
+
+  const resolvedXI = startingXI.map((item) => toPlayer(item, playerCatalog)).filter(Boolean);
+  const chasing = toPlayer(impactPlayerChasing, playerCatalog);
+  const defending = toPlayer(impactPlayerDefending, playerCatalog);
+  if (resolvedXI.length !== PLAYING_XI_SIZE || !chasing || !defending) return false;
+  const uniqueSelected = [...new Map([...resolvedXI, chasing, defending].map((player) => [player.id, player])).values()];
+  const overseasCount = uniqueSelected.filter(isOverseasPlayer).length;
+  const allRounders = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
+  const bowlingOptions = resolvedXI.filter((player) => ['ar', 'bowl'].includes(normalizeRole(player))).length;
+  return overseasCount <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
+    && allRounders >= MIN_ALL_ROUNDERS_IN_XI
+    && bowlingOptions >= MIN_BOWLERS_IN_XI;
 }
 
 /** Deterministic validation of the no-ties 1..N ranking contract. */
