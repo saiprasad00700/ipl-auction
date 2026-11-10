@@ -4,6 +4,13 @@ const numeric = (value) => {
   const parsed = Number(String(value).replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
 };
+function oversToBalls(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const match = String(value).match(/^(\\d+)(?:\\.(\\d))?$/);
+  if (!match) return null;
+  const balls = Number(match[1]) * 6 + Number(match[2] || 0);
+  return Number.isFinite(balls) ? balls : null;
+}
 function playerNameFromRow(row, role) {
   const candidates = role === "batting"
     ? [row.batsman?.name, row.batter?.name, row.name, row.player?.name]
@@ -18,14 +25,14 @@ export function normalizeScorecard(scorecard, match, season, players) {
       const player = playerByName.get(normalizeName(playerNameFromRow(row, "batting")));
       if (!player) continue;
       const record = records.get(player.id) || { player_id: player.id, player_name: player.name, season, match_id: match.id, match_name: match.name, batting_innings: [], bowling_innings: [] };
-      record.batting_innings.push({ runs: numeric(row.r), balls: numeric(row.b), fours: numeric(row["4s"] ?? row.fours), sixes: numeric(row["6s"] ?? row.sixes), strike_rate: numeric(row.sr), dismissal: row.dismissal ?? row.outdec ?? null, innings: inning.inning ?? inning.team ?? null });
+      record.batting_innings.push({ runs: numeric(row.r), balls: numeric(row.b), fours: numeric(row["4s"] ?? row.fours), sixes: numeric(row["6s"] ?? row.sixes), strike_rate: numeric(row.sr), dismissal: row["dismissal-text"] ?? row.dismissal ?? row.outdec ?? null, innings: inning.inning ?? inning.team ?? null });
       records.set(player.id, record);
     }
     for (const row of Array.isArray(inning.bowling) ? inning.bowling : []) {
       const player = playerByName.get(normalizeName(playerNameFromRow(row, "bowling")));
       if (!player) continue;
       const record = records.get(player.id) || { player_id: player.id, player_name: player.name, season, match_id: match.id, match_name: match.name, batting_innings: [], bowling_innings: [] };
-      record.bowling_innings.push({ overs: numeric(row.o), maidens: numeric(row.m), runs_conceded: numeric(row.r), wickets: numeric(row.w), economy: numeric(row.eco) });
+      record.bowling_innings.push({ overs: row.o === null || row.o === undefined ? null : String(row.o), overs_balls: oversToBalls(row.o), maidens: numeric(row.m), runs_conceded: numeric(row.r), wickets: numeric(row.w), economy: numeric(row.eco) });
       records.set(player.id, record);
     }
   }
