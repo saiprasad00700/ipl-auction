@@ -59,7 +59,11 @@ const firebaseConfig = {
     appId: process.env.VITE_FIREBASE_APP_ID
 };
 
-const CRICKET_API_KEY = process.env.CRICKET_API_KEY || process.env.VITE_CRICKET_API_KEY || "7a07fdbd-f72b-4f19-a950-f9e0f774317c";
+const CRICKET_API_KEY = process.env.CRICKET_API_KEY;
+if (!CRICKET_API_KEY) {
+    console.error("[Critical] CRICKET_API_KEY is missing. Set it as a private environment variable.");
+    process.exit(1);
+}
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
