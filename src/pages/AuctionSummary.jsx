@@ -32,6 +32,7 @@ const AuctionSummary = () => {
   
   const [activeTab, setActiveTab] = useState('squads');
   const [expandedTeam, setExpandedTeam] = useState(null);
+  const [expandedFranchiseXI, setExpandedFranchiseXI] = useState(null);
   const [sharingTeamId, setSharingTeamId] = useState(null);
   const [copiedTeamId, setCopiedTeamId] = useState(null);
   const [squadViewMode, setSquadViewMode] = useState('grid');
@@ -262,11 +263,11 @@ const AuctionSummary = () => {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
-              className="max-w-5xl mx-auto space-y-4 sm:space-y-6"
+              className="max-w-5xl mx-auto space-y-3 sm:space-y-4"
             >
               <div className="mb-6">
                 <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">Franchise Playing XI's</h2>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-2">Starting XI and Impact Player for every franchise in this auction</p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mt-2">Select a franchise to view its Starting XI and Impact Player</p>
               </div>
               {activeTeams.filter((teamDoc) => teamDoc?.teamId && teamDoc.teamId !== 'NONE').length ? (
                 activeTeams.filter((teamDoc) => teamDoc?.teamId && teamDoc.teamId !== 'NONE').map((teamDoc) => {
@@ -274,6 +275,7 @@ const AuctionSummary = () => {
                   const savedXI = teamDoc.playingXI || {};
                   const starters = Array.isArray(savedXI.startingXI) ? savedXI.startingXI : [];
                   const impactEntry = savedXI.impactPlayer;
+                  const isExpanded = expandedFranchiseXI === teamDoc.teamId;
                   const resolveXIPlayer = (entry) => {
                     const playerId = typeof entry === 'string' ? entry : entry?.id;
                     return (playerId ? IPL_PLAYERS.find((player) => player.id === playerId) : null) || (typeof entry === 'object' ? entry : null);
@@ -282,46 +284,67 @@ const AuctionSummary = () => {
                   const impactPlayer = resolveXIPlayer(impactEntry);
                   const hasSavedXI = startingPlayers.length === 11 && Boolean(impactPlayer);
                   return (
-                    <div key={teamDoc.id || teamDoc.teamId} className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6">
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div key={teamDoc.id || teamDoc.teamId} className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedFranchiseXI(isExpanded ? null : teamDoc.teamId)}
+                        aria-expanded={isExpanded}
+                        className="w-full flex items-center justify-between gap-3 p-4 sm:p-5 text-left hover:bg-white/[0.04] transition-colors"
+                      >
                         <div className="flex items-center gap-3 min-w-0">
-                          {teamInfo?.logo && <img src={teamInfo.logo} alt="" className="w-10 h-10 object-contain" />}
+                          {teamInfo?.logo && <img src={teamInfo.logo} alt="" className="w-11 h-11 object-contain shrink-0" />}
                           <div className="min-w-0">
                             <h3 className="font-black uppercase truncate">{teamInfo?.name || teamDoc.teamName || teamDoc.teamId}</h3>
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{teamDoc.disqualified ? 'Disqualified' : 'Franchise squad'}</p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{teamDoc.disqualified ? 'Disqualified' : 'View Playing XI'}</p>
                           </div>
                         </div>
-                        {savedXI.autoSelected && (
-                          <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">
-                            Automatically selected
-                          </span>
-                        )}
-                      </div>
-                      {hasSavedXI ? (
-                        <>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {startingPlayers.map((player, index) => (
-                              <div key={player.id || index} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-                                <span className="w-6 h-6 shrink-0 rounded-lg bg-emerald-400/10 text-emerald-300 flex items-center justify-center text-[10px] font-black">{index + 1}</span>
-                                {player.image && <img src={player.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold truncate">{player.name || 'Player'}</p>
-                                  <p className="text-[9px] text-gray-500 uppercase">{player.role || 'Player'}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/[0.07] p-3 flex items-center gap-3">
-                            {impactPlayer.image && <img src={impactPlayer.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
-                            <div>
-                              <p className="text-[9px] font-black uppercase tracking-wider text-blue-300">Impact Player</p>
-                              <p className="text-sm font-bold">{impactPlayer.name || 'Player'}</p>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {savedXI.autoSelected && (
+                            <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-amber-200">
+                              Automatically selected
+                            </span>
+                          )}
+                          <ChevronDown size={18} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t border-white/10 p-4 sm:p-5">
+                              {hasSavedXI ? (
+                                <>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {startingPlayers.map((player, index) => (
+                                      <div key={player.id || index} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                                        <span className="w-6 h-6 shrink-0 rounded-lg bg-emerald-400/10 text-emerald-300 flex items-center justify-center text-[10px] font-black">{index + 1}</span>
+                                        {player.image && <img src={player.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-bold truncate">{player.name || 'Player'}</p>
+                                          <p className="text-[9px] text-gray-500 uppercase">{player.role || 'Player'}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/[0.07] p-3 flex items-center gap-3">
+                                    {impactPlayer.image && <img src={impactPlayer.image} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/5" />}
+                                    <div>
+                                      <p className="text-[9px] font-black uppercase tracking-wider text-blue-300">Impact Player</p>
+                                      <p className="text-sm font-bold">{impactPlayer.name || 'Player'}</p>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-sm text-gray-400">Playing XI has not been saved for this franchise.</p>
+                              )}
                             </div>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-sm text-gray-400">Playing XI has not been saved for this franchise.</p>
-                      )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   );
                 })
@@ -331,7 +354,7 @@ const AuctionSummary = () => {
                 </div>
               )}
             </motion.section>
-          ) : activeTab === 'leaderboard' ? (
+           : activeTab === 'leaderboard' ? (
             <motion.section
               key="leaderboard"
               initial={{ opacity: 0, scale: 0.95 }}
