@@ -8,6 +8,7 @@ on:
       - feature/winner-calculation-retention-cards
       - cinematic-3d-rebuild
       - feature/ss-auction-insights-phase-1
+      - feature/cricketdata-player-stats
   pull_request:
     branches:
       - main
