@@ -109,7 +109,6 @@ const AuctionRoom = () => {
    const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
    const [feedbackBusy, setFeedbackBusy] = useState(false);
    const [feedbackError, setFeedbackError] = useState('');
-   const [feedbackTouched, setFeedbackTouched] = useState(false);
    const feedbackTimerRef = useRef(null);
    const feedbackRatingRef = useRef(0);
    const feedbackCommentRef = useRef('');
@@ -361,7 +360,6 @@ useEffect(() => {
 
    const resetFeedbackInactivityTimer = () => {
       if (!showFeedbackPopup) return;
-      setFeedbackTouched(true);
       feedbackActivityAtRef.current = Date.now();
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = window.setTimeout(() => {
@@ -383,7 +381,7 @@ useEffect(() => {
       setShowFeedbackPopup(true);
       if (!feedbackTimerRef.current) {
          feedbackTimerRef.current = window.setTimeout(() => {
-            if (feedbackRating > 0 || feedbackComment.trim()) void submitGameFeedback(true);
+            if (feedbackRatingRef.current > 0 || feedbackCommentRef.current.trim()) void submitGameFeedback(true);
             else closeFeedbackPopup(true);
          }, 20000);
       }
