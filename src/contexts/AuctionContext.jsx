@@ -1932,6 +1932,9 @@ export const AuctionProvider = ({ children }) => {
     const teamSnap = await get(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`));
     if (!teamSnap.exists()) throw new Error('Your franchise squad was not found');
     const teamData = teamSnap.val();
+    if (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || (roomData.players || []).some((player) => player?.id === user.uid && player.isBot)) {
+      throw new Error('Bots cannot submit a Playing XI. The site selects their best eligible XI automatically.');
+    }
     if (teamData.disqualified) {
       throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
     }
@@ -1973,9 +1976,45 @@ export const AuctionProvider = ({ children }) => {
 
     // Classic/Sprint analyze the full squad immediately; Mega retains the XI window.
     const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(roomData.auctionType);
-    const readinessSnap = await get(ref(rtdb, `auctions/${roomId}/teams`));
-    const readinessTeams = Object.values(readinessSnap.val() || {})
+    const readinessRef = ref(rtdb, `auctions/${roomId}/teams`);
+    const readinessSnap = await get(readinessRef);
+    const readinessData = readinessSnap.val() || {};
+    const readinessTeams = Object.values(readinessData)
       .filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
+
+    // Bots never submit a Playing XI. For Mega auctions, the host selects and
+    // persists their best eligible XI from the squad using the site's selector.
+    // Do this before checking whether all human franchises have submitted.
+    if (!usesSquadBalanceAnalysis) {
+      const roomPlayers = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
+      const botIds = new Set(roomPlayers.filter((player) => player?.isBot || /^(bot[_-]|auctionbot[_-])/i.test(String(player?.id || ''))).map((player) => player.id));
+      for (const [teamKey, botTeam] of Object.entries(readinessData)) {
+        if (!botTeam?.teamId || botTeam.teamId === 'NONE' || botTeam.disqualified) continue;
+        const botUserId = String(botTeam.userId || '').trim();
+        if (!botIds.has(botUserId) && !/^(bot[_-]|auctionbot[_-])/i.test(botUserId)) continue;
+        const saved = botTeam.playingXI;
+        const alreadyValid = saved?.startingXI?.length === 11 && Boolean(saved?.impactPlayer)
+          && validatePlayingXI(saved.startingXI, saved.impactPlayer, botTeam.squad || [], IPL_PLAYERS);
+        if (alreadyValid) continue;
+        const selection = autoSelectBestXI(botTeam.squad || [], IPL_PLAYERS);
+        if (!selection.startingXI?.length || !selection.impactPlayer
+          || !validatePlayingXI(selection.startingXI, selection.impactPlayer, botTeam.squad || [], IPL_PLAYERS)) {
+          throw new Error(`Could not automatically select an eligible Playing XI for bot franchise ${botTeam.teamName || botTeam.teamId}.`);
+        }
+        await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${teamKey}`), {
+          playingXI: {
+            startingXI: selection.startingXI,
+            impactPlayer: selection.impactPlayer,
+            autoSelected: true,
+            selectionStatus: 'bot_auto_selected',
+            submittedAt: getSyncedTime(),
+            autoSelectedAt: getSyncedTime()
+          }
+        });
+        botTeam.playingXI = { ...selection, autoSelected: true, selectionStatus: 'bot_auto_selected', submittedAt: getSyncedTime() };
+      }
+    }
+
     const allSubmitted = readinessTeams.length >= 2 && readinessTeams.every((t) =>
       t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
     );
