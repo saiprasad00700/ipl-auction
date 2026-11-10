@@ -984,7 +984,7 @@ export const AuctionProvider = ({ children }) => {
         userId: 'system', userName: 'System',
         text: usesSquadBalanceAnalysis
           ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
-          : 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+          : 'Bidding has ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 3 minutes.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
       return;
@@ -2105,7 +2105,7 @@ export const AuctionProvider = ({ children }) => {
           franchiseId: t.teamId,
           franchiseName: t.teamName || t.teamId,
           submittedXI: [
-            ...selection.startingXI.map(toFullPlayer),
+            ...selection.startingXI.map((player, index) => ({ ...toFullPlayer(player), battingOrder: index + 1 })),
             { ...toFullPlayer(selectedChasing), isImpactPlayer: true, impactScenario: 'chasing' },
             { ...toFullPlayer(selectedDefending), isImpactPlayer: true, impactScenario: 'defending' }
           ],
