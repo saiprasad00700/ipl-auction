@@ -47,7 +47,7 @@ import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
 import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount } from '../lib/auctionRules';
-import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI, validatePlayingXIOptions } from '../lib/auctionWinnerRules';
+import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXIOptions } from '../lib/auctionWinnerRules';
 
 
 const TEAMS = [
@@ -1871,7 +1871,7 @@ export const AuctionProvider = ({ children }) => {
     });
   }, [getSyncedTime, user, currentAuction]);
 
-  // End the bidding phase and open the shared two-minute Playing XI window.
+  // End the bidding phase and open the shared three-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
     const roomRef = ref(rtdb, `auctions/${roomId}/room`);
@@ -1917,7 +1917,7 @@ export const AuctionProvider = ({ children }) => {
       userId: 'system', userName: 'System',
       text: usesSquadBalanceAnalysis
         ? 'Auction ended. AI is now analyzing every franchise squad for overall team balance.'
-        : `Auction ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.${ruleMessage}`,
+        : `Auction ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 3 minutes.${ruleMessage}`,
       type: 'log', timestamp: serverTimestampRtdb()
     });
   }, [user, currentAuction, getSyncedTime]);
