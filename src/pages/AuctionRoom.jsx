@@ -328,6 +328,8 @@ useEffect(() => {
 
    const submitGameFeedback = async (automatic = false) => {
       if (feedbackBusy || !user || !id) return;
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
       setFeedbackBusy(true);
       setFeedbackError('');
       try {
