@@ -2348,38 +2348,119 @@ useEffect(() => {
                         })()}
                      </div>
                   ) : <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.filter(Boolean).length}/11 · Impact choices: {Number(Boolean(selectedImpactChasingId)) + Number(Boolean(selectedImpactDefendingId))}/2 · Unique overseas: {mySquadPlayers.filter((p) => [...selectedXIIds, selectedImpactChasingId, selectedImpactDefendingId].includes(p.id)).filter((p) => p.country && p.country !== 'IND').length}/4 · Deadline: 3 minutes</p>}
-                  <div className="space-y-3 mb-5">
+                  <div className="space-y-5 mb-5">
                      {[
-                        { label: 'Openers', slots: [0, 1, 2] },
-                        { label: 'Middle Order Batters / Finishers', slots: [3, 4, 5, 6] },
-                        { label: 'Finishers / Bowlers', slots: [7, 8, 9, 10] }
-                     ].map((group) => <div key={group.label}><p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-2">{group.label}</p><div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{group.slots.map((slot) => {
-                        const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
-                        const active = activeXISlot === slot;
-                        return <button key={slot} type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI} onClick={() => setActiveXISlot(slot)} className={`min-h-[76px] rounded-xl border p-2 text-left transition-all ${active ? 'border-emerald-300 bg-emerald-400/15' : 'border-white/10 bg-white/[0.03]'}`}><span className="block text-[9px] font-black text-gray-500 uppercase">Slot {slot + 1}</span><span className="block text-xs font-bold mt-1 truncate">{player?.name || 'Select player'}</span><span className="block text-[9px] text-emerald-300 mt-1">{active ? 'SELECTED SLOT' : 'Tap to replace'}</span></button>;
-                     })}</div></div>)}
-                     <div><p className="text-[10px] font-black uppercase tracking-widest text-blue-300 mb-2">Impact Players</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[
-                        { label: 'Impact Player (Chasing)', value: selectedImpactChasingId },
-                        { label: 'Impact Player (Defending)', value: selectedImpactDefendingId }
-                     ].map((slot) => { const player = mySquadPlayers.find((p) => p.id === slot.value); return <button key={slot.label} type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI} onClick={() => setActiveXISlot(slot.label)} className={`min-h-[76px] rounded-xl border p-3 text-left ${activeXISlot === slot.label ? 'border-blue-300 bg-blue-400/15' : 'border-white/10 bg-white/[0.03]'}`}><span className="block text-[9px] font-black text-blue-300 uppercase">{slot.label}</span><span className="block text-xs font-bold mt-2">{player?.name || 'Select player'}</span></button>; })}</div></div>
+                        { label: 'Openers', slots: [0, 1, 2], accent: 'emerald' },
+                        { label: 'Middle Order Batters', slots: [3, 4, 5, 6], accent: 'emerald' },
+                        { label: 'Finishers / Bowlers', slots: [7, 8, 9, 10], accent: 'emerald' }
+                     ].map((group) => (
+                        <section key={group.label}>
+                           <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-emerald-300 mb-3">{group.label}</h3>
+                           <div className={`grid gap-2 sm:gap-3 ${group.slots.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                              {group.slots.map((slot) => {
+                                 const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
+                                 const active = activeXISlot === slot;
+                                 return (
+                                    <div key={slot} className="min-w-0">
+                                       <div className="text-[10px] font-black tracking-wider text-gray-500 mb-1.5">SLOT {slot + 1}</div>
+                                       <button
+                                          type="button"
+                                          aria-label={player ? `Slot ${slot + 1}: ${player.name}. Tap to change player` : `Choose player for slot ${slot + 1}`}
+                                          disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
+                                          onClick={() => setActiveXISlot(slot)}
+                                          className={`relative block w-full aspect-[4/3] sm:aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                       >
+                                          {player ? (
+                                             <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
+                                          ) : (
+                                             <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/25" />
+                                             </span>
+                                          )}
+                                          {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-emerald-300" />}
+                                       </button>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </section>
+                     ))}
+                     <section>
+                        <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-blue-300 mb-3">Impact Players</h3>
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                           {[
+                              { label: 'Impact Player (Chasing)', value: selectedImpactChasingId, key: 'chasing' },
+                              { label: 'Impact Player (Defending)', value: selectedImpactDefendingId, key: 'defending' }
+                           ].map((slot) => {
+                              const player = mySquadPlayers.find((p) => p.id === slot.value);
+                              const active = activeXISlot === slot.label;
+                              return (
+                                 <div key={slot.key} className="min-w-0">
+                                    <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-200 mb-1.5">{slot.label}</div>
+                                    <button
+                                       type="button"
+                                       aria-label={player ? `${slot.label}: ${player.name}. Tap to change player` : `Choose ${slot.label}`}
+                                       disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
+                                       onClick={() => setActiveXISlot(slot.label)}
+                                       className={`relative block w-full aspect-[4/3] sm:aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                    >
+                                       {player ? (
+                                          <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
+                                       ) : (
+                                          <span className="absolute inset-0 flex items-center justify-center">
+                                             <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/25" />
+                                          </span>
+                                       )}
+                                       {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-blue-300" />}
+                                    </button>
+                                 </div>
+                              );
+                           })}
+                        </div>
+                     </section>
                   </div>
-                  <div className="rounded-2xl border border-white/10 p-3 sm:p-4"><p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Your squad — assign to selected slot</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                     {mySquadPlayers.map((player) => {
-                        const starterSlots = selectedXIIds.map((id, index) => id === player.id ? index : -1).filter((index) => index >= 0);
-                        const usedAsStarter = starterSlots.length > 0;
-                        const isChasing = selectedImpactChasingId === player.id;
-                        const isDefending = selectedImpactDefendingId === player.id;
-                        const assignToSlot = () => {
-                           if (typeof activeXISlot === 'number') setSelectedXIIds((prev) => { const next = [...prev]; const existingIndex = next.indexOf(player.id); if (existingIndex >= 0 && existingIndex !== activeXISlot) next[existingIndex] = ''; next[activeXISlot] = player.id; return next; });
-                           else if (activeXISlot === 'Impact Player (Chasing)') setSelectedImpactChasingId(player.id);
-                           else if (activeXISlot === 'Impact Player (Defending)') setSelectedImpactDefendingId(player.id);
-                        };
-                        const disableForStarter = typeof activeXISlot === 'number' && usedAsStarter && !starterSlots.includes(activeXISlot);
-                        const disableImpactInXI = typeof activeXISlot === 'number' && (isChasing || isDefending);
-                        const disableImpactForStarter = typeof activeXISlot !== 'number' && usedAsStarter;
-                        return <div key={player.id} className={`flex items-center gap-2 p-2 rounded-xl border ${usedAsStarter || isChasing || isDefending ? 'border-emerald-300/30 bg-emerald-400/[0.07]' : 'border-white/10 bg-white/[0.02]'}`}><img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" /><div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}{isChasing ? ' · CHASING IMPACT' : ''}{isDefending ? ' · DEFENDING IMPACT' : ''}</p></div><button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || disableForStarter || disableImpactInXI || disableImpactForStarter} onClick={assignToSlot} className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-emerald-400 text-[#04110d] disabled:opacity-30">{typeof activeXISlot === 'number' ? (selectedXIIds[activeXISlot] === player.id ? 'Assigned ✓' : 'Assign') : 'Select'}</button></div>;
-                     })}
-                  </div>{mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available. The system will attempt automatic selection at the deadline.</p>}</div>
+                  <div className="rounded-2xl border border-white/10 p-3 sm:p-4">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Your squad — assign to selected slot</p>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {mySquadPlayers.map((player) => {
+                           const starterSlots = selectedXIIds.map((id, index) => id === player.id ? index : -1).filter((index) => index >= 0);
+                           const usedAsStarter = starterSlots.length > 0;
+                           const isChasing = selectedImpactChasingId === player.id;
+                           const isDefending = selectedImpactDefendingId === player.id;
+                           const assignToSlot = () => {
+                              if (typeof activeXISlot === 'number') {
+                                 setSelectedXIIds((prev) => {
+                                    const next = [...prev];
+                                    const existingIndex = next.indexOf(player.id);
+                                    if (existingIndex >= 0 && existingIndex !== activeXISlot) next[existingIndex] = '';
+                                    next[activeXISlot] = player.id;
+                                    return next;
+                                 });
+                              } else if (activeXISlot === 'Impact Player (Chasing)') {
+                                 setSelectedImpactChasingId(player.id);
+                              } else if (activeXISlot === 'Impact Player (Defending)') {
+                                 setSelectedImpactDefendingId(player.id);
+                              }
+                           };
+                           const disableForStarter = typeof activeXISlot === 'number' && usedAsStarter && !starterSlots.includes(activeXISlot);
+                           const disableImpactInXI = typeof activeXISlot === 'number' && (isChasing || isDefending);
+                           const disableImpactForStarter = typeof activeXISlot !== 'number' && usedAsStarter;
+                           return (
+                              <div key={player.id} className={`flex items-center gap-2 p-2 rounded-xl border ${usedAsStarter || isChasing || isDefending ? 'border-emerald-300/30 bg-emerald-400/[0.07]' : 'border-white/10 bg-white/[0.02]'}`}>
+                                 <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
+                                 <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold truncate">{player.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase">{player.role}{isChasing ? ' · CHASING IMPACT' : ''}{isDefending ? ' · DEFENDING IMPACT' : ''}</p>
+                                 </div>
+                                 <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || disableForStarter || disableImpactInXI || disableImpactForStarter} onClick={assignToSlot} className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-emerald-400 text-[#04110d] disabled:opacity-30">
+                                    {typeof activeXISlot === 'number' ? (selectedXIIds[activeXISlot] === player.id ? 'Assigned ✓' : 'Assign') : 'Select'}
+                                 </button>
+                              </div>
+                           );
+                        })}
+                     </div>
+                     {mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available. The system will attempt automatic selection at the deadline.</p>}
+                  </div>
                   {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5"><p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad. The same player may fill both Impact Player slots, but cannot appear in the starting XI.</p><button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.filter(Boolean).length !== 11 || !selectedImpactChasingId || !selectedImpactDefendingId || selectedXIIds.includes(selectedImpactChasingId) || selectedXIIds.includes(selectedImpactDefendingId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button></div>
                </div>
