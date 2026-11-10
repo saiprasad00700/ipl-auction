@@ -99,16 +99,16 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
     }
     return roleValue(b) - roleValue(a) || String(a.name || a.id).localeCompare(String(b.name || b.id));
   });
-  // Reserve one overseas slot for the Impact Player. The overseas limit
-  // applies to the 11 starters plus the Impact Player, not just the XI.
-  const maxOverseasStarters = Math.max(0, MAX_OVERSEAS_PLAYERS_IN_SELECTION - 1);
+  // The starting XI may use all four overseas slots. The Impact Player
+  // is selected separately, preferring an Indian player when available so
+  // the combined 12-player selection never exceeds four overseas players.
   const addBest = (predicate, count) => {
     let needed = count;
     for (const candidate of ordered(unique.filter((p) =>
       !selected.some((s) => s.id === p.id) && predicate(p)
     ))) {
       if (needed <= 0 || selected.length >= PLAYING_XI_SIZE) break;
-      if (isOverseasPlayer(candidate) && overseasCount(selected) >= maxOverseasStarters) continue;
+      if (isOverseasPlayer(candidate) && overseasCount(selected) >= MAX_OVERSEAS_PLAYERS_IN_XI) continue;
       selected.push(candidate);
       needed -= 1;
     }
@@ -134,9 +134,13 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   addBest(() => true, PLAYING_XI_SIZE - selected.length);
 
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
-  const impactPlayer = ordered(unique
+  const impactCandidates = unique
     .filter((p) => !startingXI.some((s) => s.id === p.id))
-    .filter((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION))[0] || null;
+    .filter((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION);
+  const impactPlayer = [
+    ...ordered(impactCandidates.filter((player) => !isOverseasPlayer(player))),
+    ...ordered(impactCandidates.filter(isOverseasPlayer))
+  ][0] || null;
 
   const valid = validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog);
   return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayer : null, impactPlayerChasing: valid ? impactPlayer : null, impactPlayerDefending: valid ? impactPlayer : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
