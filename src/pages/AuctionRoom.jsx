@@ -99,8 +99,10 @@ const AuctionRoom = () => {
    const [lastPauseRequestAt, setLastPauseRequestAt] = useState(0);
    const [pauseRequestClock, setPauseRequestClock] = useState(Date.now());
    const [isEnding, setIsEnding] = useState(false);
-   const [selectedXIIds, setSelectedXIIds] = useState([]);
-   const [selectedImpactId, setSelectedImpactId] = useState('');
+   const [selectedXIIds, setSelectedXIIds] = useState(Array(11).fill(''));
+   const [activeXISlot, setActiveXISlot] = useState(0);
+   const [selectedImpactChasingId, setSelectedImpactChasingId] = useState('');
+   const [selectedImpactDefendingId, setSelectedImpactDefendingId] = useState('');
    const [isSubmittingXI, setIsSubmittingXI] = useState(false);
    const [xiSubmitError, setXiSubmitError] = useState('');
    const [xiSubmitSuccess, setXiSubmitSuccess] = useState(false);
@@ -320,7 +322,7 @@ useEffect(() => {
 
    const savedPlayingXI = team?.playingXI;
    const hasSubmittedPlayingXI = Boolean(savedPlayingXI?.submittedAt
-      && savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer);
+      && savedPlayingXI?.startingXI?.length === 11 && (savedPlayingXI?.impactPlayerChasing || savedPlayingXI?.impactPlayer) && (savedPlayingXI?.impactPlayerDefending || savedPlayingXI?.impactPlayer));
    const currentRoomPlayer = (Array.isArray(currentAuction?.players) ? currentAuction.players : Object.values(currentAuction?.players || {}))
       .find((player) => player?.id === user?.uid);
    const isCurrentUserBot = /^(bot[_-]|auctionbot[_-])/i.test(String(user?.uid || '')) || Boolean(currentRoomPlayer?.isBot);
@@ -407,14 +409,17 @@ useEffect(() => {
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
    }, []);
    const xiAlreadySubmitted = xiSubmitSuccess || Boolean(
-      savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer
+      savedPlayingXI?.startingXI?.length === 11 && (savedPlayingXI?.impactPlayerChasing || savedPlayingXI?.impactPlayer) && (savedPlayingXI?.impactPlayerDefending || savedPlayingXI?.impactPlayer)
    );
 
    // Restore a previously submitted XI after a refresh/rejoin.
    useEffect(() => {
       if (!savedPlayingXI?.submittedAt) return;
-      setSelectedXIIds((savedPlayingXI.startingXI || []).map((player) => typeof player === 'string' ? player : player?.id).filter(Boolean));
-      setSelectedImpactId(typeof savedPlayingXI.impactPlayer === 'string' ? savedPlayingXI.impactPlayer : savedPlayingXI.impactPlayer?.id || '');
+      setSelectedXIIds((savedPlayingXI.startingXI || []).map((player) => typeof player === 'string' ? player : player?.id).filter(Boolean).concat(Array(Math.max(0, 11 - (savedPlayingXI.startingXI || []).length)).fill('')).slice(0, 11));
+      const chasing = savedPlayingXI.impactPlayerChasing || savedPlayingXI.impactPlayer;
+      const defending = savedPlayingXI.impactPlayerDefending || savedPlayingXI.impactPlayer;
+      setSelectedImpactChasingId(typeof chasing === 'string' ? chasing : chasing?.id || '');
+      setSelectedImpactDefendingId(typeof defending === 'string' ? defending : defending?.id || '');
       setXiSubmitSuccess(true);
    }, [savedPlayingXI?.submittedAt]);
 
@@ -423,8 +428,9 @@ useEffect(() => {
       setIsSubmittingXI(true);
       try {
          const startingXI = selectedXIIds.map((playerId) => mySquadPlayers.find((p) => p.id === playerId)).filter(Boolean);
-         const impactPlayer = mySquadPlayers.find((p) => p.id === selectedImpactId);
-         await submitPlayingXI(id, startingXI, impactPlayer);
+         const impactPlayerChasing = mySquadPlayers.find((p) => p.id === selectedImpactChasingId);
+         const impactPlayerDefending = mySquadPlayers.find((p) => p.id === selectedImpactDefendingId);
+         await submitPlayingXI(id, startingXI, impactPlayerChasing, impactPlayerDefending);
          setXiSubmitSuccess(true);
       } catch (err) {
          setXiSubmitError(err?.message || 'Could not submit your Playing XI.');
@@ -2326,66 +2332,55 @@ useEffect(() => {
 
          {currentAuction?.status === 'awaiting_xi' && !['sprint5', 'sprint11'].includes(currentAuction?.auctionType) && (
             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
-               <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#0b1422] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+               <div className="w-full max-w-4xl max-h-[94vh] overflow-y-auto bg-[#0b1422] border border-white/10 rounded-3xl p-4 sm:p-7 shadow-2xl">
                   <p className="text-emerald-300 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
                   <h2 className="text-2xl sm:text-3xl font-black uppercase mt-1">Submit Playing XI</h2>
-                  <p className="text-sm text-gray-400 mt-2 mb-4">Choose 11 starting players and one different Impact Player from your squad.</p>
-                  {team?.disqualified && (
-                     <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200">
-                        <p className="font-black uppercase text-sm">Franchise disqualified</p>
-                        <p className="text-xs mt-1">{team.disqualificationReason || 'Your franchise bought fewer than the required 18 players.'} You cannot submit a Playing XI or qualify for the rankings.</p>
-                     </div>
-                  )}
+                  <p className="text-sm text-gray-400 mt-2 mb-4">Select players in the exact order you want Gemini to evaluate. Choose a slot first, then assign a player from your squad.</p>
+                  {team?.disqualified && <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200"><p className="font-black uppercase text-sm">Franchise disqualified</p><p className="text-xs mt-1">{team.disqualificationReason || 'Your franchise bought fewer than the required 18 players.'} You cannot submit a Playing XI or qualify for the rankings.</p></div>}
                   {xiAlreadySubmitted ? (
                      <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">
                         <p className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> Waiting for other franchises to submit</p>
-                        <p className="text-xs mt-1 text-emerald-200/80">Your 11 starters and Impact Player are saved. Analysis starts as soon as everyone submits, or when the two-minute deadline expires.</p>
+                        <p className="text-xs mt-1 text-emerald-200/80">Your ordered 11 starters and both Impact Player choices are saved. Analysis starts when all franchises submit, or when the three-minute deadline expires.</p>
                         {(() => {
                            const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
-                           const missingTeams = participatingTeams.filter((t) =>
-                              !(t.playingXI?.startingXI?.length === 11 && t.playingXI?.impactPlayer)
-                           );
-                           return (
-                              <div className="mt-3 border-t border-emerald-500/20 pt-3">
-                                 <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80 mb-2">
-                                    {missingTeams.length ? `Not submitted yet (${missingTeams.length})` : 'All franchises submitted'}
-                                 </p>
-                                 {missingTeams.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                       {missingTeams.map((missingTeam) => (
-                                          <span key={missingTeam.id || missingTeam.teamId} className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white">
-                                             {missingTeam.teamName || missingTeam.teamId}
-                                          </span>
-                                       ))}
-                                    </div>
-                                 ) : (
-                                    <p className="text-xs text-emerald-200">All submitted. Starting AI analysis…</p>
-                                 )}
-                              </div>
-                           );
+                           const missingTeams = participatingTeams.filter((t) => !(t.playingXI?.startingXI?.length === 11 && (t.playingXI?.impactPlayerChasing || t.playingXI?.impactPlayer) && (t.playingXI?.impactPlayerDefending || t.playingXI?.impactPlayer)));
+                           return <div className="mt-3 border-t border-emerald-500/20 pt-3"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80 mb-2">{missingTeams.length ? `Not submitted yet (${missingTeams.length})` : 'All franchises submitted'}</p>{missingTeams.length ? <div className="flex flex-wrap gap-2">{missingTeams.map((t) => <span key={t.id || t.teamId} className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white">{t.teamName || t.teamId}</span>)}</div> : <p className="text-xs text-emerald-200">All submitted. Starting AI analysis…</p>}</div>;
                         })()}
                      </div>
-                  ) : (
-                     <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.length}/11 · Impact Player: {selectedImpactId ? 'selected' : 'not selected'} · Overseas: {mySquadPlayers.filter((p) => selectedXIIds.includes(p.id) || selectedImpactId === p.id).filter((p) => p.country && p.country !== 'IND').length}/4 (including Impact Player) · Deadline: 2 minutes</p>
-                  )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  ) : <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.filter(Boolean).length}/11 · Impact choices: {Number(Boolean(selectedImpactChasingId)) + Number(Boolean(selectedImpactDefendingId))}/2 · Unique overseas: {mySquadPlayers.filter((p) => [...selectedXIIds, selectedImpactChasingId, selectedImpactDefendingId].includes(p.id)).filter((p) => p.country && p.country !== 'IND').length}/4 · Deadline: 3 minutes</p>}
+                  <div className="space-y-3 mb-5">
+                     {[
+                        { label: 'Openers', slots: [0, 1, 2] },
+                        { label: 'Middle Order Batters / Finishers', slots: [3, 4, 5, 6] },
+                        { label: 'Finishers / Bowlers', slots: [7, 8, 9, 10] }
+                     ].map((group) => <div key={group.label}><p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-2">{group.label}</p><div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{group.slots.map((slot) => {
+                        const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
+                        const active = activeXISlot === slot;
+                        return <button key={slot} type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI} onClick={() => setActiveXISlot(slot)} className={`min-h-[76px] rounded-xl border p-2 text-left transition-all ${active ? 'border-emerald-300 bg-emerald-400/15' : 'border-white/10 bg-white/[0.03]'}`}><span className="block text-[9px] font-black text-gray-500 uppercase">Slot {slot + 1}</span><span className="block text-xs font-bold mt-1 truncate">{player?.name || 'Select player'}</span><span className="block text-[9px] text-emerald-300 mt-1">{active ? 'SELECTED SLOT' : 'Tap to replace'}</span></button>;
+                     })}</div></div>)}
+                     <div><p className="text-[10px] font-black uppercase tracking-widest text-blue-300 mb-2">Impact Players</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[
+                        { label: 'Impact Player (Chasing)', value: selectedImpactChasingId },
+                        { label: 'Impact Player (Defending)', value: selectedImpactDefendingId }
+                     ].map((slot) => { const player = mySquadPlayers.find((p) => p.id === slot.value); return <button key={slot.label} type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI} onClick={() => setActiveXISlot(slot.label)} className={`min-h-[76px] rounded-xl border p-3 text-left ${activeXISlot === slot.label ? 'border-blue-300 bg-blue-400/15' : 'border-white/10 bg-white/[0.03]'}`}><span className="block text-[9px] font-black text-blue-300 uppercase">{slot.label}</span><span className="block text-xs font-bold mt-2">{player?.name || 'Select player'}</span></button>; })}</div></div>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 p-3 sm:p-4"><p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Your squad — assign to selected slot</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                      {mySquadPlayers.map((player) => {
-                        const isStarter = selectedXIIds.includes(player.id);
-                        const isImpact = selectedImpactId === player.id;
-                        return <div key={player.id} className={`flex items-center gap-2 p-3 rounded-xl border ${isStarter || isImpact ? 'border-emerald-300/40 bg-emerald-400/10' : 'border-white/10 bg-white/[0.02]'}`}>
-                           <img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" />
-                           <div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}</p></div>
-                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || (!isStarter && selectedXIIds.length >= 11) || isImpact} onClick={() => setSelectedXIIds((prev) => isStarter ? prev.filter((x) => x !== player.id) : [...prev, player.id])} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isStarter ? 'bg-emerald-400 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isStarter ? 'Starter ✓' : 'Starter'}</button>
-                           <button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || isStarter} onClick={() => setSelectedImpactId(isImpact ? '' : player.id)} className={`px-2 py-2 rounded-lg text-[9px] font-black uppercase ${isImpact ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-300'} disabled:opacity-40`}>{isImpact ? 'Impact ✓' : 'Impact'}</button>
-                        </div>;
+                        const starterSlots = selectedXIIds.map((id, index) => id === player.id ? index : -1).filter((index) => index >= 0);
+                        const usedAsStarter = starterSlots.length > 0;
+                        const isChasing = selectedImpactChasingId === player.id;
+                        const isDefending = selectedImpactDefendingId === player.id;
+                        const assignToSlot = () => {
+                           if (typeof activeXISlot === 'number') setSelectedXIIds((prev) => { const next = [...prev]; const existingIndex = next.indexOf(player.id); if (existingIndex >= 0 && existingIndex !== activeXISlot) next[existingIndex] = ''; next[activeXISlot] = player.id; return next; });
+                           else if (activeXISlot === 'Impact Player (Chasing)') setSelectedImpactChasingId(player.id);
+                           else if (activeXISlot === 'Impact Player (Defending)') setSelectedImpactDefendingId(player.id);
+                        };
+                        const disableForStarter = typeof activeXISlot === 'number' && usedAsStarter && !starterSlots.includes(activeXISlot);
+                        const disableImpactInXI = typeof activeXISlot === 'number' && (isChasing || isDefending);
+                        return <div key={player.id} className={`flex items-center gap-2 p-2 rounded-xl border ${usedAsStarter || isChasing || isDefending ? 'border-emerald-300/30 bg-emerald-400/[0.07]' : 'border-white/10 bg-white/[0.02]'}`}><img src={player.image} alt="" className="w-9 h-9 rounded-lg object-cover bg-white/5" /><div className="min-w-0 flex-1"><p className="text-xs font-bold truncate">{player.name}</p><p className="text-[10px] text-gray-500 uppercase">{player.role}{isChasing ? ' · CHASING IMPACT' : ''}{isDefending ? ' · DEFENDING IMPACT' : ''}</p></div><button type="button" disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || disableForStarter || disableImpactInXI} onClick={assignToSlot} className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-emerald-400 text-[#04110d] disabled:opacity-30">{typeof activeXISlot === 'number' ? (selectedXIIds[activeXISlot] === player.id ? 'Assigned ✓' : 'Assign') : 'Select'}</button></div>;
                      })}
-                  </div>
-                  {mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available in this view. The system will attempt automatic selection at the deadline.</p>}
+                  </div>{mySquadPlayers.length === 0 && <p className="text-sm text-amber-300 mt-4">No squad players are available. The system will attempt automatic selection at the deadline.</p>}</div>
                   {xiSubmitError && <p className="text-sm text-red-400 mt-4">{xiSubmitError}</p>}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5">
-                     <p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad.</p>
-                     <button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.length !== 11 || !selectedImpactId || selectedXIIds.includes(selectedImpactId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button>
-                  </div>
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5"><p className="text-[11px] text-gray-500">Missing submissions are automatically selected from each franchise squad. The same player may fill both Impact Player slots, but cannot appear in the starting XI.</p><button type="button" onClick={submitXI} disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI || selectedXIIds.filter(Boolean).length !== 11 || !selectedImpactChasingId || !selectedImpactDefendingId || selectedXIIds.includes(selectedImpactChasingId) || selectedXIIds.includes(selectedImpactDefendingId)} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-40">{isSubmittingXI ? 'Submitting…' : xiAlreadySubmitted ? 'Playing XI Submitted ✓' : 'Submit Playing XI'}</button></div>
                </div>
             </div>
          )}
