@@ -47,7 +47,7 @@ import { useQuota } from './QuotaContext';
 import { useConnectionAlert } from './ConnectionAlertContext';
 import { shouldReportConnectionTrouble } from '../lib/connectionAlerts';
 import { DEFAULT_BID_TIMER_SECONDS, MEGA_OVERSEAS_LIMIT, getNextBidAmount } from '../lib/auctionRules';
-import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI } from '../lib/auctionWinnerRules';
+import { autoSelectBestXI, PLAYING_XI_DEADLINE_MS, validatePlayingXI, validatePlayingXIOptions } from '../lib/auctionWinnerRules';
 
 
 const TEAMS = [
@@ -861,7 +861,7 @@ export const AuctionProvider = ({ children }) => {
               userId: 'system', userName: 'System',
               text: usesSquadBalanceAnalysis
                 ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
-                : 'Bidding has ended. Submit your Playing XI (11 starters + 1 Impact Player) within 2 minutes.',
+                : 'Bidding has ended. Submit your Playing XI (11 ordered starters + chasing and defending Impact Player choices) within 3 minutes.',
               type: 'log', timestamp: serverTimestampRtdb()
             });
           }
@@ -1922,7 +1922,7 @@ export const AuctionProvider = ({ children }) => {
     });
   }, [user, currentAuction, getSyncedTime]);
 
-  const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayer) => {
+  const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayerChasing, impactPlayerDefending = impactPlayerChasing) => {
     if (!user) throw new Error('Sign in to submit your Playing XI');
     const roomSnap = await get(ref(rtdb, `auctions/${roomId}/room`));
     if (!roomSnap.exists()) throw new Error('Auction room not found');
@@ -1938,20 +1938,30 @@ export const AuctionProvider = ({ children }) => {
     if (teamData.disqualified) {
       throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
     }
-    if (!validatePlayingXI(startingXI, impactPlayer, teamData.squad || [], IPL_PLAYERS)) {
-      const selectedPlayers = [...(startingXI || []), impactPlayer].filter(Boolean);
-      const overseasCount = selectedPlayers.filter((item) => {
+    if (!validatePlayingXIOptions(startingXI, impactPlayerChasing, impactPlayerDefending, teamData.squad || [], IPL_PLAYERS)) {
+      const uniqueSelected = [...new Map([...(startingXI || []), impactPlayerChasing, impactPlayerDefending].filter(Boolean).map((item) => {
+        const id = typeof item === 'string' ? item : item?.id;
+        return [id, item];
+      })).values()];
+      const overseasCount = uniqueSelected.filter((item) => {
         const playerId = typeof item === 'string' ? item : item?.id;
         const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
         return player && player.country !== 'IND';
       }).length;
       if (overseasCount > 4) {
-        throw new Error('Your 11 starters plus Impact Player can include a maximum of 4 overseas players combined. Please select an Indian player.');
+        throw new Error('Your 11 starters and both Impact Player choices can include a maximum of 4 unique overseas players combined.');
       }
-      throw new Error('Choose 11 unique players and one different Impact Player from your squad');
+      throw new Error('Choose 11 different starters in order and select an Impact Player for both chasing and defending from your squad. The two Impact slots may use the same player.');
     }
     await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
-      playingXI: { startingXI, impactPlayer, submittedAt: getSyncedTime(), autoSelected: false }
+      playingXI: {
+        startingXI,
+        impactPlayerChasing,
+        impactPlayerDefending,
+        impactPlayer: impactPlayerChasing,
+        submittedAt: getSyncedTime(),
+        autoSelected: false
+      }
     });
     await push(ref(rtdb, `auctions/${roomId}/messages`), {
       userId: 'system', userName: 'System',
@@ -1992,18 +2002,20 @@ export const AuctionProvider = ({ children }) => {
         const botUserId = String(botTeam.userId || '').trim();
         if (!botIds.has(botUserId) && !/^(bot[_-]|auctionbot[_-])/i.test(botUserId)) continue;
         const saved = botTeam.playingXI;
-        const alreadyValid = saved?.startingXI?.length === 11 && Boolean(saved?.impactPlayer)
-          && validatePlayingXI(saved.startingXI, saved.impactPlayer, botTeam.squad || [], IPL_PLAYERS);
+        const alreadyValid = saved?.startingXI?.length === 11 && Boolean(saved?.impactPlayerChasing || saved?.impactPlayer) && Boolean(saved?.impactPlayerDefending || saved?.impactPlayer)
+          && validatePlayingXIOptions(saved.startingXI, saved.impactPlayerChasing || saved.impactPlayer, saved.impactPlayerDefending || saved.impactPlayer, botTeam.squad || [], IPL_PLAYERS);
         if (alreadyValid) continue;
         const selection = autoSelectBestXI(botTeam.squad || [], IPL_PLAYERS);
-        if (!selection.startingXI?.length || !selection.impactPlayer
-          || !validatePlayingXI(selection.startingXI, selection.impactPlayer, botTeam.squad || [], IPL_PLAYERS)) {
+        if (!selection.startingXI?.length || !selection.impactPlayerChasing || !selection.impactPlayerDefending
+          || !validatePlayingXIOptions(selection.startingXI, selection.impactPlayerChasing, selection.impactPlayerDefending, botTeam.squad || [], IPL_PLAYERS)) {
           throw new Error(`Could not automatically select an eligible Playing XI for bot franchise ${botTeam.teamName || botTeam.teamId}.`);
         }
         await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${teamKey}`), {
           playingXI: {
             startingXI: selection.startingXI,
-            impactPlayer: selection.impactPlayer,
+            impactPlayer: selection.impactPlayerChasing,
+            impactPlayerChasing: selection.impactPlayerChasing,
+            impactPlayerDefending: selection.impactPlayerDefending,
             autoSelected: true,
             selectionStatus: 'bot_auto_selected',
             submittedAt: getSyncedTime(),
@@ -2015,7 +2027,7 @@ export const AuctionProvider = ({ children }) => {
     }
 
     const allSubmitted = readinessTeams.length >= 2 && readinessTeams.every((t) =>
-      t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
+      t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayerChasing || t.playingXI?.impactPlayer) && Boolean(t.playingXI?.impactPlayerDefending || t.playingXI?.impactPlayer)
     );
     const deadlinePassed = getSyncedTime() >= Number(roomData.xiSubmissionDeadline || 0);
     if (!usesSquadBalanceAnalysis && !deadlinePassed && !allSubmitted) return;
@@ -2055,14 +2067,18 @@ export const AuctionProvider = ({ children }) => {
           continue;
         }
         const savedXI = t.playingXI;
+        const savedChasing = savedXI?.impactPlayerChasing || savedXI?.impactPlayer;
+        const savedDefending = savedXI?.impactPlayerDefending || savedXI?.impactPlayer;
         const savedIsValid = savedXI?.startingXI?.length === 11
-          && Boolean(savedXI?.impactPlayer)
-          && validatePlayingXI(savedXI.startingXI, savedXI.impactPlayer, squad, IPL_PLAYERS);
+          && Boolean(savedChasing) && Boolean(savedDefending)
+          && validatePlayingXIOptions(savedXI.startingXI, savedChasing, savedDefending, squad, IPL_PLAYERS);
         const selection = savedIsValid
           ? savedXI
           : autoSelectBestXI(squad, IPL_PLAYERS);
-        if (!selection.startingXI?.length || !selection.impactPlayer
-          || !validatePlayingXI(selection.startingXI, selection.impactPlayer, squad, IPL_PLAYERS)) {
+        const selectedChasing = selection.impactPlayerChasing || selection.impactPlayer;
+        const selectedDefending = selection.impactPlayerDefending || selection.impactPlayer;
+        if (!selection.startingXI?.length || !selectedChasing || !selectedDefending
+          || !validatePlayingXIOptions(selection.startingXI, selectedChasing, selectedDefending, squad, IPL_PLAYERS)) {
           throw new Error(`Could not automatically select an eligible Playing XI for ${t.teamName || t.teamId}. Please check that the franchise squad has enough eligible players.`);
         }
 
@@ -2074,7 +2090,9 @@ export const AuctionProvider = ({ children }) => {
           await updateRtdb(ref(rtdb, `auctions/${roomId}/teams/${teamKey}`), {
             playingXI: {
               startingXI: selection.startingXI.map(toFullPlayer),
-              impactPlayer: toFullPlayer(selection.impactPlayer),
+              impactPlayer: toFullPlayer(selectedChasing),
+              impactPlayerChasing: toFullPlayer(selectedChasing),
+              impactPlayerDefending: toFullPlayer(selectedDefending),
               autoSelected: true,
               selectionStatus: 'auto_selected',
               submittedAt: getSyncedTime(),
@@ -2088,8 +2106,11 @@ export const AuctionProvider = ({ children }) => {
           franchiseName: t.teamName || t.teamId,
           submittedXI: [
             ...selection.startingXI.map(toFullPlayer),
-            { ...toFullPlayer(selection.impactPlayer), isImpactPlayer: true }
+            { ...toFullPlayer(selectedChasing), isImpactPlayer: true, impactScenario: 'chasing' },
+            { ...toFullPlayer(selectedDefending), isImpactPlayer: true, impactScenario: 'defending' }
           ],
+          impactPlayerChasing: toFullPlayer(selectedChasing),
+          impactPlayerDefending: toFullPlayer(selectedDefending),
           fullSquad,
           autoSelected
         });
