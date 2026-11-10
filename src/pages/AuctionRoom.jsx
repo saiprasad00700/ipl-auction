@@ -2370,11 +2370,15 @@ useEffect(() => {
                                           onClick={() => setActiveXISlot(slot)}
                                           className={`relative block w-full aspect-[4/5] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                        >
-                                          {player ? (
-                                             <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
+                                          {player?.image ? (
+                                             <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="block w-[76px] h-[114px] overflow-hidden rounded-[3px] border border-white/30 bg-white/[0.03]">
+                                                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                                                </span>
+                                             </span>
                                           ) : (
                                              <span className="absolute inset-0 flex items-center justify-center">
-                                                <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/25" />
+                                                <span className="block w-[76px] h-[114px] rounded-[3px] border border-dashed border-white/30 bg-white/[0.03]" />
                                              </span>
                                           )}
                                           {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-emerald-300" />}
@@ -2404,13 +2408,17 @@ useEffect(() => {
                                        onClick={() => setActiveXISlot(slot.label)}
                                        className={`relative block w-full aspect-[4/5] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                     >
-                                       {player ? (
-                                          <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
-                                       ) : (
-                                          <span className="absolute inset-0 flex items-center justify-center">
-                                             <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-dashed border-white/25" />
-                                          </span>
-                                       )}
+                                       {player?.image ? (
+                                             <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="block w-[76px] h-[114px] overflow-hidden rounded-[3px] border border-white/30 bg-white/[0.03]">
+                                                   <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                                                </span>
+                                             </span>
+                                          ) : (
+                                             <span className="absolute inset-0 flex items-center justify-center">
+                                                <span className="block w-[76px] h-[114px] rounded-[3px] border border-dashed border-white/30 bg-white/[0.03]" />
+                                             </span>
+                                          )}
                                        {active && <span className="absolute inset-x-0 bottom-0 h-1 bg-blue-300" />}
                                     </button>
                                  </div>
