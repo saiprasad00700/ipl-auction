@@ -142,13 +142,52 @@ export default async function handler(req, res) {
   // Attach season-by-season evidence to both the selected XI and full squad.
   // Raw innings objects are retained so the model can use source field names
   // without us inventing or miscalculating cricket metrics.
+  const sum = (items, key) => items.reduce((total, item) => {
+    const value = Number(item?.[key]);
+    return Number.isFinite(value) ? total + value : total;
+  }, 0);
+  const average = (numerator, denominator) => denominator > 0
+    ? Number((numerator / denominator).toFixed(2)) : null;
+  const summarizeSeason = (season) => {
+    const bat = season.battingInnings;
+    const bowl = season.bowlingInnings;
+    const runs = sum(bat, "runs");
+    const balls = sum(bat, "balls");
+    const fours = sum(bat, "fours");
+    const sixes = sum(bat, "sixes");
+    const dismissals = bat.filter((inning) => {
+      const dismissal = getText(inning?.dismissal).toLowerCase();
+      return dismissal && !dismissal.includes("not out");
+    }).length;
+    const wickets = sum(bowl, "wickets");
+    const conceded = sum(bowl, "runs_conceded");
+    const bowlingBalls = sum(bowl, "overs_balls");
+    return {
+      season: season.season,
+      matches: season.matches,
+      batting: {
+        innings: bat.length, runs, balls, fours, sixes, dismissals,
+        average: average(runs, dismissals),
+        strikeRate: average(runs * 100, balls)
+      },
+      bowling: {
+        innings: bowl.length, balls: bowlingBalls,
+        overs: average(bowlingBalls, 6),
+        runsConceded: conceded, wickets,
+        maidens: sum(bowl, "maidens"),
+        economy: average(conceded * 6, bowlingBalls),
+        average: average(conceded, wickets),
+        strikeRate: average(bowlingBalls, wickets)
+      }
+    };
+  };
   const attachRecentStats = (player) => {
     if (!player || typeof player !== "object") return player;
     const seasons = recentStatsByPlayer.get(getText(player.id));
     return {
       ...player,
       recentIplStats: seasons
-        ? [...seasons.values()].sort((a, b) => a.season - b.season)
+        ? [...seasons.values()].sort((a, b) => a.season - b.season).map(summarizeSeason)
         : { status: "no_mapped_recent_ipl_records" }
     };
   };
@@ -168,7 +207,7 @@ MODE RULES:
 - There is NO minimum squad-size requirement. Never disqualify, exclude, or penalize a franchise simply because it bought fewer players.
 - Assess each squad as it stands. Compare wicketkeeping, batting roles, finishing, batting depth, all-rounders, pace, spin, death bowling, role flexibility, overseas/Indian balance, and depth relative to this format.
 - Sprint has a compact 5-player squad cap: prioritize versatility and coverage across the small squad. Classic has an 11-player squad cap: assess balance across the full 11-player squad.
-- Use the attached recentIplStats data for each player as the primary IPL evidence. It contains player-match records grouped by IPL season (2024, 2025, 2026), with original battingInnings and bowlingInnings objects. Treat matches as appearances; aggregate only explicitly present fields, and do not add averages or rates across innings. If a player has no_mapped_recent_ipl_records, treat recent IPL database coverage as unavailable for that player. Recent international T20/ODI evidence is a fallback only when recent IPL evidence is too limited. Never invent statistics or claim live research. Unknown data must remain uncertain.
+- Use the attached recentIplStats data for each player as the primary IPL evidence. It contains player-match records grouped by IPL season (2024, 2025, 2026), with per-season batting and bowling totals and rates calculated from the stored innings. Treat matches as player-match appearances; use the supplied runs, balls, boundaries, wickets, runs conceded, average, strike rate, and economy exactly as supplied. If a player has no_mapped_recent_ipl_records, treat recent IPL database coverage as unavailable for that player. Recent international T20/ODI evidence is a fallback only when recent IPL evidence is too limited. Never invent statistics or claim live research. Unknown data must remain uncertain.
 - Ignore artificial catalogue ratings. Judge players by roles and reliable performance evidence.
 - For EVERY franchise, explain why it earned its exact rank compared with the other teams. Include specific strengths, weaknesses/gaps, and the decisive reason it ranks above/below the nearest team.
 - Return every franchise exactly once, with unique ranks 1..N.
@@ -187,7 +226,7 @@ PERFORMANCE EVIDENCE — IPL FIRST, LAST THREE YEARS ONLY (ESSENTIAL):
 - INTERNATIONAL PERFORMANCE IS A FALLBACK ONLY: if a player has too few IPL appearances in that three-year window to make a reasonably reliable assessment (use fewer than 5 IPL matches as the practical threshold), then use recent international performance as supporting/alternative evidence. Prefer recent T20Is first, then relevant recent ODI performances; use Tests only cautiously for skills that translate to T20 cricket. If the player has no meaningful recent IPL or international evidence, acknowledge uncertainty rather than inventing performance.
 - For players with at least 5 IPL matches in the window, assess their recent IPL output and role-specific impact; do not let international performances override that IPL evidence. International data may be mentioned only as context, not as the basis of the rating.
 - Judge recent IPL consistency, role-specific contribution, batting/bowling effectiveness, fielding where known, and performance under pressure where reliable evidence is available. Do not invent exact runs, wickets, averages, strike rates, economy rates, match counts, injuries, or results. Missing data is unknown, not zero.
-- Use the attached recentIplStats data for each player as the primary evidence. It contains one record per player per match, grouped by IPL season (2024, 2025, 2026), with the original battingInnings and bowlingInnings objects from the statistics database. Treat matches as appearances; do not treat missing innings as zero. Aggregate runs, balls, boundaries, wickets, runs conceded, overs, and other fields only when those fields are explicitly present. Do not add rate/average fields across innings. If recentIplStats says no_mapped_recent_ipl_records, say recent IPL database coverage is unavailable for that player and use the existing international fallback rule only when justified. The attached database data, not general model memory, is the source of exact IPL figures.
+- Use the attached recentIplStats data for each player as the primary evidence. It contains one record per player per match, grouped by IPL season (2024, 2025, 2026), with per-season totals and derived batting/bowling rates calculated from the stored innings. Matches are player-match appearances; batting/bowling innings are counted separately. Use the supplied runs, balls, fours, sixes, dismissals, wickets, runs conceded, bowling balls, average, strike rate, and economy exactly as supplied. Do not invent missing values or treat them as zero. If recentIplStats says no_mapped_recent_ipl_records, say recent IPL database coverage is unavailable for that player and use the existing international fallback rule only when justified. The attached database data, not general model memory, is the source of exact IPL figures.
 
 RANKING METHOD — FOLLOW THIS ORDER:
 1. First assess each submitted starting XI (11 starters) and its Impact Player as the primary basis. Evaluate role fit and balance: opening pair skill/compatibility, top-order stability, middle-order strength, batting depth, finishers, wicketkeeping, pace, spin, death bowling, all-round options, and sufficient bowling choices. Consider recent IPL and international performance as described above. Do not automatically prefer a player merely because they are labelled an all-rounder; evaluate their actual batting and bowling value.
