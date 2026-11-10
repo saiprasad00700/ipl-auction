@@ -84,7 +84,7 @@ export default async function handler(req, res) {
   const recentStatsByPlayer = new Map();
   let statsRowsLoaded = 0;
   if (playerById.size) {
-    const base = supabaseUrl.replace(/\\/$/, "") + "/rest/v1/cricket_player_match_stats";
+    const base = supabaseUrl.replace(/\/$/, "") + "/rest/v1/cricket_player_match_stats";
     const ids = [...playerById.keys()];
     const pageSize = 500;
     for (let offset = 0; ; offset += pageSize) {
