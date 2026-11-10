@@ -296,7 +296,14 @@ useEffect(() => {
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
             t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
          );
-         if (usesSquadBalanceAnalysis || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
+         const roomPlayers = Array.isArray(currentAuction.players) ? currentAuction.players : Object.values(currentAuction.players || {});
+         const botIds = new Set(roomPlayers.filter((player) => player?.isBot || /^(bot[_-]|auctionbot[_-])/i.test(String(player?.id || ''))).map((player) => player.id));
+         const botNeedsAutoXI = !usesSquadBalanceAnalysis && participatingTeams.some((entry) => {
+            const userId = String(entry.userId || '');
+            const isBot = botIds.has(userId) || /^(bot[_-]|auctionbot[_-])/i.test(userId);
+            return isBot && !(entry.playingXI?.startingXI?.length === 11 && Boolean(entry.playingXI?.impactPlayer));
+         });
+         if (usesSquadBalanceAnalysis || botNeedsAutoXI || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
             finalizeWinnerAnalysis(id).catch((err) => console.error('Could not start winner analysis:', err));
          }
       };
