@@ -2356,12 +2356,12 @@ useEffect(() => {
                      ].map((group) => (
                         <section key={group.label}>
                            <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-emerald-300 mb-3 text-center">{group.label}</h3>
-                           <div className="flex flex-wrap justify-center items-start gap-3 sm:gap-4">
+                           <div className={`grid justify-center gap-3 sm:gap-4 ${group.slots.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
                               {group.slots.map((slot) => {
                                  const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
                                  const active = activeXISlot === slot;
                                  return (
-                                    <div key={slot} className="w-[250px] max-w-full shrink-0">
+                                    <div key={slot} className="w-full min-w-0">
                                        <div className="text-[10px] font-black tracking-wider text-gray-500 mb-1.5">SLOT {slot + 1}</div>
                                        <button
                                           type="button"
@@ -2387,7 +2387,7 @@ useEffect(() => {
                      ))}
                      <section>
                         <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-blue-300 mb-3 text-center">Impact Players</h3>
-                        <div className="flex flex-wrap justify-center items-start gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 justify-center gap-3 sm:gap-4">
                            {[
                               { label: 'Impact Player (Chasing)', value: selectedImpactChasingId, key: 'chasing' },
                               { label: 'Impact Player (Defending)', value: selectedImpactDefendingId, key: 'defending' }
@@ -2395,7 +2395,7 @@ useEffect(() => {
                               const player = mySquadPlayers.find((p) => p.id === slot.value);
                               const active = activeXISlot === slot.label;
                               return (
-                                 <div key={slot.key} className="w-[250px] max-w-full shrink-0">
+                                 <div key={slot.key} className="w-full min-w-0">
                                     <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-200 mb-1.5">{slot.label}</div>
                                     <button
                                        type="button"
