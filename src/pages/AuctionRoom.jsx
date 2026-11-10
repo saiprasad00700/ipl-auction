@@ -2361,7 +2361,7 @@ useEffect(() => {
                                  const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
                                  const active = activeXISlot === slot;
                                  return (
-                                    <div key={slot} className="w-[clamp(112px,20vw,220px)] shrink-0">
+                                    <div key={slot} className="w-[250px] max-w-full shrink-0">
                                        <div className="text-[10px] font-black tracking-wider text-gray-500 mb-1.5">SLOT {slot + 1}</div>
                                        <button
                                           type="button"
@@ -2395,7 +2395,7 @@ useEffect(() => {
                               const player = mySquadPlayers.find((p) => p.id === slot.value);
                               const active = activeXISlot === slot.label;
                               return (
-                                 <div key={slot.key} className="w-[clamp(112px,20vw,220px)] shrink-0">
+                                 <div key={slot.key} className="w-[250px] max-w-full shrink-0">
                                     <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-200 mb-1.5">{slot.label}</div>
                                     <button
                                        type="button"
