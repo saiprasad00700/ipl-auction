@@ -64,6 +64,90 @@ export default async function handler(req, res) {
     return json(503, error);
   }
 
+
+  // Load verified recent IPL match records from the server-only Supabase table.
+  // Player IDs in the auction catalogue (p_...) are the same IDs used by the
+  // approved mapping import; never match these records by display name.
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Recent IPL statistics are not configured. Check Supabase server environment variables.");
+  }
+
+  const playerById = new Map();
+  for (const team of normalized) {
+    for (const player of [...team.submittedXI, ...team.fullSquad]) {
+      const id = getText(player?.id);
+      if (id && /^p_[a-zA-Z0-9_-]+$/.test(id)) playerById.set(id, getText(player?.name) || id);
+    }
+  }
+  const recentStatsByPlayer = new Map();
+  if (playerById.size) {
+    const base = supabaseUrl.replace(/\\/$/, "") + "/rest/v1/cricket_player_match_stats";
+    const ids = [...playerById.keys()];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const url = new URL(base);
+      url.searchParams.set("select", "player_id,player_name,season,batting_innings,bowling_innings");
+      url.searchParams.set("player_id", "in.(" + ids.join(",") + ")");
+      url.searchParams.set("season", "gte.2024");
+      url.searchParams.set("order", "season.asc,player_id.asc");
+      url.searchParams.set("limit", String(pageSize));
+      url.searchParams.set("offset", String(offset));
+      const statsResponse = await fetch(url, {
+        headers: { apikey: supabaseServiceKey, Authorization: "Bearer " + supabaseServiceKey }
+      });
+      if (!statsResponse.ok) {
+        const detail = (await statsResponse.text()).slice(0, 400);
+        console.error("[AI stats] Supabase lookup failed", statsResponse.status, detail);
+        throw new Error("Could not load recent IPL player statistics from Supabase (HTTP " + statsResponse.status + ").");
+      }
+      const rows = await statsResponse.json();
+      if (!Array.isArray(rows)) throw new Error("Supabase returned an invalid recent IPL statistics response.");
+      for (const row of rows) {
+        const id = getText(row.player_id);
+        const season = String(row.season);
+        if (!playerById.has(id) || !["2024", "2025", "2026"].includes(season)) continue;
+        if (!recentStatsByPlayer.has(id)) recentStatsByPlayer.set(id, new Map());
+        const seasons = recentStatsByPlayer.get(id);
+        if (!seasons.has(season)) seasons.set(season, {
+          season: Number(season), matches: 0, battingInnings: [], bowlingInnings: []
+        });
+        const summary = seasons.get(season);
+        summary.matches += 1;
+        const asArray = (value) => {
+          if (Array.isArray(value)) return value;
+          if (value && typeof value === "object") return [value];
+          return [];
+        };
+        summary.battingInnings.push(...asArray(row.batting_innings));
+        summary.bowlingInnings.push(...asArray(row.bowling_innings));
+      }
+      if (rows.length < pageSize) break;
+    }
+  }
+
+  // Attach season-by-season evidence to both the selected XI and full squad.
+  // Raw innings objects are retained so the model can use source field names
+  // without us inventing or miscalculating cricket metrics.
+  const attachRecentStats = (player) => {
+    if (!player || typeof player !== "object") return player;
+    const seasons = recentStatsByPlayer.get(getText(player.id));
+    return {
+      ...player,
+      recentIplStats: seasons
+        ? [...seasons.values()].sort((a, b) => a.season - b.season)
+        : { status: "no_mapped_recent_ipl_records" }
+    };
+  };
+  for (const team of normalized) {
+    team.submittedXI = team.submittedXI.map(attachRecentStats);
+    team.fullSquad = team.fullSquad.map(attachRecentStats);
+  }
+  if (JSON.stringify(normalized).length > 850_000) {
+    throw new Error("Recent IPL statistics made the analysis payload too large. Reduce the squad payload and retry.");
+  }
+
   const prompt = usesSquadBalanceAnalysis
     ? `You are an expert IPL/T20 analyst and franchise squad strategist. This is a ${auctionType === "sprint5" ? "Sprint (5-player)" : "Classic (11-player)"} auction. Rank every franchise from 1 (strongest) to N (weakest), with one unique integer rank per franchise and no ties.
 
@@ -91,7 +175,7 @@ PERFORMANCE EVIDENCE — IPL FIRST, LAST THREE YEARS ONLY (ESSENTIAL):
 - INTERNATIONAL PERFORMANCE IS A FALLBACK ONLY: if a player has too few IPL appearances in that three-year window to make a reasonably reliable assessment (use fewer than 5 IPL matches as the practical threshold), then use recent international performance as supporting/alternative evidence. Prefer recent T20Is first, then relevant recent ODI performances; use Tests only cautiously for skills that translate to T20 cricket. If the player has no meaningful recent IPL or international evidence, acknowledge uncertainty rather than inventing performance.
 - For players with at least 5 IPL matches in the window, assess their recent IPL output and role-specific impact; do not let international performances override that IPL evidence. International data may be mentioned only as context, not as the basis of the rating.
 - Judge recent IPL consistency, role-specific contribution, batting/bowling effectiveness, fielding where known, and performance under pressure where reliable evidence is available. Do not invent exact runs, wickets, averages, strike rates, economy rates, match counts, injuries, or results. Missing data is unknown, not zero.
-- Do not claim you browsed live statistics or cite specific matches/seasons unless you can support those details. If recent statistics are not included in the input and are not reliably known, be transparent about uncertainty; do not pretend to have looked up live data.
+- Use the attached recentIplStats data for each player as the primary evidence. It contains one record per player per match, grouped by IPL season (2024, 2025, 2026), with the original battingInnings and bowlingInnings objects from the statistics database. Treat matches as appearances; do not treat missing innings as zero. Aggregate runs, balls, boundaries, wickets, runs conceded, overs, and other fields only when those fields are explicitly present. Do not add rate/average fields across innings. If recentIplStats says no_mapped_recent_ipl_records, say recent IPL database coverage is unavailable for that player and use the existing international fallback rule only when justified. The attached database data, not general model memory, is the source of exact IPL figures.
 
 RANKING METHOD — FOLLOW THIS ORDER:
 1. First assess each submitted starting XI (11 starters) and its Impact Player as the primary basis. Evaluate role fit and balance: opening pair skill/compatibility, top-order stability, middle-order strength, batting depth, finishers, wicketkeeping, pace, spin, death bowling, all-round options, and sufficient bowling choices. Consider recent IPL and international performance as described above. Do not automatically prefer a player merely because they are labelled an all-rounder; evaluate their actual batting and bowling value.
