@@ -321,6 +321,9 @@ useEffect(() => {
    const savedPlayingXI = team?.playingXI;
    const hasSubmittedPlayingXI = Boolean(savedPlayingXI?.submittedAt
       && savedPlayingXI?.startingXI?.length === 11 && savedPlayingXI?.impactPlayer);
+   const currentRoomPlayer = (Array.isArray(currentAuction?.players) ? currentAuction.players : Object.values(currentAuction?.players || {}))
+      .find((player) => player?.id === user?.uid);
+   const isCurrentUserBot = /^(bot[_-]|auctionbot[_-])/i.test(String(user?.uid || '')) || Boolean(currentRoomPlayer?.isBot);
    const feedbackPhaseOpen = ['awaiting_xi', 'analyzing', 'analysis_failed'].includes(currentAuction?.status)
       && currentAuction?.winnerAnalysisStatus !== 'completed'
       && !currentAuction?.winnerRankings;
@@ -381,7 +384,7 @@ useEffect(() => {
    };
 
    useEffect(() => {
-      const shouldShow = hasSubmittedPlayingXI && feedbackPhaseOpen && !feedbackStorageDismissed;
+      const shouldShow = !isCurrentUserBot && hasSubmittedPlayingXI && feedbackPhaseOpen && !feedbackStorageDismissed;
       if (!shouldShow) {
          setShowFeedbackPopup(false);
          if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
@@ -398,7 +401,7 @@ useEffect(() => {
          if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
          feedbackTimerRef.current = null;
       };
-   }, [hasSubmittedPlayingXI, feedbackPhaseOpen, feedbackStorageDismissed, id, user?.uid]);
+   }, [isCurrentUserBot, hasSubmittedPlayingXI, feedbackPhaseOpen, feedbackStorageDismissed, id, user?.uid]);
 
    useEffect(() => () => {
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
