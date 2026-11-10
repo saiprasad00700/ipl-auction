@@ -2355,20 +2355,20 @@ useEffect(() => {
                         { label: 'Finishers / Bowlers', slots: [7, 8, 9, 10], accent: 'emerald' }
                      ].map((group) => (
                         <section key={group.label}>
-                           <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-emerald-300 mb-3">{group.label}</h3>
-                           <div className={`grid gap-2 sm:gap-3 ${group.slots.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                           <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-emerald-300 mb-3 text-center">{group.label}</h3>
+                           <div className="flex flex-wrap justify-center items-start gap-3 sm:gap-4">
                               {group.slots.map((slot) => {
                                  const player = mySquadPlayers.find((p) => p.id === selectedXIIds[slot]);
                                  const active = activeXISlot === slot;
                                  return (
-                                    <div key={slot} className="min-w-0">
+                                    <div key={slot} className="w-[clamp(112px,20vw,220px)] shrink-0">
                                        <div className="text-[10px] font-black tracking-wider text-gray-500 mb-1.5">SLOT {slot + 1}</div>
                                        <button
                                           type="button"
                                           aria-label={player ? `Slot ${slot + 1}: ${player.name}. Tap to change player` : `Choose player for slot ${slot + 1}`}
                                           disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                           onClick={() => setActiveXISlot(slot)}
-                                          className={`relative block w-full aspect-[4/3] sm:aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                          className={`relative block w-full aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-emerald-300 ring-2 ring-emerald-300/20' : 'border-white/15 hover:border-emerald-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                        >
                                           {player ? (
                                              <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
@@ -2386,8 +2386,8 @@ useEffect(() => {
                         </section>
                      ))}
                      <section>
-                        <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-blue-300 mb-3">Impact Players</h3>
-                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-blue-300 mb-3 text-center">Impact Players</h3>
+                        <div className="flex flex-wrap justify-center items-start gap-3 sm:gap-4">
                            {[
                               { label: 'Impact Player (Chasing)', value: selectedImpactChasingId, key: 'chasing' },
                               { label: 'Impact Player (Defending)', value: selectedImpactDefendingId, key: 'defending' }
@@ -2395,14 +2395,14 @@ useEffect(() => {
                               const player = mySquadPlayers.find((p) => p.id === slot.value);
                               const active = activeXISlot === slot.label;
                               return (
-                                 <div key={slot.key} className="min-w-0">
+                                 <div key={slot.key} className="w-[clamp(112px,20vw,220px)] shrink-0">
                                     <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-200 mb-1.5">{slot.label}</div>
                                     <button
                                        type="button"
                                        aria-label={player ? `${slot.label}: ${player.name}. Tap to change player` : `Choose ${slot.label}`}
                                        disabled={team?.disqualified || xiAlreadySubmitted || isSubmittingXI}
                                        onClick={() => setActiveXISlot(slot.label)}
-                                       className={`relative block w-full aspect-[4/3] sm:aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
+                                       className={`relative block w-full aspect-[5/4] overflow-hidden rounded-xl sm:rounded-2xl border-2 transition-all ${active ? 'border-blue-300 ring-2 ring-blue-300/20' : 'border-white/15 hover:border-blue-300/60'} ${player ? 'bg-[#111a27]' : 'bg-white/[0.025]'}`}
                                     >
                                        {player ? (
                                           <img src={player.image} alt={player.name} className="w-full h-full object-contain" />
