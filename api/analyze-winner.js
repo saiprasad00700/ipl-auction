@@ -82,6 +82,7 @@ export default async function handler(req, res) {
     }
   }
   const recentStatsByPlayer = new Map();
+  let statsRowsLoaded = 0;
   if (playerById.size) {
     const base = supabaseUrl.replace(/\\/$/, "") + "/rest/v1/cricket_player_match_stats";
     const ids = [...playerById.keys()];
@@ -104,6 +105,7 @@ export default async function handler(req, res) {
       }
       const rows = await statsResponse.json();
       if (!Array.isArray(rows)) throw new Error("Supabase returned an invalid recent IPL statistics response.");
+      statsRowsLoaded += rows.length;
       for (const row of rows) {
         const id = getText(row.player_id);
         const season = String(row.season);
@@ -126,6 +128,16 @@ export default async function handler(req, res) {
       if (rows.length < pageSize) break;
     }
   }
+
+  if (statsRowsLoaded === 0 || recentStatsByPlayer.size === 0) {
+    throw new Error("No recent IPL statistics matched the auction player IDs in Supabase. Check the player mapping before retrying; Gemini ranking was stopped to avoid unsupported rankings.");
+  }
+
+  console.log("[AI stats] Loaded recent IPL records", {
+    matchRecords: statsRowsLoaded,
+    matchedPlayers: recentStatsByPlayer.size,
+    auctionPlayers: playerById.size
+  });
 
   // Attach season-by-season evidence to both the selected XI and full squad.
   // Raw innings objects are retained so the model can use source field names
@@ -156,7 +168,7 @@ MODE RULES:
 - There is NO minimum squad-size requirement. Never disqualify, exclude, or penalize a franchise simply because it bought fewer players.
 - Assess each squad as it stands. Compare wicketkeeping, batting roles, finishing, batting depth, all-rounders, pace, spin, death bowling, role flexibility, overseas/Indian balance, and depth relative to this format.
 - Sprint has a compact 5-player squad cap: prioritize versatility and coverage across the small squad. Classic has an 11-player squad cap: assess balance across the full 11-player squad.
-- Use reliable recent IPL performance from the last three years where known. Recent international T20/ODI evidence is a fallback when recent IPL evidence is too limited. Never invent statistics or claim live research. Unknown data must remain uncertain.
+- Use the attached recentIplStats data for each player as the primary IPL evidence. It contains player-match records grouped by IPL season (2024, 2025, 2026), with original battingInnings and bowlingInnings objects. Treat matches as appearances; aggregate only explicitly present fields, and do not add averages or rates across innings. If a player has no_mapped_recent_ipl_records, treat recent IPL database coverage as unavailable for that player. Recent international T20/ODI evidence is a fallback only when recent IPL evidence is too limited. Never invent statistics or claim live research. Unknown data must remain uncertain.
 - Ignore artificial catalogue ratings. Judge players by roles and reliable performance evidence.
 - For EVERY franchise, explain why it earned its exact rank compared with the other teams. Include specific strengths, weaknesses/gaps, and the decisive reason it ranks above/below the nearest team.
 - Return every franchise exactly once, with unique ranks 1..N.
