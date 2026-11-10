@@ -158,14 +158,7 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
   const resolvedImpactPlayer = toPlayer(impactPlayer, playerCatalog);
   if (resolvedXI.length !== PLAYING_XI_SIZE || !resolvedImpactPlayer) return false;
   const overseasInSelection = [...resolvedXI, resolvedImpactPlayer].filter(isOverseasPlayer).length;
-  const allRoundersInXI = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
-  // All-rounders count toward the five-player bowling group, as required by the game rules.
-  const bowlingOptionsInXI = resolvedXI.filter((player) =>
-    ['ar', 'bowl'].includes(normalizeRole(player))
-  ).length;
-
-  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
-;
+  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION;
 }
 
 /**
@@ -188,8 +181,6 @@ export function validatePlayingXIOptions(startingXI, impactPlayerChasing, impact
   if (resolvedXI.length !== PLAYING_XI_SIZE || !chasing || !defending) return false;
   const uniqueSelected = [...new Map([...resolvedXI, chasing, defending].map((player) => [player.id, player])).values()];
   const overseasCount = uniqueSelected.filter(isOverseasPlayer).length;
-  const allRounders = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
-  const bowlingOptions = resolvedXI.filter((player) => ['ar', 'bowl'].includes(normalizeRole(player))).length;
   return overseasCount <= MAX_OVERSEAS_PLAYERS_IN_SELECTION;
 }
 
