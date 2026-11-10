@@ -6,7 +6,7 @@ const numeric = (value) => {
 };
 function oversToBalls(value) {
   if (value === null || value === undefined || value === "") return null;
-  const match = String(value).match(/^(\\d+)(?:\\.(\\d))?$/);
+  const match = String(value).match(/^(\d+)(?:\.(\d))?$/);
   if (!match) return null;
   const balls = Number(match[1]) * 6 + Number(match[2] || 0);
   return Number.isFinite(balls) ? balls : null;
