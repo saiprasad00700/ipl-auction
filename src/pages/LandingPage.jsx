@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
-import { rtdb, server2Rtdb } from "../lib/firebase";
+import { rtdb, server2Rtdb, ensureServer2Auth } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
 import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
@@ -53,12 +53,16 @@ const LandingPage = () => {
     try {
       // The app starts RTDB offline by default; connect before reading the public lobby.
       goOnline(rtdb);
-      const [primarySnapshot, secondarySnapshot] = await Promise.all([
-        get(ref(rtdb, "publicRooms")),
-        get(ref(server2Rtdb, "publicRooms"))
-      ]);
+      const primarySnapshot = await get(ref(rtdb, "publicRooms"));
+      let secondaryDirectory = {};
+      try {
+        if (user) await ensureServer2Auth();
+        const secondarySnapshot = await get(ref(server2Rtdb, "publicRooms"));
+        secondaryDirectory = secondarySnapshot.exists() ? secondarySnapshot.val() : {};
+      } catch (secondaryError) {
+        console.warn("Server 2 public room list is temporarily unavailable:", secondaryError?.message || secondaryError);
+      }
       const primaryDirectory = primarySnapshot.exists() ? primarySnapshot.val() : {};
-      const secondaryDirectory = secondarySnapshot.exists() ? secondarySnapshot.val() : {};
       const rooms = [
         ...Object.values(primaryDirectory).map((room) => ({ ...room, serverId: "1" })),
         ...Object.values(secondaryDirectory).map((room) => ({ ...room, serverId: "2" }))
@@ -135,9 +139,10 @@ const LandingPage = () => {
           let teamData = null;
           let roomData = null;
           try {
+            const historyDatabase = entry.serverId === "2" ? server2Rtdb : rtdb;
             const [teamSnap, roomSnap] = await Promise.all([
-              get(ref(rtdb, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
-              get(ref(rtdb, `auctions/${entry.roomId}/room`))
+              get(ref(historyDatabase, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
+              get(ref(historyDatabase, `auctions/${entry.roomId}/room`))
             ]);
             teamData = teamSnap.exists() ? teamSnap.val() : null;
             roomData = roomSnap.exists() ? roomSnap.val() : null;
