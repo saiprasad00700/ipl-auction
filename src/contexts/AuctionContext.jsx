@@ -218,8 +218,8 @@ export const AuctionProvider = ({ children }) => {
 
     // Record history without blocking room creation if rules are not deployed yet.
     try {
-      await set(ref(roomDatabase, `userAuctionHistory/${userId}/${roomId}`), {
-        roomId, userId, hostId: userId,
+      await set(ref(rtdb, `userAuctionHistory/${userId}/${roomId}`), {
+        roomId, userId, serverId: roomServerId, hostId: userId,
         hostName: playerDetails.name || 'Manager',
         teamId: playerDetails.team || '',
         teamName: teamDetails?.name || 'Unknown',
@@ -1115,11 +1115,11 @@ export const AuctionProvider = ({ children }) => {
     // Save history independently of the activity heartbeat. A heartbeat/rules
     // failure must never prevent a successfully joined room from being recorded.
     try {
-      const historyRef = ref(roomDatabase, `userAuctionHistory/${userId}/${roomId}`);
+      const historyRef = ref(rtdb, `userAuctionHistory/${userId}/${roomId}`);
       const previousHistory = await get(historyRef);
       const previousEntry = previousHistory.exists() ? previousHistory.val() : {};
       await set(historyRef, {
-        roomId, userId, hostId: data.hostId || '',
+        roomId, userId, serverId: getRoomServerId(roomId), hostId: data.hostId || '',
         hostName: data.hostName || 'Auction host',
         teamId: playerDetails.team || playerExists?.team || '',
         teamName: teamDetails?.name || playerExists?.teamName || 'Unknown',
