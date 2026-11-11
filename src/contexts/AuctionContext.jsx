@@ -1044,7 +1044,9 @@ export const AuctionProvider = ({ children }) => {
   }, [getSyncedTime]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
-    const preferredServerId = '1';
+    // Room codes are allocated with their first digit identifying the Firebase server.
+    // Route directly to the assigned server; only probe the other server as a fallback.
+    const preferredServerId = String(roomId || '').startsWith('2') ? '2' : '1';
     let roomDatabase = preferredServerId === '2' ? await ensureServer2Auth() : rtdb;
     rememberRoomServer(roomId, preferredServerId);
     try { goOnline(roomDatabase); } catch (e) {}
