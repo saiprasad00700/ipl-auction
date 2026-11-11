@@ -22,7 +22,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const server2Config = {
-  apiKey: "AIzaSyCtfixD6HTHbLrLLkHNZ-X90dtq3LmFWIU",
+  apiKey: "AIzaSyCtfixD6HTHbLrLlkHNZ-X9Odtq3LmFWIU",
   authDomain: "ss-auction-server-2.firebaseapp.com",
   databaseURL: "https://ss-auction-server-2-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "ss-auction-server-2",
