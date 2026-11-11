@@ -356,6 +356,7 @@ async function cleanupAbandonedRooms() {
 
       await database.ref('auctions/' + roomId).remove();
       await database.ref('publicRooms/' + roomId).remove();
+      await database.ref(ALLOCATOR_PATH + '/' + roomId).remove().catch(() => {});
       console.log('[Room cleanup] Removed abandoned room from Firebase:', roomId);
       }
     }
