@@ -138,7 +138,7 @@ export const AuctionProvider = ({ children }) => {
     const roomServerId = String(roomId).startsWith('2') ? '2' : '1';
     if (roomServerId === '2') await ensureServer2Auth();
     rememberRoomServer(roomId, roomServerId);
-    const roomDatabase = roomDatabase;
+    const roomDatabase = getRoomDatabase(roomId);
     // Explicitly connect RTDB WebSocket for room creation
     try { goOnline(roomDatabase); } catch (e) {}
 
@@ -1042,7 +1042,7 @@ export const AuctionProvider = ({ children }) => {
   }, [getSyncedTime]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
-    const preferredServerId = String(roomId).startsWith('2') ? '2' : '1';
+    const preferredServerId = '1';
     let roomDatabase = preferredServerId === '2' ? await ensureServer2Auth() : rtdb;
     rememberRoomServer(roomId, preferredServerId);
     try { goOnline(roomDatabase); } catch (e) {}
@@ -1228,7 +1228,7 @@ export const AuctionProvider = ({ children }) => {
     if (!userId) return () => {};
     
     // Connect to the Firebase project assigned to this room.
-    const roomDatabase = roomDatabase;
+    const roomDatabase = getRoomDatabase(auctionId);
     try { goOnline(roomDatabase); } catch (e) {}
 
     setLoading(true);
