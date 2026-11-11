@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
-import { rtdb } from "../lib/firebase";
+import { rtdb, server2Rtdb } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
 import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
@@ -53,9 +53,16 @@ const LandingPage = () => {
     try {
       // The app starts RTDB offline by default; connect before reading the public lobby.
       goOnline(rtdb);
-      const snapshot = await get(ref(rtdb, "publicRooms"));
-      const directory = snapshot.exists() ? snapshot.val() : {};
-      const rooms = Object.values(directory).filter((room) =>
+      const [primarySnapshot, secondarySnapshot] = await Promise.all([
+        get(ref(rtdb, "publicRooms")),
+        get(ref(server2Rtdb, "publicRooms"))
+      ]);
+      const primaryDirectory = primarySnapshot.exists() ? primarySnapshot.val() : {};
+      const secondaryDirectory = secondarySnapshot.exists() ? secondarySnapshot.val() : {};
+      const rooms = [
+        ...Object.values(primaryDirectory).map((room) => ({ ...room, serverId: "1" })),
+        ...Object.values(secondaryDirectory).map((room) => ({ ...room, serverId: "2" }))
+      ].filter((room) =>
         room && typeof room.roomId === "string" &&
         typeof room.hostName === "string" &&
         (room.status === "waiting" || room.status === "active") &&
@@ -65,6 +72,7 @@ const LandingPage = () => {
         hostName: room.hostName,
         status: room.status,
         auctionType: room.auctionType,
+        serverId: room.serverId,
         players: 0
       }));
       setPublicRooms(rooms);
@@ -260,9 +268,10 @@ const LandingPage = () => {
       const displayName = user.displayName || "Manager";
 
       if (activeTab === "new") {
-        const newRoomId = Math.random()
+        const roomServerPrefix = Math.random() < 0.5 ? "1" : "2";
+        const newRoomId = roomServerPrefix + Math.random()
           .toString(36)
-          .substring(2, 8)
+          .substring(2, 7)
           .toUpperCase();
         await createRoom(
           newRoomId,
