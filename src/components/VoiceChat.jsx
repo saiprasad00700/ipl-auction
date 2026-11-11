@@ -3,7 +3,7 @@ import { Room, RoomEvent, Track } from 'livekit-client';
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ref, update } from 'firebase/database';
-import { rtdb } from '../lib/firebase';
+import { rtdb, ensureServer2Auth } from '../lib/firebase';
 import { trackAnalyticsEvent } from '../lib/insights';
 
 const VoiceChat = ({ roomId }) => {
@@ -35,11 +35,17 @@ const VoiceChat = ({ roomId }) => {
     const start = async () => {
       if (!roomId || !user || user.isAnonymous === undefined) return;
       try {
+        let serverId = '1';
+        try {
+          const savedServer = window.localStorage.getItem('ssauction:room-server:' + roomId);
+          serverId = savedServer === '2' || (!savedServer && String(roomId).startsWith('2')) ? '2' : '1';
+        } catch (e) {}
+        const roomDatabase = serverId === '2' ? await ensureServer2Auth() : rtdb;
         const idToken = await user.getIdToken();
         const response = await fetch('/api/voice-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + idToken },
-          body: JSON.stringify({ roomId, participantName: user.displayName || 'Player' })
+          body: JSON.stringify({ roomId, serverId, participantName: user.displayName || 'Player' })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Voice chat is unavailable');
@@ -54,7 +60,7 @@ const VoiceChat = ({ roomId }) => {
           const now = Date.now();
           if (now - lastVoiceActivityPingRef.current < 10000) return;
           lastVoiceActivityPingRef.current = now;
-          void update(ref(rtdb, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((err) => {
+          void update(ref(roomDatabase, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((err) => {
             console.warn('[VoiceChat] Could not update room activity:', err?.message || err);
           });
         });
