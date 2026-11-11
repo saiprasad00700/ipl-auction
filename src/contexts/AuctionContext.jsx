@@ -520,7 +520,22 @@ export const AuctionProvider = ({ children }) => {
             ? Number(eligibleTeamData.retentionCardsRemaining)
             : RETENTION_CARDS_PER_FRANCHISE;
           const purseRemaining = Number(eligibleTeamData.budgetRemaining ?? preRoomData.settings?.budget ?? 120);
+          const auctionPlayer = IPL_PLAYERS.find((player) => player.id === currentData.playerId);
+          const isOverseasPlayer = Boolean(auctionPlayer && auctionPlayer.country !== 'IND');
+          const overseasLimit = preRoomData.auctionType === 'sprint5' ? 2
+            : preRoomData.auctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
+          const existingOverseasCount = (Array.isArray(eligibleTeamData.squad) ? eligibleTeamData.squad : [])
+            .reduce((count, squadItem) => {
+              const squadPlayerId = typeof squadItem === 'string' ? squadItem : squadItem?.id;
+              const squadPlayer = IPL_PLAYERS.find((player) => player.id === squadPlayerId);
+              return count + (squadPlayer && squadPlayer.country !== 'IND' ? 1 : 0);
+            }, 0);
+          // RTM must never bypass the franchise overseas-player limit. If the
+          // original franchise is already at its cap, skip the RTM offer entirely
+          // and let the current highest bidder win the player.
+          const eligibleForOverseasRtm = !isOverseasPlayer || existingOverseasCount < overseasLimit;
           if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer
+            && eligibleForOverseasRtm
             && canUseRetentionCard({
               originalFranchiseId,
               eligibleFranchiseId: eligibleTeamData.teamId,
