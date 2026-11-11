@@ -121,27 +121,6 @@ export default function AuctionActivityFeed({ activeCount = 0, selectedServer = 
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:items-end">
-            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-gray-400">
-              Auction Server
-            </span>
-            <div className="inline-flex w-fit max-w-full rounded-xl border border-white/10 bg-black/20 p-1" role="group" aria-label="Select auction server">
-              {["1", "2"].map((serverId) => (
-                <button
-                  key={serverId}
-                  type="button"
-                  onClick={() => onSelectServer(serverId)}
-                  aria-pressed={selectedServer === serverId}
-                  className={`rounded-lg px-3 py-2 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all ${selectedServer === serverId
-                    ? "border border-white/20 bg-white/10 text-white shadow-inner"
-                    : "border border-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}
-                >
-                  Server {serverId}
-                </button>
-              ))}
-            </div>
-            <span className="text-[8px] text-gray-500">Lobbies and history are separate per server.</span>
-          </div>
         </div>
 
         <div className="w-full h-px bg-white/10 my-4" />
