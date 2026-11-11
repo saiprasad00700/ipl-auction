@@ -147,7 +147,7 @@ async function getFirebaseAdminServices() {
 // Firebase Realtime Database storage metrics are sampled infrequently by Cloud Monitoring.
 const capacityMetricCache = new Map();
 const CAPACITY_THRESHOLD = 0.80;
-const CAPACITY_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const CAPACITY_MAX_AGE_MS = 54 * 60 * 60 * 1000;
 
 function base64Url(value) {
   return Buffer.from(value).toString('base64url');
