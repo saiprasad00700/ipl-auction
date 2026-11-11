@@ -109,26 +109,27 @@ export const AuctionProvider = ({ children }) => {
   // Server-authoritative time using Firebase RTDB offset.
   // getServerTime() returns Date.now() + serverOffset, synced across all clients.
   const getSyncedTime = useCallback(() => {
-    return getServerTime();
-  }, []);
+    const database = currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb;
+    return getServerTime(database);
+  }, [currentAuction?.id]);
 
   // RTM actions can be clicked immediately after a room reconnects. Wait briefly
   // for Firebase's server-time metadata instead of rejecting the user's click
   // during the short connection/sync window.
   const ensureServerTimeSync = useCallback(async () => {
-    if (isServerTimeSynced()) return;
+    if (isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) return;
     try { goOnline(rtdb); } catch (e) {}
     await new Promise((resolve) => {
       let attempts = 0;
       const retry = setInterval(() => {
         attempts += 1;
-        if (isServerTimeSynced() || attempts >= 50) {
+        if (isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb) || attempts >= 50) {
           clearInterval(retry);
           resolve();
         }
       }, 100);
     });
-    if (!isServerTimeSynced()) {
+    if (!isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) {
       throw new Error('Auction server time is still connecting. Please try again in a moment.');
     }
   }, []);
@@ -433,19 +434,19 @@ export const AuctionProvider = ({ children }) => {
   const endPlayerAuction = useCallback(async (roomId) => {
     // A single missed sync check must not permanently stall the lot at 0 seconds.
     // Reconnect RTDB and briefly wait for its server-time offset before giving up.
-    if (!isServerTimeSynced()) {
-      try { goOnline(rtdb); } catch (e) {}
+    if (!isServerTimeSynced(getRoomDatabase(roomId))) {
+      try { goOnline(getRoomDatabase(roomId)); } catch (e) {}
       await new Promise((resolve) => {
         let attempts = 0;
         const retry = setInterval(() => {
           attempts += 1;
-          if (isServerTimeSynced() || attempts >= 50) {
+          if (isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb) || attempts >= 50) {
             clearInterval(retry);
             resolve();
           }
         }, 100);
       });
-      if (!isServerTimeSynced()) return;
+      if (!isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) return;
     }
     // Prevent duplicate calls from the timer interval
     if (endingPlayerRef.current) return;
@@ -606,7 +607,7 @@ export const AuctionProvider = ({ children }) => {
         console.error('[Auction] Settlement transaction was not committed.', {
           roomId,
           liveState: txResult.snapshot?.val() || null,
-          serverTimeSynced: isServerTimeSynced(),
+          serverTimeSynced: isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb),
           serverTime: getSyncedTime()
         });
         endingPlayerRef.current = false;
@@ -715,7 +716,7 @@ export const AuctionProvider = ({ children }) => {
             offerExpiresAt: failedOffer?.expiresAt ?? null,
             offerDecidedAt: failedOffer?.decidedAt ?? null,
             hasCounterBid: failedOffer?.counterBid != null,
-            serverTimeSynced: isServerTimeSynced(),
+            serverTimeSynced: isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb),
             serverTime: getSyncedTime(),
             liveState: failedState
           });
@@ -920,7 +921,7 @@ export const AuctionProvider = ({ children }) => {
   // transaction checks the player, status and deadline again, so only one client
   // can advance a given settled lot.
   const recoverPlayerTransition = useCallback(async (roomId) => {
-    if (!isServerTimeSynced()) return;
+    if (!isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) return;
     const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
     const liveSnap = await get(liveRef);
     const live = liveSnap.exists() ? liveSnap.val() : null;
