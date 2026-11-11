@@ -1,6 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, signInWithCustomToken } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getDatabase, ref, onValue, get, goOffline } from "firebase/database";
 import { getStorage } from "firebase/storage";
@@ -20,6 +20,39 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+const server2Config = {
+  apiKey: "AIzaSyCtfixD6HTHbLrLLkHNZ-X90dtq3LmFWIU",
+  authDomain: "ss-auction-server-2.firebaseapp.com",
+  databaseURL: "https://ss-auction-server-2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ss-auction-server-2",
+  storageBucket: "ss-auction-server-2.firebasestorage.app",
+  messagingSenderId: "541583284758",
+  appId: "1:541583284758:web:f706cf9cd15a6472cd7337"
+};
+const server2App = initializeApp(server2Config, "ss-auction-server-2");
+export const server2Auth = getAuth(server2App);
+export const server2Rtdb = getDatabase(server2App);
+let server2AuthPromise = null;
+export const ensureServer2Auth = async () => {
+  const primaryUser = auth.currentUser;
+  if (!primaryUser) throw new Error("Please sign in before joining this auction.");
+  if (server2Auth.currentUser?.uid === primaryUser.uid) return server2Rtdb;
+  if (!server2AuthPromise) server2AuthPromise = (async () => {
+    const idToken = await primaryUser.getIdToken();
+    const response = await fetch("/api/server2-token", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}` }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.customToken) {
+      throw new Error(payload.error || "Server 2 authentication failed.");
+    }
+    await signInWithCustomToken(server2Auth, payload.customToken);
+    return server2Rtdb;
+  })().finally(() => { server2AuthPromise = null; });
+  return server2AuthPromise;
+};
 
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
