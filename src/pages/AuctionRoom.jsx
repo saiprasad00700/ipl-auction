@@ -307,7 +307,7 @@ useEffect(() => {
             const isBot = botIds.has(userId) || /^(bot[_-]|auctionbot[_-])/i.test(userId);
             return isBot && !(entry.playingXI?.startingXI?.length === 11 && Boolean(entry.playingXI?.impactPlayer));
          });
-         if (usesSquadBalanceAnalysis || botNeedsAutoXI || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
+         if (usesSquadBalanceAnalysis || noEligibleMegaFranchises || botNeedsAutoXI || getSyncedTime() >= Number(currentAuction.xiSubmissionDeadline) || allSubmitted) {
             finalizeWinnerAnalysis(id).catch((err) => console.error('Could not start winner analysis:', err));
          }
       };
@@ -2352,7 +2352,7 @@ useEffect(() => {
                            return <div className="mt-3 border-t border-emerald-500/20 pt-3"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-200/80 mb-2">{missingTeams.length ? `Not submitted yet (${missingTeams.length})` : 'All franchises submitted'}</p>{missingTeams.length ? <div className="flex flex-wrap gap-2">{missingTeams.map((t) => <span key={t.id || t.teamId} className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white">{t.teamName || t.teamId}</span>)}</div> : <p className="text-xs text-emerald-200">All submitted. Starting AI analysis…</p>}</div>;
                         })()}
                      </div>
-                  ) : <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.filter(Boolean).length}/11 · Impact choices: {Number(Boolean(selectedImpactChasingId)) + Number(Boolean(selectedImpactDefendingId))}/2 · Unique overseas: {mySquadPlayers.filter((p) => [...selectedXIIds, selectedImpactChasingId, selectedImpactDefendingId].includes(p.id)).filter((p) => p.country && p.country !== 'IND').length}/4 · Deadline: 30 minutes</p>}
+                  ) : <p className="text-xs text-gray-400 mb-3">Selected: {selectedXIIds.filter(Boolean).length}/11 · Impact choices: {Number(Boolean(selectedImpactChasingId)) + Number(Boolean(selectedImpactDefendingId))}/2 · Unique overseas: {mySquadPlayers.filter((p) => [...selectedXIIds, selectedImpactChasingId, selectedImpactDefendingId].includes(p.id)).filter((p) => p.country && p.country !== 'IND').length}/4 · Deadline: 5 minutes</p>}
                   <div className="space-y-5 mb-5">
                      {[
                         { label: 'Openers', slots: [0, 1, 2], accent: 'emerald' },
