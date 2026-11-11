@@ -72,60 +72,56 @@ if (typeof window !== 'undefined') {
 export { analytics };
 
 
-// ─── Server Time Sync via Firebase RTDB ───
-let _serverTimeOffset = 0;
-let _hasServerTimeOffset = false;
-let _rtdbConnected = false;
-let _offsetReceivedWhileConnected = false;
+// ─── Independent server-time sync for each Firebase RTDB ───
+const timeSyncByDatabase = new Map();
 
 export const rtdb = getDatabase(app);
 export const storage = getStorage(app);
 
+const registerServerTimeSync = (database, label) => {
+  const state = {
+    offset: 0,
+    hasOffset: false,
+    connected: false,
+    offsetReceivedWhileConnected: false
+  };
+  timeSyncByDatabase.set(database, state);
+  try {
+    goOffline(database);
+    const connectedRef = ref(database, '.info/connected');
+    const offsetRef = ref(database, '.info/serverTimeOffset');
+    onValue(offsetRef, (snap) => {
+      const offset = Number(snap.val());
+      if (Number.isFinite(offset)) {
+        state.offset = offset;
+        state.hasOffset = true;
+        if (state.connected) state.offsetReceivedWhileConnected = true;
+      }
+    });
+    onValue(connectedRef, (snap) => {
+      const connected = snap.val() === true;
+      if (connected !== state.connected) {
+        state.connected = connected;
+        state.offsetReceivedWhileConnected = connected && state.hasOffset;
+      }
+    });
+  } catch (err) {
+    console.error(`[Firebase:${label}] Failed to initialize server-time sync:`, err);
+  }
+};
 
-try {
-  // Start offline by default until entering an active room session
-  goOffline(rtdb);
-  const connectedRef = ref(rtdb, '.info/connected');
-  const offsetRef = ref(rtdb, '.info/serverTimeOffset');
+registerServerTimeSync(rtdb, 'server-1');
+registerServerTimeSync(server2Rtdb, 'server-2');
 
-  // .info/serverTimeOffset is client-side Firebase metadata. Do not call
-  // get() on it: that can issue an invalid server path request and mark
-  // time sync unavailable, preventing expired auctions from settling.
-  onValue(offsetRef, (snap) => {
-    const offset = Number(snap.val());
-    if (Number.isFinite(offset)) {
-      _serverTimeOffset = offset;
-      _hasServerTimeOffset = true;
-      if (_rtdbConnected) _offsetReceivedWhileConnected = true;
-    }
-  });
+export const getServerTime = (database = rtdb) =>
+  Date.now() + (timeSyncByDatabase.get(database)?.offset || 0);
 
-  onValue(connectedRef, (snap) => {
-    const connected = snap.val() === true;
-    if (connected !== _rtdbConnected) {
-      _rtdbConnected = connected;
-      // Reuse the last valid Firebase-provided offset after reconnecting;
-      // the .info listener may not emit again if the offset did not change.
-      _offsetReceivedWhileConnected = connected && _hasServerTimeOffset;
-    }
-  });
-} catch (err) {
-  console.error('[Firebase] Failed to initialize server-time sync listeners:', err);
-}
+export const isServerTimeSynced = (database = rtdb) => {
+  const state = timeSyncByDatabase.get(database);
+  return !!state?.connected && !!state?.offsetReceivedWhileConnected;
+};
 
-/**
- * Returns the current server-authoritative time in milliseconds.
- * Uses Firebase RTDB's `.info/serverTimeOffset` for ms-accurate sync.
- * All clients calling this will agree on the same absolute time (±50ms).
- */
-export const getServerTime = () => Date.now() + _serverTimeOffset;
-
-/** True only after RTDB connects and supplies an offset during that connection. */
-export const isServerTimeSynced = () => _rtdbConnected && _offsetReceivedWhileConnected;
-
-/**
- * Returns the current server time offset in ms (for debugging).
- */
-export const getServerTimeOffset = () => _serverTimeOffset;
+export const getServerTimeOffset = (database = rtdb) =>
+  timeSyncByDatabase.get(database)?.offset || 0;
 
 export default app;
