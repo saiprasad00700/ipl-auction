@@ -50,16 +50,16 @@ test('automatic XI selection ignores artificial ratings and prefers explicit rec
   assert.equal(validatePlayingXI(selected.startingXI, selected.impactPlayer, performanceSquad, performanceCatalog), true);
 });
 
-test('automatic XI selection returns an explicit ineligible status when the squad cannot satisfy rules', () => {
-  const ineligibleCatalog = [
+test('automatic XI selection accepts a squad without mandatory all-rounder or bowling depth', () => {
+  const roleImbalancedCatalog = [
     { id: 'wk', role: 'Wicketkeeper', country: 'IND' },
     ...Array.from({ length: 10 }, (_, i) => ({ id: `bat${i}`, role: 'Batter', country: 'IND' })),
     { id: 'impact', role: 'Batter', country: 'IND' },
   ];
-  const result = autoSelectBestXI(ineligibleCatalog.map((p) => ({ id: p.id })), ineligibleCatalog);
-  assert.equal(result.selectionStatus, 'ineligible_squad');
-  assert.deepEqual(result.startingXI, []);
-  assert.equal(result.impactPlayer, null);
+  const result = autoSelectBestXI(roleImbalancedCatalog.map((p) => ({ id: p.id })), roleImbalancedCatalog);
+  assert.equal(result.selectionStatus, 'selected');
+  assert.equal(result.startingXI.length, 11);
+  assert.ok(result.impactPlayer);
 });
 
 test('XI validation rejects duplicate or out-of-squad selections', () => {
