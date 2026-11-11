@@ -1051,8 +1051,8 @@ export const AuctionProvider = ({ children }) => {
       throw new Error("You have been kicked from this room and cannot rejoin.");
     }
 
-    if (data.status === 'completed') {
-      throw new Error("This auction has already ended.");
+    if (data.status === 'completed' || data.winnerAnalysisStatus === 'completed' || Array.isArray(data.winnerRankings)) {
+      throw new Error(`ROOM_COMPLETED:${roomId}`);
     }
 
     const existingPlayers = data.players || [];
