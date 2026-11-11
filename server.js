@@ -1,5 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import http from 'node:http';
+import { createSign } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -141,6 +142,117 @@ async function getFirebaseAdminServices() {
     return { auth: getAuth(app), database: getDatabase(app) };
   })();
   return firebaseAdminServicesPromise;
+}
+
+// Firebase Realtime Database storage metrics are sampled infrequently by Cloud Monitoring.
+const capacityMetricCache = new Map();
+const CAPACITY_THRESHOLD = 0.80;
+const CAPACITY_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+
+function base64Url(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+async function getMonitoringAccessToken(serviceAccount) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claim = base64Url(JSON.stringify({
+    iss: serviceAccount.client_email,
+    scope: 'https://www.googleapis.com/auth/monitoring.read',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600
+  }));
+  const unsigned = header + '.' + claim;
+  const signer = createSign('RSA-SHA256');
+  signer.update(unsigned);
+  signer.end();
+  const assertion = unsigned + '.' + signer.sign(serviceAccount.private_key, 'base64url');
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) throw new Error('Cloud Monitoring authentication failed: ' + (payload.error_description || response.status));
+  return payload.access_token;
+}
+
+async function readFirebaseStorageMetric(projectId, accessToken, metricName) {
+  const now = new Date();
+  const start = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  const url = new URL('https://monitoring.googleapis.com/v3/projects/' + encodeURIComponent(projectId) + '/timeSeries');
+  url.searchParams.set('filter', 'metric.type="firebasedatabase.googleapis.com/' + metricName + '"');
+  url.searchParams.set('interval.startTime', start.toISOString());
+  url.searchParams.set('interval.endTime', now.toISOString());
+  url.searchParams.set('view', 'FULL');
+  url.searchParams.set('pageSize', '10');
+  const response = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Cloud Monitoring query failed for ' + projectId + ': ' + (payload.error?.message || response.status));
+  const points = (payload.timeSeries || []).flatMap((series) => series.points || []);
+  points.sort((a, b) => new Date(b.interval?.endTime || 0) - new Date(a.interval?.endTime || 0));
+  const point = points[0];
+  if (!point) return null;
+  const raw = point.value?.int64Value ?? point.value?.doubleValue ?? point.value?.boolValue;
+  const value = typeof raw === 'string' ? Number(raw) : raw;
+  const timestamp = new Date(point.interval?.endTime || 0).getTime();
+  if (!Number.isFinite(value) || !Number.isFinite(timestamp)) return null;
+  return { value, timestamp };
+}
+
+async function getFirebaseStorageCapacity(serverId) {
+  const cache = capacityMetricCache.get(serverId);
+  if (cache && Date.now() - cache.checkedAt < 10 * 60 * 1000) return cache;
+  const raw = serverId === '2'
+    ? process.env.SERVER2_FIREBASE_SERVICE_ACCOUNT_JSON
+    : process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('Firebase Admin service account is not configured for Server ' + serverId);
+  const serviceAccount = JSON.parse(raw);
+  const projectId = serviceAccount.project_id;
+  if (!projectId) throw new Error('Missing Firebase project ID for Server ' + serverId);
+  const accessToken = await getMonitoringAccessToken(serviceAccount);
+  const [total, limit] = await Promise.all([
+    readFirebaseStorageMetric(projectId, accessToken, 'storage/total_bytes'),
+    readFirebaseStorageMetric(projectId, accessToken, 'storage/limit')
+  ]);
+  const checkedAt = Date.now();
+  const fresh = total && limit &&
+    checkedAt - total.timestamp <= CAPACITY_MAX_AGE_MS &&
+    checkedAt - limit.timestamp <= CAPACITY_MAX_AGE_MS &&
+    limit.value > 0;
+  const result = {
+    serverId,
+    projectId,
+    totalBytes: total?.value ?? null,
+    limitBytes: limit?.value ?? null,
+    utilization: fresh ? total.value / limit.value : null,
+    metricTimestamp: total?.timestamp ?? null,
+    fresh: !!fresh,
+    checkedAt
+  };
+  capacityMetricCache.set(serverId, result);
+  return result;
+}
+
+async function chooseAutomaticFirebaseServer() {
+  const [server1, server2] = await Promise.all([
+    getFirebaseStorageCapacity('1'),
+    getFirebaseStorageCapacity('2')
+  ]);
+  if (!server1.fresh || !server2.fresh) {
+    throw new Error('AUTO allocation is waiting for fresh Firebase storage metrics. Enable Cloud Monitoring API and grant Monitoring Viewer to both Firebase service accounts.');
+  }
+  const available = [server1, server2]
+    .filter((server) => server.utilization < CAPACITY_THRESHOLD)
+    .sort((a, b) => a.utilization - b.utilization);
+  if (!available.length) {
+    throw new Error('Both Firebase servers are at or above 80% of their storage limit. New room creation is paused to protect existing auctions.');
+  }
+  return { serverId: available[0].serverId, servers: [server1, server2] };
 }
 
 let firebaseServer2AdminPromise;
@@ -683,6 +795,28 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     } catch (error) {
       console.warn('[Guardian] Could not record browser error:', error?.message || error);
       return sendJson(res, 503, { error: 'Guardian could not store this error' });
+    }
+  }
+  if (pathname === '/api/server-capacity') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth } = await getFirebaseAdminServices();
+      await auth.verifyIdToken(authorization.slice(7));
+      const [server1, server2] = await Promise.all([
+        getFirebaseStorageCapacity('1'),
+        getFirebaseStorageCapacity('2')
+      ]);
+      return sendJson(res, 200, {
+        threshold: CAPACITY_THRESHOLD,
+        servers: [server1, server2].map(({ serverId, totalBytes, limitBytes, utilization, metricTimestamp, fresh }) => ({
+          serverId, totalBytes, limitBytes, utilization, metricTimestamp, fresh
+        }))
+      });
+    } catch (error) {
+      console.warn('[Server capacity] Could not read Firebase storage metrics:', error?.message || error);
+      return sendJson(res, 503, { error: error?.message || 'Firebase storage metrics are unavailable' });
     }
   }
   if (pathname === '/api/server2-token') {
