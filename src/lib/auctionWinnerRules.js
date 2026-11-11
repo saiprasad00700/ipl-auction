@@ -1,5 +1,5 @@
 // Modified from the upstream project by saiprasad00700.
-import { PLAYER_BATTING_POSITIONS } from '../data/playerBattingPositions';
+import { PLAYER_BATTING_POSITIONS } from '../data/playerBattingPositions.js';
 /**
  * Pure helpers for the post-auction squad evaluation workflow.
  * Kept independent of React/Firebase so the rules can be unit-tested.
