@@ -11,8 +11,9 @@ export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
 export const MAX_OVERSEAS_PLAYERS_IN_SELECTION = 4;
-export const MIN_ALL_ROUNDERS_IN_XI = 2;
-export const MIN_BOWLERS_IN_XI = 5;
+// Selection preferences only; these are not eligibility requirements.
+export const PREFERRED_ALL_ROUNDERS_IN_XI = 2;
+export const PREFERRED_BOWLING_OPTIONS_IN_XI = 5;
 
 const normalizeRole = (player) => {
   const role = String(player?.role || player?.playingRole || '').toLowerCase();
@@ -122,14 +123,14 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   // batters before considering finishers or bowlers in the opening slots.
   addBest((p) => ['MID'].includes(p.battingPosition) && normalizeRole(p) !== 'bowl', 3 - selected.length);
 
-  addBest((p) => normalizeRole(p) === 'ar', MIN_ALL_ROUNDERS_IN_XI);
+  addBest((p) => normalizeRole(p) === 'ar', PREFERRED_ALL_ROUNDERS_IN_XI);
   addBest((p) => p.battingPosition === 'MID' && normalizeRole(p) !== 'bowl', 2);
   addBest((p) => p.battingPosition === 'MID' || normalizeRole(p) === 'ar', 4 - selected.length);
 
   // Keep the lower order functional: prioritize one declared finisher and
   // then three specialist bowling options (all-rounders count as bowling options).
   addBest((p) => p.battingPosition === 'FIN', 1);
-  addBest((p) => normalizeRole(p) === 'bowl', MIN_BOWLERS_IN_XI - selected.filter((p) => ['ar', 'bowl'].includes(normalizeRole(p))).length);
+  addBest((p) => normalizeRole(p) === 'bowl', PREFERRED_BOWLING_OPTIONS_IN_XI - selected.filter((p) => ['ar', 'bowl'].includes(normalizeRole(p))).length);
   addBest((p) => ['FIN', 'BOWL', 'AR'].includes(p.battingPosition) || ['ar', 'bowl'].includes(normalizeRole(p)), PLAYING_XI_SIZE - selected.length);
   addBest(() => true, PLAYING_XI_SIZE - selected.length);
 
@@ -160,11 +161,7 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
   const resolvedImpactPlayer = toPlayer(impactPlayer, playerCatalog);
   if (resolvedXI.length !== PLAYING_XI_SIZE || !resolvedImpactPlayer) return false;
   const overseasInSelection = [...resolvedXI, resolvedImpactPlayer].filter(isOverseasPlayer).length;
-  const allRounders = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
-  const bowlingOptions = resolvedXI.filter((player) => ['ar', 'bowl'].includes(normalizeRole(player))).length;
-  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
-    && allRounders >= MIN_ALL_ROUNDERS_IN_XI
-    && bowlingOptions >= MIN_BOWLERS_IN_XI;
+  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION;
 }
 
 /**
