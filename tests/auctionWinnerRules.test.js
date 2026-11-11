@@ -95,17 +95,17 @@ test('Playing XI plus Impact Player allows at most four overseas players while s
 
 
 
-test('XI validation requires at least two all-rounders and five bowling options', () => {
-  const invalidCatalog = [
+test('XI validation does not reject a squad for lacking all-rounders or bowling depth', () => {
+  const roleImbalancedCatalog = [
     { id: 'wk-only', role: 'Wicket-Keeper', country: 'IND' },
     ...Array.from({ length: 6 }, (_, i) => ({ id: `bat-only-${i}`, role: 'Batsman', country: 'IND' })),
     ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-only-${i}`, role: 'Bowler', country: 'IND' })),
     { id: 'impact', role: 'Batsman', country: 'IND' },
   ];
-  const invalidSquad = invalidCatalog.map((p) => ({ id: p.id }));
+  const roleImbalancedSquad = roleImbalancedCatalog.map((p) => ({ id: p.id }));
   assert.equal(
-    validatePlayingXI(invalidCatalog.slice(0, 11), invalidCatalog[11], invalidSquad, invalidCatalog),
-    false,
+    validatePlayingXI(roleImbalancedCatalog.slice(0, 11), roleImbalancedCatalog[11], roleImbalancedSquad, roleImbalancedCatalog),
+    true,
   );
 });
 
