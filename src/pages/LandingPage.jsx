@@ -42,7 +42,7 @@ const LandingPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [completedRoomCode, setCompletedRoomCode] = useState("");
-  const [selectedServer, setSelectedServer] = useState("1");
+  const [selectedServer, setSelectedServer] = useState("auto");
 
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
@@ -52,23 +52,28 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      const selectedDatabase = selectedServer === "2" ? await ensureServer2Auth() : rtdb;
-      goOnline(selectedDatabase);
-      const snapshot = await get(ref(selectedDatabase, "publicRooms"));
-      const directory = snapshot.exists() ? snapshot.val() : {};
-      const rooms = Object.values(directory).map((room) => ({ ...room, serverId: selectedServer })).filter((room) =>
-        room && typeof room.roomId === "string" &&
-        typeof room.hostName === "string" &&
-        (room.status === "waiting" || room.status === "active") &&
-        ["mega", "sprint11", "sprint5"].includes(room.auctionType)
-      ).map((room) => ({
-        roomId: room.roomId,
-        hostName: room.hostName,
-        status: room.status,
-        auctionType: room.auctionType,
-        serverId: room.serverId,
-        players: 0
+      const serverIds = selectedServer === "auto" ? ["1", "2"] : [selectedServer];
+      const directories = await Promise.all(serverIds.map(async (serverId) => {
+        const database = serverId === "2" ? await ensureServer2Auth() : rtdb;
+        goOnline(database);
+        const snapshot = await get(ref(database, "publicRooms"));
+        return { serverId, directory: snapshot.exists() ? snapshot.val() : {} };
       }));
+      const rooms = directories.flatMap(({ serverId, directory }) =>
+        Object.values(directory).map((room) => ({ ...room, serverId })).filter((room) =>
+          room && typeof room.roomId === "string" &&
+          typeof room.hostName === "string" &&
+          (room.status === "waiting" || room.status === "active") &&
+          ["mega", "sprint11", "sprint5"].includes(room.auctionType)
+        ).map((room) => ({
+          roomId: room.roomId,
+          hostName: room.hostName,
+          status: room.status,
+          auctionType: room.auctionType,
+          serverId: room.serverId,
+          players: 0
+        }))
+      );
       setPublicRooms(rooms);
     } catch (err) {
       console.error("Could not load public auction rooms:", err);
@@ -124,13 +129,15 @@ const LandingPage = () => {
         goOnline(rtdb);
         const snapshot = await get(ref(rtdb, `userAuctionHistory/${user.uid}`));
         const allEntries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
-        const entries = allEntries.filter((entry) => String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === selectedServer);
-        const historyDatabase = selectedServer === "2" ? await ensureServer2Auth() : rtdb;
+        const entries = allEntries.filter((entry) => selectedServer === "auto" || String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === selectedServer);
+        if (entries.some((entry) => String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === "2")) await ensureServer2Auth();
         const sessions = await Promise.all(entries.map(async (entry) => {
           if (!entry?.roomId) return null;
           let teamData = null;
           let roomData = null;
           try {
+            const entryServerId = String(entry.serverId || String(entry.roomId).charAt(0)) === "2" ? "2" : "1";
+            const historyDatabase = entryServerId === "2" ? server2Rtdb : rtdb;
             const [teamSnap, roomSnap] = await Promise.all([
               get(ref(historyDatabase, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
               get(ref(historyDatabase, `auctions/${entry.roomId}/room`))
@@ -264,7 +271,18 @@ const LandingPage = () => {
       const displayName = user.displayName || "Manager";
 
       if (activeTab === "new") {
-        const roomServerPrefix = selectedServer;
+        let roomServerPrefix = selectedServer;
+        if (selectedServer === "auto") {
+          const token = await user.getIdToken();
+          const response = await fetch("/api/server-capacity?allocate=1", {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const allocation = await response.json().catch(() => ({}));
+          if (!response.ok || !["1", "2"].includes(String(allocation.serverId))) {
+            throw new Error(allocation.error || "Automatic server allocation is temporarily unavailable. Please select Server 1 or Server 2 manually.");
+          }
+          roomServerPrefix = String(allocation.serverId);
+        }
         const newRoomId = roomServerPrefix + Math.random()
           .toString(36)
           .substring(2, 7)
@@ -592,17 +610,17 @@ const LandingPage = () => {
                     Auction Server
                   </span>
                   <div className="inline-flex items-center rounded-lg border border-white/10 bg-black/20 p-0.5" role="group" aria-label="Select auction server">
-                    {["1", "2"].map((serverId) => (
+                    {[{ id: "auto", label: "AUTO" }, { id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }].map(({ id, label }) => (
                       <button
-                        key={serverId}
+                        key={id}
                         type="button"
-                        onClick={() => setSelectedServer(serverId)}
-                        aria-pressed={selectedServer === serverId}
-                        className={`rounded-md px-2.5 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${selectedServer === serverId
+                        onClick={() => setSelectedServer(id)}
+                        aria-pressed={selectedServer === id}
+                        className={`rounded-md px-2.5 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${selectedServer === id
                           ? "border border-white/20 bg-white/10 text-white shadow-inner"
                           : "border border-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}
                       >
-                        Server {serverId}
+                        {label}
                       </button>
                     ))}
                   </div>
