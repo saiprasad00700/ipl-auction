@@ -850,7 +850,7 @@ export const AuctionProvider = ({ children }) => {
             const endedAt = getSyncedTime();
             const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
             const auctionType = roomSnapshot.val()?.auctionType || 'mega';
-            const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
+            const usesSquadBalanceAnalysis = auctionType !== 'mega';
             await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
               status: 'awaiting_xi',
               xiSubmissionStartedAt: endedAt,
@@ -973,7 +973,7 @@ export const AuctionProvider = ({ children }) => {
       const now = getSyncedTime();
       const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
       const auctionType = roomSnapshot.val()?.auctionType || 'mega';
-      const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
+      const usesSquadBalanceAnalysis = auctionType !== 'mega';
       await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
         status: 'awaiting_xi',
         xiSubmissionStartedAt: now,
