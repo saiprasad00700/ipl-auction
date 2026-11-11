@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
-import { rtdb, server2Rtdb } from "../lib/firebase";
+import { rtdb, server2Rtdb, ensureServer2Auth } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
 import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
@@ -133,6 +133,7 @@ const LandingPage = () => {
         goOnline(rtdb);
         const snapshot = await get(ref(rtdb, `userAuctionHistory/${user.uid}`));
         const entries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
+        if (entries.some((entry) => entry?.serverId === '2')) await ensureServer2Auth();
         const sessions = await Promise.all(entries.map(async (entry) => {
           if (!entry?.roomId) return null;
           let teamData = null;
