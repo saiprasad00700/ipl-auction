@@ -300,8 +300,16 @@ async function recordAnalyticsPresenceSnapshot() {
   try {
     const { database } = await getFirebaseAdminServices();
     const snapshot = await database.ref('auctions').get();
+    let allAuctions = snapshot.exists() ? (snapshot.val() || {}) : {};
+    try {
+      const { database: secondaryDatabase } = await getFirebaseServer2AdminServices();
+      const secondarySnapshot = await secondaryDatabase.ref('auctions').get();
+      if (secondarySnapshot.exists()) allAuctions = { ...allAuctions, ...(secondarySnapshot.val() || {}) };
+    } catch (secondaryError) {
+      console.warn('[Analytics] Server 2 snapshot unavailable:', secondaryError?.message || secondaryError);
+    }
     const { buildLiveAnalyticsSnapshot } = await import('./api/analytics.js');
-    const live = buildLiveAnalyticsSnapshot(snapshot.exists() ? snapshot.val() : {}, Date.now());
+    const live = buildLiveAnalyticsSnapshot(allAuctions, Date.now());
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) return;
