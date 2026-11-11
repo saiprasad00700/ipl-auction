@@ -2189,9 +2189,23 @@ export const AuctionProvider = ({ children }) => {
         winnerAnalysisCompletedAt: getSyncedTime()
       });
       void trackAnalyticsEvent('auction_completed', roomId);
-      // Completed auctions should no longer appear in the public lobby.
-      try { await remove(ref(rtdb, `publicRooms/${roomId}`)); }
-      catch (directoryError) { console.warn('Public room cleanup failed:', directoryError); }
+      // Mark the public directory entry completed before removing it. The lobby
+      // filters out completed entries, so a temporary RTDB delete failure cannot
+      // leave a finished auction available to new users.
+      const publicRoomRef = ref(rtdb, `publicRooms/${roomId}`);
+      try {
+        await updateRtdb(publicRoomRef, {
+          status: 'completed',
+          completedAt: getSyncedTime()
+        });
+      } catch (directoryUpdateError) {
+        console.warn('Could not mark public room completed:', directoryUpdateError);
+      }
+      try {
+        await remove(publicRoomRef);
+      } catch (directoryError) {
+        console.warn('Public room cleanup failed; completed status remains as a fallback:', directoryError);
+      }
       await push(ref(rtdb, `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: usesSquadBalanceAnalysis
