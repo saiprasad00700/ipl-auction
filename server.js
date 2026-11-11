@@ -171,13 +171,21 @@ let roomCleanupStarted = false;
 
 async function cleanupAbandonedRooms() {
   try {
-    const { database } = await getFirebaseAdminServices();
-    const auctionsSnapshot = await database.ref('auctions').get();
-    if (!auctionsSnapshot.exists()) return;
-    const now = Date.now();
-    const rooms = auctionsSnapshot.val() || {};
+    const { database: primaryDatabase } = await getFirebaseAdminServices();
+    const databases = [primaryDatabase];
+    try {
+      const { database: secondaryDatabase } = await getFirebaseServer2AdminServices();
+      databases.push(secondaryDatabase);
+    } catch (secondaryError) {
+      console.warn('[Room cleanup] Server 2 cleanup is not configured yet:', secondaryError?.message || secondaryError);
+    }
+    for (const database of databases) {
+      const auctionsSnapshot = await database.ref('auctions').get();
+      if (!auctionsSnapshot.exists()) continue;
+      const now = Date.now();
+      const rooms = auctionsSnapshot.val() || {};
 
-    for (const [roomId, roomNode] of Object.entries(rooms)) {
+      for (const [roomId, roomNode] of Object.entries(rooms)) {
       const room = roomNode?.room;
       if (!room) continue;
       // The live node is updated when an auction starts; prefer it over the
@@ -271,7 +279,8 @@ async function cleanupAbandonedRooms() {
 
       await database.ref('auctions/' + roomId).remove();
       await database.ref('publicRooms/' + roomId).remove();
-      console.log('[Room cleanup] Removed abandoned waiting room:', roomId);
+      console.log('[Room cleanup] Removed abandoned room from Firebase:', roomId);
+      }
     }
   } catch (error) {
     console.warn('[Room cleanup] Cleanup pass failed:', error?.message || error);
