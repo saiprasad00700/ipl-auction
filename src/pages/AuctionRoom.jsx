@@ -294,7 +294,7 @@ useEffect(() => {
 
    useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
-      const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(currentAuction.auctionType);
+      const usesSquadBalanceAnalysis = (currentAuction.auctionType || 'mega') !== 'mega';
       const tick = () => {
          const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
