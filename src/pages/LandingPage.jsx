@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
-import { rtdb, server2Rtdb, ensureServer2Auth } from "../lib/firebase";
+import { rtdb, server2Rtdb } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
 import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
@@ -56,7 +56,6 @@ const LandingPage = () => {
       const primarySnapshot = await get(ref(rtdb, "publicRooms"));
       let secondaryDirectory = {};
       try {
-        if (user) await ensureServer2Auth();
         const secondarySnapshot = await get(ref(server2Rtdb, "publicRooms"));
         secondaryDirectory = secondarySnapshot.exists() ? secondarySnapshot.val() : {};
       } catch (secondaryError) {
