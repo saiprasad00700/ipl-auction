@@ -296,7 +296,14 @@ useEffect(() => {
       if (currentAuction?.status !== 'awaiting_xi' || !currentAuction?.xiSubmissionDeadline) return;
       const usesSquadBalanceAnalysis = (currentAuction.auctionType || 'mega') !== 'mega';
       const tick = () => {
-         const participatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
+         const allParticipatingTeams = roomTeams.filter((t) => t?.teamId && t.teamId !== 'NONE');
+         const isMegaAuction = (currentAuction.auctionType || 'mega') === 'mega';
+         const participatingTeams = allParticipatingTeams.filter((t) =>
+            !t.disqualified && (!isMegaAuction || (Array.isArray(t.squad) ? t.squad.length : 0) >= 18)
+         );
+         const noEligibleMegaFranchises = isMegaAuction
+            && allParticipatingTeams.length > 0
+            && participatingTeams.length === 0;
          const allSubmitted = participatingTeams.length >= 2 && participatingTeams.every((t) =>
             t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayer)
          );
