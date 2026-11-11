@@ -118,6 +118,8 @@ const AuctionRoom = () => {
    feedbackCommentRef.current = feedbackComment;
    const feedbackActivityAtRef = useRef(0);
    const feedbackDismissedKey = user?.uid ? `ssauction-feedback-dismissed:${id}:${user.uid}` : null;
+   // Once a user successfully submits feedback, never show the review popup to that account again on this browser.
+   const feedbackSubmittedKey = user?.uid ? `ssauction-feedback-submitted:${user.uid}` : null;
    const [isRetryingAnalysis, setIsRetryingAnalysis] = useState(false);
    const [sidebarTab, setSidebarTab] = useState('activity'); // activity or chat
    const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -329,8 +331,10 @@ useEffect(() => {
    const feedbackPhaseOpen = ['awaiting_xi', 'analyzing', 'analysis_failed'].includes(currentAuction?.status)
       && currentAuction?.winnerAnalysisStatus !== 'completed'
       && !currentAuction?.winnerRankings;
-   const feedbackStorageDismissed = feedbackDismissedKey
-      && window.localStorage.getItem(feedbackDismissedKey) === '1';
+   const feedbackStorageDismissed = Boolean(
+      (feedbackDismissedKey && window.localStorage.getItem(feedbackDismissedKey) === '1')
+      || (feedbackSubmittedKey && window.localStorage.getItem(feedbackSubmittedKey) === '1')
+   );
 
    const closeFeedbackPopup = (remember = true) => {
       if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
@@ -357,6 +361,7 @@ useEffect(() => {
          });
          const result = await response.json().catch(() => ({}));
          if (!response.ok) throw new Error(result.error || 'Could not submit feedback. Please try again.');
+         if (feedbackSubmittedKey) window.localStorage.setItem(feedbackSubmittedKey, '1');
          closeFeedbackPopup(true);
       } catch (err) {
          setFeedbackError(err?.message || 'Could not submit feedback.');
