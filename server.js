@@ -143,6 +143,25 @@ async function getFirebaseAdminServices() {
   return firebaseAdminServicesPromise;
 }
 
+let firebaseServer2AdminPromise;
+async function getFirebaseServer2AdminServices() {
+  if (!firebaseServer2AdminPromise) firebaseServer2AdminPromise = (async () => {
+    const raw = process.env.SERVER2_FIREBASE_SERVICE_ACCOUNT_JSON;
+    const databaseURL = process.env.SERVER2_FIREBASE_DATABASE_URL;
+    if (!raw || !databaseURL) throw new Error('Server 2 is not configured');
+    const { initializeApp, cert, getApps } = await import('firebase-admin/app');
+    const { getAuth } = await import('firebase-admin/auth');
+    const { getDatabase } = await import('firebase-admin/database');
+    const serviceAccount = JSON.parse(raw);
+    if (serviceAccount.project_id !== 'ss-auction-server-2') throw new Error('Server 2 service account project mismatch');
+    const appName = 'ss-auction-server-2';
+    const app = getApps().find((item) => item.name === appName) ||
+      initializeApp({ credential: cert(serviceAccount), databaseURL }, appName);
+    return { auth: getAuth(app), database: getDatabase(app) };
+  })();
+  return firebaseServer2AdminPromise;
+}
+
 // Remove idle waiting rooms after 15 minutes and idle started auctions after 30 minutes.
 // Presence alone does not count as activity for started auctions.
 const WAITING_ROOM_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -659,19 +678,8 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!decoded?.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
         return sendJson(res, 403, { error: 'This account cannot access auction rooms' });
       }
-      const raw = process.env.SERVER2_FIREBASE_SERVICE_ACCOUNT_JSON;
-      const databaseURL = process.env.SERVER2_FIREBASE_DATABASE_URL;
-      if (!raw || !databaseURL) return sendJson(res, 503, { error: 'Server 2 is not configured' });
-      const { initializeApp, cert, getApps } = await import('firebase-admin/app');
-      const { getAuth } = await import('firebase-admin/auth');
-      const serviceAccount = JSON.parse(raw);
-      if (serviceAccount.project_id !== 'ss-auction-server-2') {
-        return sendJson(res, 503, { error: 'Server 2 service account does not match the configured project' });
-      }
-      const appName = 'ss-auction-server-2';
-      const server2App = getApps().find((item) => item.name === appName) ||
-        initializeApp({ credential: cert(serviceAccount), databaseURL }, appName);
-      const customToken = await getAuth(server2App).createCustomToken(decoded.uid);
+      const { auth: server2Auth } = await getFirebaseServer2AdminServices();
+      const customToken = await server2Auth.createCustomToken(decoded.uid);
       return sendJson(res, 200, { customToken });
     } catch (error) {
       console.error('[Server 2] Token bridge failed:', error?.message || error);
@@ -762,11 +770,12 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth, database } = await getFirebaseAdminServices();
+      const { auth } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
+      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       const roomRef = database.ref(`auctions/${roomId}/room`);
       const roomSnapshot = await roomRef.get();
@@ -788,10 +797,11 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in to use voice chat' });
-      const { auth, database } = await getFirebaseAdminServices();
+      const { auth } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
+      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
         return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
