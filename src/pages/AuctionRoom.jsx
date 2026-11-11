@@ -2335,7 +2335,7 @@ useEffect(() => {
             )}
          </AnimatePresence>
 
-         {currentAuction?.status === 'awaiting_xi' && !['sprint5', 'sprint11'].includes(currentAuction?.auctionType) && (
+         {currentAuction?.status === 'awaiting_xi' && (currentAuction?.auctionType || 'mega') === 'mega' && (
             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
                <div className="w-full max-w-4xl max-h-[94vh] overflow-y-auto bg-[#0b1422] border border-white/10 rounded-3xl p-4 sm:p-7 shadow-2xl">
                   <p className="text-emerald-300 text-[10px] font-black uppercase tracking-[0.25em]">Auction complete</p>
@@ -2467,7 +2467,7 @@ useEffect(() => {
                </div>
             </div>
          )}
-         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">AI is comparing all Playing XIs and full squads. Rankings will appear for everyone when ready.</p></div></div>}
+         {currentAuction?.status === 'analyzing' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><div className="w-12 h-12 border-4 border-emerald-400/20 border-t-emerald-400 rounded-full animate-spin mx-auto mb-5" /><h2 className="text-2xl font-black uppercase">Analyzing squads</h2><p className="text-sm text-gray-400 mt-3">Gemini is evaluating every franchise's squad balance, strengths, and weaknesses. Rankings will appear for everyone when ready.</p></div></div>}
          {currentAuction?.status === 'analysis_failed' && <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 text-center"><div className="max-w-md bg-[#0b1422] border border-white/10 rounded-3xl p-8"><h2 className="text-2xl font-black uppercase text-red-400">AI analysis failed</h2><p className="text-sm text-gray-400 mt-3">{currentAuction.winnerAnalysisError || 'AI analysis failed.'}</p><p className="text-xs text-gray-500 mt-2">If this mentions API key permissions, quota, or model access, fix the Gemini settings in Render before retrying.</p><button type="button" onClick={retryAnalysis} disabled={isRetryingAnalysis} className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-400 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50">{isRetryingAnalysis ? 'Retrying analysis…' : 'Retry AI Analysis'}</button></div></div>}
 
          {showFeedbackPopup && (
