@@ -143,25 +143,6 @@ async function getFirebaseAdminServices() {
   return firebaseAdminServicesPromise;
 }
 
-
-
-// Server 2 Admin SDK is isolated from the default Server 1 app.
-let firebaseServer2AuthPromise;
-async function getFirebaseServer2Auth() {
-  if (!firebaseServer2AuthPromise) firebaseServer2AuthPromise = (async () => {
-    const raw = process.env.SERVER2_FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!raw) throw new Error('Server 2 service account is not configured');
-    const { initializeApp, cert, getApps } = await import('firebase-admin/app');
-    const { getAuth } = await import('firebase-admin/auth');
-    const serviceAccount = JSON.parse(raw);
-    const appName = 'ss-auction-server-2';
-    const app = getApps().find((item) => item.name === appName) ||
-      initializeApp({ credential: cert(serviceAccount) }, appName);
-    return getAuth(app);
-  })();
-  return firebaseServer2AuthPromise;
-}
-
 // Remove idle waiting rooms after 15 minutes and idle started auctions after 30 minutes.
 // Presence alone does not count as activity for started auctions.
 const WAITING_ROOM_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -773,29 +754,6 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not record room activity' });
     }
   }
-
-  if (pathname === '/api/server2-token') {
-    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-    try {
-      const authorization = String(req.headers.authorization || '');
-      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth } = await getFirebaseAdminServices();
-      const decoded = await auth.verifyIdToken(authorization.slice(7));
-      if (!decoded.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
-        return sendJson(res, 403, { error: 'This account cannot access Server 2' });
-      }
-      const server2Auth = await getFirebaseServer2Auth();
-      const customToken = await server2Auth.createCustomToken(decoded.uid, {
-        server: 'ss-auction-server-2',
-        source: 'ss-auction-server-1'
-      });
-      return sendJson(res, 200, { customToken });
-    } catch (error) {
-      console.error('[Server 2 auth] Token creation failed:', error?.message || error);
-      return sendJson(res, 500, { error: 'Could not authorize Server 2 access' });
-    }
-  }
-
   if (pathname === '/api/voice-token') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
