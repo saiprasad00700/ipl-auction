@@ -41,6 +41,7 @@ const LandingPage = () => {
   const [roomCode, setRoomCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [completedRoomCode, setCompletedRoomCode] = useState("");
 
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
@@ -281,10 +282,13 @@ const LandingPage = () => {
         navigate(`/lobby/${code}`);
       }
     } catch (error) {
-      setError(
-        error.message || "Failed to create/join room. Please try again.",
-      );
-      setTimeout(() => setError(""), 3000);
+      const message = error?.message || "Failed to create/join room. Please try again.";
+      if (message.startsWith("ROOM_COMPLETED:")) {
+        setCompletedRoomCode(message.split(":")[1] || roomCode.toUpperCase());
+      } else {
+        setError(message);
+        setTimeout(() => setError(""), 3000);
+      }
       setIsSubmitting(false);
     }
   };
@@ -1239,6 +1243,27 @@ const LandingPage = () => {
           </div>
         </div>
       </div>
+
+      {completedRoomCode && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" role="alertdialog" aria-modal="true" aria-labelledby="completed-room-title">
+          <div className="w-full max-w-sm rounded-2xl border border-red-400/25 bg-[#101522] p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-400/10 text-red-300">
+              <Clock size={22} />
+            </div>
+            <h2 id="completed-room-title" className="text-base font-black uppercase tracking-wide text-white">Room Completed</h2>
+            <p className="mt-3 text-sm leading-relaxed text-gray-300">
+              This <span className="font-black text-emerald-300">{completedRoomCode}</span> is completed.
+            </p>
+            <button
+              type="button"
+              onClick={() => setCompletedRoomCode("")}
+              className="mt-5 w-full rounded-xl bg-emerald-400 px-4 py-3 text-xs font-black uppercase tracking-widest text-[#04120f] hover:bg-emerald-300"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={!!sessionToDelete}
