@@ -586,6 +586,27 @@ const LandingPage = () => {
                 >
                   History
                 </button>
+
+                <div className="flex flex-col justify-center gap-1.5 self-center px-2 pb-3 sm:pb-0 sm:ml-2 sm:pl-3 sm:border-l sm:border-white/10">
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">
+                    Auction Server
+                  </span>
+                  <div className="inline-flex items-center rounded-lg border border-white/10 bg-black/20 p-0.5" role="group" aria-label="Select auction server">
+                    {["1", "2"].map((serverId) => (
+                      <button
+                        key={serverId}
+                        type="button"
+                        onClick={() => setSelectedServer(serverId)}
+                        aria-pressed={selectedServer === serverId}
+                        className={`rounded-md px-2.5 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${selectedServer === serverId
+                          ? "border border-white/20 bg-white/10 text-white shadow-inner"
+                          : "border border-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}
+                      >
+                        Server {serverId}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* User Profile and Logout */}
