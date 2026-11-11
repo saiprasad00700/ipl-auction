@@ -117,8 +117,8 @@ export const AuctionProvider = ({ children }) => {
   // for Firebase's server-time metadata instead of rejecting the user's click
   // during the short connection/sync window.
   const ensureServerTimeSync = useCallback(async () => {
-    if (isServerTimeSynced(database)) return;
     const database = currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb;
+    if (isServerTimeSynced(database)) return;
     try { goOnline(database); } catch (e) {}
     await new Promise((resolve) => {
       let attempts = 0;
@@ -133,7 +133,7 @@ export const AuctionProvider = ({ children }) => {
     if (!isServerTimeSynced(database)) {
       throw new Error('Auction server time is still connecting. Please try again in a moment.');
     }
-  }, []);
+  }, [currentAuction?.id]);
 
   // Create a new room in DB (RTDB + Supabase index, zero Firestore load)
   const createRoom = useCallback(async (roomId, userId, playerDetails, auctionType = 'mega', isPublic = true) => {
