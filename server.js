@@ -700,13 +700,14 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth, database } = await getFirebaseAdminServices();
+      const { auth } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       if (/^(bot[_-]|auctionbot[_-])/i.test(String(decoded.uid || ''))) {
         return sendJson(res, 403, { error: 'Bots are not allowed to submit feedback' });
       }
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
+      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
 
       const rating = body.rating == null || body.rating === '' ? null : Number(body.rating);
