@@ -11,6 +11,8 @@ export const PLAYING_XI_SIZE = 11;
 export const IMPACT_PLAYER_COUNT = 1;
 export const MAX_OVERSEAS_PLAYERS_IN_XI = 4;
 export const MAX_OVERSEAS_PLAYERS_IN_SELECTION = 4;
+export const MIN_ALL_ROUNDERS_IN_XI = 2;
+export const MIN_BOWLERS_IN_XI = 5;
 
 const normalizeRole = (player) => {
   const role = String(player?.role || player?.playingRole || '').toLowerCase();
@@ -158,7 +160,11 @@ export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog
   const resolvedImpactPlayer = toPlayer(impactPlayer, playerCatalog);
   if (resolvedXI.length !== PLAYING_XI_SIZE || !resolvedImpactPlayer) return false;
   const overseasInSelection = [...resolvedXI, resolvedImpactPlayer].filter(isOverseasPlayer).length;
-  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION;
+  const allRounders = resolvedXI.filter((player) => normalizeRole(player) === 'ar').length;
+  const bowlingOptions = resolvedXI.filter((player) => ['ar', 'bowl'].includes(normalizeRole(player))).length;
+  return overseasInSelection <= MAX_OVERSEAS_PLAYERS_IN_SELECTION
+    && allRounders >= MIN_ALL_ROUNDERS_IN_XI
+    && bowlingOptions >= MIN_BOWLERS_IN_XI;
 }
 
 /**
