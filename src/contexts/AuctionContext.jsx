@@ -117,19 +117,20 @@ export const AuctionProvider = ({ children }) => {
   // for Firebase's server-time metadata instead of rejecting the user's click
   // during the short connection/sync window.
   const ensureServerTimeSync = useCallback(async () => {
-    if (isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) return;
-    try { goOnline(rtdb); } catch (e) {}
+    if (isServerTimeSynced(database)) return;
+    const database = currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb;
+    try { goOnline(database); } catch (e) {}
     await new Promise((resolve) => {
       let attempts = 0;
       const retry = setInterval(() => {
         attempts += 1;
-        if (isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb) || attempts >= 50) {
+        if (isServerTimeSynced(database) || attempts >= 50) {
           clearInterval(retry);
           resolve();
         }
       }, 100);
     });
-    if (!isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb)) {
+    if (!isServerTimeSynced(database)) {
       throw new Error('Auction server time is still connecting. Please try again in a moment.');
     }
   }, []);
