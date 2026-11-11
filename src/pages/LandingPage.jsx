@@ -271,22 +271,24 @@ const LandingPage = () => {
       const displayName = user.displayName || "Manager";
 
       if (activeTab === "new") {
-        let roomServerPrefix = selectedServer;
-        if (selectedServer === "auto") {
-          const token = await user.getIdToken();
-          const response = await fetch("/api/server-capacity?allocate=1", {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const allocation = await response.json().catch(() => ({}));
-          if (!response.ok || !["1", "2"].includes(String(allocation.serverId))) {
-            throw new Error(allocation.error || "Automatic server allocation is temporarily unavailable. Please select Server 1 or Server 2 manually.");
-          }
-          roomServerPrefix = String(allocation.serverId);
+        const roomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+        const token = await user.getIdToken();
+        const allocatorPayload = selectedServer === "auto"
+          ? { mode: "allocate", roomSuffix, auctionType }
+          : { mode: "reserve", serverId: selectedServer, roomId: selectedServer + roomSuffix, auctionType };
+        const allocationResponse = await fetch("/api/server-capacity", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(allocatorPayload)
+        });
+        const allocation = await allocationResponse.json().catch(() => ({}));
+        if (!allocationResponse.ok || !["1", "2"].includes(String(allocation.serverId)) || !allocation.roomId) {
+          throw new Error(allocation.error || "Server allocation failed. Please try again.");
         }
-        const newRoomId = roomServerPrefix + Math.random()
-          .toString(36)
-          .substring(2, 7)
-          .toUpperCase();
+        const newRoomId = allocation.roomId;
         await createRoom(
           newRoomId,
           user.uid,
