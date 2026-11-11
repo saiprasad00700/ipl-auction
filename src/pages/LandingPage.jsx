@@ -841,6 +841,13 @@ const LandingPage = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2.5 text-center">
+                  <Wifi size={13} className="shrink-0 text-cyan-300" />
+                  <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-cyan-200">
+                    Auto server allocation · Room code 1 = Server 1 · Room code 2 = Server 2
+                  </p>
+                </div>
+
                 <div className="pt-1 sm:pt-2">
                   <button
                     type="submit"
@@ -929,7 +936,12 @@ const LandingPage = () => {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[10px] font-black text-white">{room.hostName}'s Room</p>
                           <p className="mt-1 text-[9px] text-gray-400"><span className={room.status === "active" ? "text-emerald-300" : "text-blue-300"}>{room.status === "active" ? "LIVE" : "WAITING"}</span>{" · "}{room.auctionType === "sprint11" ? "Classic" : room.auctionType === "sprint5" ? "Sprint" : "Mega"}</p>
-                          <p className="mt-1 font-mono text-[9px] tracking-widest text-emerald-300">{room.roomId}</p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-[9px] tracking-widest text-emerald-300">{room.roomId}</span>
+                            <span className={`rounded-md border px-1.5 py-0.5 text-[7px] font-black tracking-wider ${room.serverId === "2" ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200" : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"}`}>
+                              SERVER {room.serverId}
+                            </span>
+                          </div>
                         </div>
                         <button type="button" onClick={() => setRoomCode(room.roomId)} className="rounded-lg bg-emerald-400 px-3 py-2 text-[9px] font-black uppercase text-black">Use code</button>
                       </div>
