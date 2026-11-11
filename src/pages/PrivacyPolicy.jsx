@@ -236,7 +236,7 @@ const PrivacyPolicy = () => {
                   If you have questions about this Privacy Policy or how we handle your data, please contact the engineering team at:
                 </p>
                 <p>
-                  <a href="mailto:shaurya01836@gmail.com" className="text-blue-400 hover:text-blue-300 transition-colors">shaurya01836@gmail.com</a>
+                  <a href="mailto:ssauctionforall@gmail.com" className="text-blue-400 hover:text-blue-300 transition-colors">ssauctionforall@gmail.com</a>
                 </p>
               </div>
             </section>
