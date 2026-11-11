@@ -876,7 +876,7 @@ const LandingPage = () => {
                 <div className="flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2.5 text-center">
                   <Wifi size={13} className="shrink-0 text-cyan-300" />
                   <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-cyan-200">
-                    Auto server allocation · Room code 1 = Server 1 · Room code 2 = Server 2
+                    AUTO load balancing · New rooms go to the lower-estimated workload
                   </p>
                 </div>
 
