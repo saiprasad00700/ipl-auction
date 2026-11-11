@@ -649,6 +649,35 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 503, { error: 'Guardian could not store this error' });
     }
   }
+  if (pathname === '/api/server2-token') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      if (!decoded?.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
+        return sendJson(res, 403, { error: 'This account cannot access auction rooms' });
+      }
+      const raw = process.env.SERVER2_FIREBASE_SERVICE_ACCOUNT_JSON;
+      const databaseURL = process.env.SERVER2_FIREBASE_DATABASE_URL;
+      if (!raw || !databaseURL) return sendJson(res, 503, { error: 'Server 2 is not configured' });
+      const { initializeApp, cert, getApps } = await import('firebase-admin/app');
+      const { getAuth } = await import('firebase-admin/auth');
+      const serviceAccount = JSON.parse(raw);
+      if (serviceAccount.project_id !== 'ss-auction-server-2') {
+        return sendJson(res, 503, { error: 'Server 2 service account does not match the configured project' });
+      }
+      const appName = 'ss-auction-server-2';
+      const server2App = getApps().find((item) => item.name === appName) ||
+        initializeApp({ credential: cert(serviceAccount), databaseURL }, appName);
+      const customToken = await getAuth(server2App).createCustomToken(decoded.uid);
+      return sendJson(res, 200, { customToken });
+    } catch (error) {
+      console.error('[Server 2] Token bridge failed:', error?.message || error);
+      return sendJson(res, 503, { error: 'Could not authenticate with Server 2' });
+    }
+  }
   if (pathname === '/api/auction-feedback') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
