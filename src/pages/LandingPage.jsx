@@ -42,6 +42,7 @@ const LandingPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [completedRoomCode, setCompletedRoomCode] = useState("");
+  const [selectedServer, setSelectedServer] = useState("1");
 
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
@@ -51,21 +52,11 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      // The app starts RTDB offline by default; connect before reading the public lobby.
-      goOnline(rtdb);
-      const primarySnapshot = await get(ref(rtdb, "publicRooms"));
-      let secondaryDirectory = {};
-      try {
-        const secondarySnapshot = await get(ref(server2Rtdb, "publicRooms"));
-        secondaryDirectory = secondarySnapshot.exists() ? secondarySnapshot.val() : {};
-      } catch (secondaryError) {
-        console.warn("Server 2 public room list is temporarily unavailable:", secondaryError?.message || secondaryError);
-      }
-      const primaryDirectory = primarySnapshot.exists() ? primarySnapshot.val() : {};
-      const rooms = [
-        ...Object.values(primaryDirectory).map((room) => ({ ...room, serverId: "1" })),
-        ...Object.values(secondaryDirectory).map((room) => ({ ...room, serverId: "2" }))
-      ].filter((room) =>
+      const selectedDatabase = selectedServer === "2" ? await ensureServer2Auth() : rtdb;
+      goOnline(selectedDatabase);
+      const snapshot = await get(ref(selectedDatabase, "publicRooms"));
+      const directory = snapshot.exists() ? snapshot.val() : {};
+      const rooms = Object.values(directory).map((room) => ({ ...room, serverId: selectedServer })).filter((room) =>
         room && typeof room.roomId === "string" &&
         typeof room.hostName === "string" &&
         (room.status === "waiting" || room.status === "active") &&
@@ -90,7 +81,7 @@ const LandingPage = () => {
     fetchPublicLobbies();
     const refreshId = setInterval(fetchPublicLobbies, 15000);
     return () => clearInterval(refreshId);
-  }, []);
+  }, [selectedServer]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
@@ -132,14 +123,14 @@ const LandingPage = () => {
       try {
         goOnline(rtdb);
         const snapshot = await get(ref(rtdb, `userAuctionHistory/${user.uid}`));
-        const entries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
-        if (entries.some((entry) => entry?.serverId === '2')) await ensureServer2Auth();
+        const allEntries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
+        const entries = allEntries.filter((entry) => String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === selectedServer);
+        const historyDatabase = selectedServer === "2" ? await ensureServer2Auth() : rtdb;
         const sessions = await Promise.all(entries.map(async (entry) => {
           if (!entry?.roomId) return null;
           let teamData = null;
           let roomData = null;
           try {
-            const historyDatabase = entry.serverId === "2" ? server2Rtdb : rtdb;
             const [teamSnap, roomSnap] = await Promise.all([
               get(ref(historyDatabase, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
               get(ref(historyDatabase, `auctions/${entry.roomId}/room`))
@@ -197,7 +188,7 @@ const LandingPage = () => {
 
     fetchHistory();
     return () => { cancelled = true; };
-  }, [activeTab, user?.uid, historyRefreshKey]);
+  }, [activeTab, user?.uid, historyRefreshKey, selectedServer]);
 
   // Filtered public rooms
   const filteredPublicRooms = useMemo(() => {
@@ -273,7 +264,7 @@ const LandingPage = () => {
       const displayName = user.displayName || "Manager";
 
       if (activeTab === "new") {
-        const roomServerPrefix = Math.random() < 0.5 ? "1" : "2";
+        const roomServerPrefix = selectedServer;
         const newRoomId = roomServerPrefix + Math.random()
           .toString(36)
           .substring(2, 7)
@@ -368,7 +359,7 @@ const LandingPage = () => {
           <div className="bg-[#080f1d]/95 rounded-[1.35rem] sm:rounded-[2rem] border border-white/[0.07] grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/[0.07] overflow-hidden">
             {/* Left Side: Live Activity Feed */}
             <div className="lg:col-span-5 w-full flex flex-col p-5 sm:p-7 md:p-8 relative bg-gradient-to-b from-white/[0.025] to-transparent">
-              <AuctionActivityFeed activeCount={publicRooms.length} />
+              <AuctionActivityFeed activeCount={publicRooms.length} selectedServer={selectedServer} onSelectServer={setSelectedServer} />
             </div>
 
             {/* Right Side: Welcome Login Form */}
@@ -549,7 +540,7 @@ const LandingPage = () => {
         <div className="bg-[#080f1d]/95 rounded-[1.35rem] sm:rounded-[2rem] border border-white/[0.07] grid grid-cols-1 lg:grid-cols-12 gap-0 items-stretch divide-y lg:divide-y-0 lg:divide-x divide-white/[0.07] overflow-hidden">
           {/* Left Side: Live signings */}
           <div className="lg:col-span-5 w-full flex flex-col p-5 sm:p-7 md:p-8 relative bg-gradient-to-b from-white/[0.025] to-transparent">
-            <AuctionActivityFeed activeCount={publicRooms.length} />
+            <AuctionActivityFeed activeCount={publicRooms.length} selectedServer={selectedServer} onSelectServer={setSelectedServer} />
           </div>
 
           {/* Right Side: Create/Join/History form */}
