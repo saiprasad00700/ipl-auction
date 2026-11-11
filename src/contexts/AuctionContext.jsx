@@ -861,7 +861,7 @@ export const AuctionProvider = ({ children }) => {
               userId: 'system', userName: 'System',
               text: usesSquadBalanceAnalysis
                 ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
-                : 'Bidding has ended. Submit your Playing XI (11 ordered starters + chasing and defending Impact Player choices) within 3 minutes.',
+                : 'Bidding has ended. Submit your Playing XI (11 ordered starters + chasing and defending Impact Player choices) within 5 minutes.',
               type: 'log', timestamp: serverTimestampRtdb()
             });
           }
@@ -984,7 +984,7 @@ export const AuctionProvider = ({ children }) => {
         userId: 'system', userName: 'System',
         text: usesSquadBalanceAnalysis
           ? 'Bidding has ended. AI is now analyzing every franchise squad for overall team balance.'
-          : 'Bidding has ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 3 minutes.',
+          : 'Bidding has ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 5 minutes.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
       return;
@@ -1918,7 +1918,7 @@ export const AuctionProvider = ({ children }) => {
       userId: 'system', userName: 'System',
       text: usesSquadBalanceAnalysis
         ? 'Auction ended. AI is now analyzing every franchise squad for overall team balance.'
-        : `Auction ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 3 minutes.${ruleMessage}`,
+        : `Auction ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 5 minutes.${ruleMessage}`,
       type: 'log', timestamp: serverTimestampRtdb()
     });
   }, [user, currentAuction, getSyncedTime]);
@@ -1990,8 +1990,33 @@ export const AuctionProvider = ({ children }) => {
     const readinessRef = ref(rtdb, `auctions/${roomId}/teams`);
     const readinessSnap = await get(readinessRef);
     const readinessData = readinessSnap.val() || {};
-    const readinessTeams = Object.values(readinessData)
-      .filter((t) => t?.teamId && t.teamId !== 'NONE' && !t.disqualified);
+    const allParticipatingTeams = Object.entries(readinessData)
+      .filter(([, t]) => t?.teamId && t.teamId !== 'NONE');
+    // Enforce the 18-player minimum only in MEGA, including auctions that
+    // reach this phase through the natural end-of-bidding path.
+    if (!usesSquadBalanceAnalysis) {
+      const disqualificationUpdates = {};
+      for (const [teamKey, team] of allParticipatingTeams) {
+        const squadCount = Array.isArray(team.squad) ? team.squad.length : 0;
+        const disqualified = squadCount < 18;
+        team.disqualified = disqualified;
+        team.disqualificationReason = disqualified
+          ? `You need to buy minimum 18 players, but you bought only ${squadCount} players. So you are disqualified.`
+          : null;
+        disqualificationUpdates[`${teamKey}/disqualified`] = disqualified;
+        disqualificationUpdates[`${teamKey}/disqualificationReason`] = team.disqualificationReason;
+        disqualificationUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
+      }
+      if (Object.keys(disqualificationUpdates).length) {
+        await updateRtdb(readinessRef, disqualificationUpdates);
+      }
+    }
+    const readinessTeams = allParticipatingTeams
+      .map(([, team]) => team)
+      .filter((team) => !team.disqualified);
+    const noEligibleMegaFranchises = !usesSquadBalanceAnalysis
+      && allParticipatingTeams.length > 0
+      && readinessTeams.length === 0;
 
     // Bots never submit a Playing XI. For Mega auctions, the host selects and
     // persists their best eligible XI from the squad using the site's selector.
@@ -2027,9 +2052,9 @@ export const AuctionProvider = ({ children }) => {
       }
     }
 
-    const allSubmitted = readinessTeams.length >= 2 && readinessTeams.every((t) =>
+    const allSubmitted = noEligibleMegaFranchises || (readinessTeams.length >= 2 && readinessTeams.every((t) =>
       t.playingXI?.startingXI?.length === 11 && Boolean(t.playingXI?.impactPlayerChasing || t.playingXI?.impactPlayer) && Boolean(t.playingXI?.impactPlayerDefending || t.playingXI?.impactPlayer)
-    );
+    ));
     const deadlinePassed = getSyncedTime() >= Number(roomData.xiSubmissionDeadline || 0);
     if (!usesSquadBalanceAnalysis && !deadlinePassed && !allSubmitted) return;
 
@@ -2144,7 +2169,7 @@ export const AuctionProvider = ({ children }) => {
 
       const disqualifiedRankings = disqualifiedFranchises.map((franchise, index) => {
         const squadCount = Array.isArray(franchise.squad) ? franchise.squad.length : 0;
-        const reason = franchise.disqualificationReason || `Only ${squadCount} players bought; at least 18 are required.`;
+        const reason = franchise.disqualificationReason || `You need to buy minimum 18 players, but you bought only ${squadCount} players. So you are disqualified.`;
         return {
           franchiseId: franchise.teamId,
           rank: eligibleRankings.length + index + 1,
