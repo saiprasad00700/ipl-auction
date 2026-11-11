@@ -1,6 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, signInWithCustomToken } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getDatabase, ref, onValue, get, goOffline } from "firebase/database";
 import { getStorage } from "firebase/storage";
@@ -47,6 +47,50 @@ let _offsetReceivedWhileConnected = false;
 
 export const rtdb = getDatabase(app);
 export const storage = getStorage(app);
+
+// Secondary project is initialized separately; primary authentication remains authoritative.
+const server2Config = {
+  apiKey: "AIzaSyCtfixD6HTHbLrLLkHNZ-X90dtq3LmFWIU",
+  authDomain: "ss-auction-server-2.firebaseapp.com",
+  databaseURL: "https://ss-auction-server-2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ss-auction-server-2",
+  storageBucket: "ss-auction-server-2.firebasestorage.app",
+  messagingSenderId: "541583284758",
+  appId: "1:541583284758:web:f706cf9cd15a6472cd7337"
+};
+const server2App = initializeApp(server2Config, "ss-auction-server-2");
+export const server2Auth = getAuth(server2App);
+export const server2Rtdb = getDatabase(server2App);
+let server2AuthUid = null;
+let server2AuthPromise = null;
+
+/** Exchange the Server 1 identity for a short-lived Firebase custom-token session on Server 2. */
+export async function ensureServer2Auth() {
+  const primaryUser = auth.currentUser;
+  if (!primaryUser) throw new Error("Sign in before connecting to Server 2.");
+  if (server2Auth.currentUser?.uid === primaryUser.uid) return server2Auth.currentUser;
+  if (server2AuthPromise && server2AuthUid === primaryUser.uid) return server2AuthPromise;
+  server2AuthUid = primaryUser.uid;
+  server2AuthPromise = (async () => {
+    const idToken = await primaryUser.getIdToken();
+    const response = await fetch("/api/server2-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({})
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.customToken) {
+      throw new Error(payload.error || "Could not authorize Server 2.");
+    }
+    const credential = await signInWithCustomToken(server2Auth, payload.customToken);
+    return credential.user;
+  })().catch((error) => {
+    server2AuthPromise = null;
+    server2AuthUid = null;
+    throw error;
+  });
+  return server2AuthPromise;
+}
 
 
 try {
