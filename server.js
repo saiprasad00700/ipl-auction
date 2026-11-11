@@ -804,6 +804,11 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
       const { auth } = await getFirebaseAdminServices();
       await auth.verifyIdToken(authorization.slice(7));
+      const requestUrl = new URL(req.url || '/', 'http://localhost');
+      if (requestUrl.searchParams.get('allocate') === '1') {
+        const allocation = await chooseAutomaticFirebaseServer();
+        return sendJson(res, 200, { serverId: allocation.serverId });
+      }
       const [server1, server2] = await Promise.all([
         getFirebaseStorageCapacity('1'),
         getFirebaseStorageCapacity('2')
