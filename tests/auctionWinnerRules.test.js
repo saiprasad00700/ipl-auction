@@ -21,7 +21,7 @@ const catalog = [
 const squad = catalog.map((p) => ({ id: p.id, bid: 1 }));
 
 test('post-auction deadlines and retention allowance match product rules', () => {
-  assert.equal(PLAYING_XI_DEADLINE_MS, 120000);
+  assert.equal(PLAYING_XI_DEADLINE_MS, 300000);
   assert.equal(RETENTION_DECISION_MS, 10000);
   assert.equal(RETENTION_CARDS_PER_FRANCHISE, 2);
 });
@@ -50,16 +50,16 @@ test('automatic XI selection ignores artificial ratings and prefers explicit rec
   assert.equal(validatePlayingXI(selected.startingXI, selected.impactPlayer, performanceSquad, performanceCatalog), true);
 });
 
-test('automatic XI selection returns an explicit ineligible status when the squad cannot satisfy rules', () => {
-  const ineligibleCatalog = [
+test('automatic XI selection accepts a squad without mandatory all-rounder or bowling depth', () => {
+  const roleImbalancedCatalog = [
     { id: 'wk', role: 'Wicketkeeper', country: 'IND' },
     ...Array.from({ length: 10 }, (_, i) => ({ id: `bat${i}`, role: 'Batter', country: 'IND' })),
     { id: 'impact', role: 'Batter', country: 'IND' },
   ];
-  const result = autoSelectBestXI(ineligibleCatalog.map((p) => ({ id: p.id })), ineligibleCatalog);
-  assert.equal(result.selectionStatus, 'ineligible_squad');
-  assert.deepEqual(result.startingXI, []);
-  assert.equal(result.impactPlayer, null);
+  const result = autoSelectBestXI(roleImbalancedCatalog.map((p) => ({ id: p.id })), roleImbalancedCatalog);
+  assert.equal(result.selectionStatus, 'selected');
+  assert.equal(result.startingXI.length, 11);
+  assert.ok(result.impactPlayer);
 });
 
 test('XI validation rejects duplicate or out-of-squad selections', () => {
@@ -95,17 +95,17 @@ test('Playing XI plus Impact Player allows at most four overseas players while s
 
 
 
-test('XI validation requires at least two all-rounders and five bowling options', () => {
-  const invalidCatalog = [
+test('XI validation does not reject a squad for lacking all-rounders or bowling depth', () => {
+  const roleImbalancedCatalog = [
     { id: 'wk-only', role: 'Wicket-Keeper', country: 'IND' },
     ...Array.from({ length: 6 }, (_, i) => ({ id: `bat-only-${i}`, role: 'Batsman', country: 'IND' })),
     ...Array.from({ length: 4 }, (_, i) => ({ id: `bowl-only-${i}`, role: 'Bowler', country: 'IND' })),
     { id: 'impact', role: 'Batsman', country: 'IND' },
   ];
-  const invalidSquad = invalidCatalog.map((p) => ({ id: p.id }));
+  const roleImbalancedSquad = roleImbalancedCatalog.map((p) => ({ id: p.id }));
   assert.equal(
-    validatePlayingXI(invalidCatalog.slice(0, 11), invalidCatalog[11], invalidSquad, invalidCatalog),
-    false,
+    validatePlayingXI(roleImbalancedCatalog.slice(0, 11), roleImbalancedCatalog[11], roleImbalancedSquad, roleImbalancedCatalog),
+    true,
   );
 });
 
