@@ -44,7 +44,7 @@ const generateMockNotification = (existingIds = new Set()) => {
   };
 };
 
-export default function AuctionActivityFeed({ activeCount = 0 }) {
+export default function AuctionActivityFeed({ activeCount = 0, selectedServer = "1", onSelectServer = () => {} }) {
   const [notifications, setNotifications] = useState([]);
    const [fakeCount, setFakeCount] = useState(52);
 
@@ -100,30 +100,51 @@ export default function AuctionActivityFeed({ activeCount = 0 }) {
       {/* Background glow blob */}
       <div className="absolute -top-12 -right-12 w-24 h-24 bg-white/5 blur-[40px] rounded-full pointer-events-none" />
 
-      {/* Card Header */}
+      {/* Card Header + Firebase Server Selector */}
       <div className="flex flex-col flex-shrink-0">
-        <h2 className="text-sm sm:text-base font-black uppercase text-white tracking-wider leading-none flex items-center gap-2">
-          <span className="w-5 flex justify-center">🔥</span>
-          <span>LIVE AUCTION ROOMS</span>
-        </h2>
-        
-        {/* Active Hubs Counter right under title */}
-        <div className="flex items-center gap-2 mt-2 select-none">
-          <span className="w-5 flex justify-center">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-black uppercase text-white tracking-wider leading-none flex items-center gap-2">
+              <span className="w-5 flex justify-center">🔥</span>
+              <span>LIVE AUCTION ROOMS</span>
+            </h2>
+            <div className="flex items-center gap-2 mt-2 select-none">
+              <span className="w-5 flex justify-center">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              </span>
+              <span className="text-[10px] font-black text-green-400 uppercase tracking-widest leading-none mt-[1px]">
+                {activeCount}+ Active rooms
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:items-end">
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Auction Server
             </span>
-          </span>
-          <span className="text-[10px] font-black text-green-400 uppercase tracking-widest leading-none mt-[1px]">
-           {activeCount !== undefined && activeCount !== null ? activeCount : fakeCount}+ Active rooms
-          </span>
+            <div className="inline-flex w-fit max-w-full rounded-xl border border-white/10 bg-black/20 p-1" role="group" aria-label="Select auction server">
+              {["1", "2"].map((serverId) => (
+                <button
+                  key={serverId}
+                  type="button"
+                  onClick={() => onSelectServer(serverId)}
+                  aria-pressed={selectedServer === serverId}
+                  className={`rounded-lg px-3 py-2 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all ${selectedServer === serverId
+                    ? "border border-white/20 bg-white/10 text-white shadow-inner"
+                    : "border border-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}
+                >
+                  Server {serverId}
+                </button>
+              ))}
+            </div>
+            <span className="text-[8px] text-gray-500">Lobbies and history are separate per server.</span>
+          </div>
         </div>
 
-        {/* Divider Line */}
         <div className="w-full h-px bg-white/10 my-4" />
-
-        {/* Recent Signings Section Label */}
         <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-3 flex-shrink-0">
           Recent Signings
         </span>
