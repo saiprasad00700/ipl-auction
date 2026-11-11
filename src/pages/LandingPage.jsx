@@ -42,7 +42,8 @@ const LandingPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [completedRoomCode, setCompletedRoomCode] = useState("");
-  const [selectedServer, setSelectedServer] = useState("auto");
+  const [selectedServer, setSelectedServer] = useState("1");
+  const [serverCapacityPrompt, setServerCapacityPrompt] = useState("");
 
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
@@ -272,23 +273,7 @@ const LandingPage = () => {
 
       if (activeTab === "new") {
         const roomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-        const token = await user.getIdToken();
-        const allocatorPayload = selectedServer === "auto"
-          ? { mode: "allocate", roomSuffix, auctionType }
-          : { mode: "reserve", serverId: selectedServer, roomId: selectedServer + roomSuffix, auctionType };
-        const allocationResponse = await fetch("/api/server-capacity", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(allocatorPayload)
-        });
-        const allocation = await allocationResponse.json().catch(() => ({}));
-        if (!allocationResponse.ok || !["1", "2"].includes(String(allocation.serverId)) || !allocation.roomId) {
-          throw new Error(allocation.error || "Server allocation failed. Please try again.");
-        }
-        const newRoomId = allocation.roomId;
+        const newRoomId = String(selectedServer) + roomSuffix;
         await createRoom(
           newRoomId,
           user.uid,
@@ -311,8 +296,15 @@ const LandingPage = () => {
       if (message.startsWith("ROOM_COMPLETED:")) {
         setCompletedRoomCode(message.split(":")[1] || roomCode.toUpperCase());
       } else {
-        setError(message);
-        setTimeout(() => setError(""), 3000);
+        const normalized = message.toLowerCase();
+        const capacityFailure = /quota|storage.{0,20}(full|limit|exceed)|limit.{0,20}exceed|resource[_ -]?exhausted|too many (connections|requests)|maximum.{0,20}connections|database.{0,20}unavailable/.test(normalized);
+        if (activeTab === "new" && capacityFailure) {
+          setServerCapacityPrompt(selectedServer === "1" ? "2" : "1");
+          setError("");
+        } else {
+          setError(message);
+          setTimeout(() => setError(""), 5000);
+        }
       }
       setIsSubmitting(false);
     }
@@ -612,7 +604,7 @@ const LandingPage = () => {
                     Auction Server
                   </span>
                   <div className="inline-flex items-center rounded-lg border border-white/10 bg-black/20 p-0.5" role="group" aria-label="Select auction server">
-                    {[{ id: "auto", label: "AUTO" }, { id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }].map(({ id, label }) => (
+                    {[{ id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }].map(({ id, label }) => (
                       <button
                         key={id}
                         type="button"
@@ -876,7 +868,7 @@ const LandingPage = () => {
                 <div className="flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2.5 text-center">
                   <Wifi size={13} className="shrink-0 text-cyan-300" />
                   <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-cyan-200">
-                    AUTO load balancing · New rooms go to the lower-estimated workload
+                    SELECT SERVER · If one server is full, switch to the other server
                   </p>
                 </div>
 
@@ -1301,6 +1293,37 @@ const LandingPage = () => {
           </div>
         </div>
       </div>
+
+      {serverCapacityPrompt && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4" role="alertdialog" aria-modal="true" aria-labelledby="server-capacity-title">
+          <div className="w-full max-w-sm rounded-2xl border border-amber-400/25 bg-[#101522] p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-400/10 text-amber-300">
+              <Wifi size={22} />
+            </div>
+            <h2 id="server-capacity-title" className="text-base font-black uppercase tracking-wide text-white">Server unavailable</h2>
+            <p className="mt-3 text-sm leading-relaxed text-gray-300">
+              Server {selectedServer} could not create this room. Please create your auction room using Server {serverCapacityPrompt}.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedServer(serverCapacityPrompt);
+                setServerCapacityPrompt("");
+              }}
+              className="mt-5 w-full rounded-xl bg-emerald-400 px-4 py-3 text-xs font-black uppercase tracking-widest text-[#04120f] hover:bg-emerald-300"
+            >
+              Switch to Server {serverCapacityPrompt}
+            </button>
+            <button
+              type="button"
+              onClick={() => setServerCapacityPrompt("")}
+              className="mt-2 w-full rounded-xl border border-white/10 px-4 py-3 text-xs font-black uppercase tracking-widest text-gray-300 hover:bg-white/5"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {completedRoomCode && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" role="alertdialog" aria-modal="true" aria-labelledby="completed-room-title">
