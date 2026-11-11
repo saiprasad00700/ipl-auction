@@ -850,7 +850,7 @@ export const AuctionProvider = ({ children }) => {
             const endedAt = getSyncedTime();
             const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
             const auctionType = roomSnapshot.val()?.auctionType || 'mega';
-            const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
+            const usesSquadBalanceAnalysis = auctionType !== 'mega';
             await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
               status: 'awaiting_xi',
               xiSubmissionStartedAt: endedAt,
@@ -973,7 +973,7 @@ export const AuctionProvider = ({ children }) => {
       const now = getSyncedTime();
       const roomSnapshot = await get(ref(rtdb, `auctions/${roomId}/room`));
       const auctionType = roomSnapshot.val()?.auctionType || 'mega';
-      const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(auctionType);
+      const usesSquadBalanceAnalysis = auctionType !== 'mega';
       await updateRtdb(ref(rtdb, `auctions/${roomId}/room`), {
         status: 'awaiting_xi',
         xiSubmissionStartedAt: now,
@@ -1880,9 +1880,10 @@ export const AuctionProvider = ({ children }) => {
     const roomData = roomSnap.val();
     if (roomData.hostId !== user.uid) throw new Error('Only the host can end the auction');
     if (roomData.status === 'awaiting_xi' || roomData.status === 'analyzing' || roomData.status === 'completed') return;
-    // Only Mega Auction keeps the 18-player minimum and manual Playing XI phase.
+    // Only MEGA requires a submitted Playing XI and keeps its 18-player minimum.
+    // Classic and every Sprint variant are ranked from the complete squad.
     const isMegaAuction = (roomData.auctionType || 'mega') === 'mega';
-    const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(roomData.auctionType);
+    const usesSquadBalanceAnalysis = !isMegaAuction;
     const disqualifiedNames = [];
     const teamsRef = ref(rtdb, `auctions/${roomId}/teams`);
     const teamsSnap = await get(teamsRef);
@@ -1984,8 +1985,8 @@ export const AuctionProvider = ({ children }) => {
     if (!user || roomData.hostId !== user.uid) return;
     if (roomData.status !== 'awaiting_xi') return;
 
-    // Classic/Sprint analyze the full squad immediately; Mega retains the XI window.
-    const usesSquadBalanceAnalysis = ['sprint5', 'sprint11'].includes(roomData.auctionType);
+    // Classic and Sprint analyze the full squad immediately; only MEGA uses Playing XI.
+    const usesSquadBalanceAnalysis = (roomData.auctionType || 'mega') !== 'mega';
     const readinessRef = ref(rtdb, `auctions/${roomId}/teams`);
     const readinessSnap = await get(readinessRef);
     const readinessData = readinessSnap.val() || {};
