@@ -188,7 +188,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="analytics" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">5. Analytics and diagnostics</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">6. Analytics and diagnostics</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   We may use privacy-respecting analytics tools to understand how the platform is used. These tools do not track you across other websites and do not sell your data. We rely on aggregate telemetry to identify which features are most popular and where errors occur.
