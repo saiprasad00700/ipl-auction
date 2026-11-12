@@ -1,14 +1,9 @@
 /**
  * SS AUCTION Cloudflare edge router
  *
- * Deploy as a Cloudflare Worker and attach routes:
- *   ssauction.in/*
- *   www.ssauction.in/*
- *
- * Keep both Render services configured with equivalent application
- * environment variables. Firebase room data remains client-connected
- * directly to the selected Firebase project; this Worker only routes
- * HTTP requests to the Render application.
+ * Routes browser HTTP traffic across two Render origins.
+ * Firebase realtime connections remain direct to Firebase; this Worker
+ * only proxies requests addressed to ssauction.in / www.ssauction.in.
  */
 
 const ORIGINS = {
@@ -17,7 +12,8 @@ const ORIGINS = {
 };
 
 const COOKIE_NAME = "ssau_origin";
-const COOKIE_MAX_AGE = 60 * 60 * 24; // 24 hours
+const COOKIE_MAX_AGE = 60 * 60 * 24;
+const HEALTH_TIMEOUT_MS = 4000;
 
 function readCookie(request, name) {
   const cookieHeader = request.headers.get("Cookie") || "";
@@ -36,12 +32,53 @@ function chooseOrigin() {
   return Math.random() < 0.5 ? "server1" : "server2";
 }
 
+function alternateOrigin(origin) {
+  return origin === "server1" ? "server2" : "server1";
+}
+
 function makeTargetUrl(requestUrl, origin) {
   const incoming = new URL(requestUrl);
   const target = new URL(origin);
   target.pathname = incoming.pathname;
   target.search = incoming.search;
   return target;
+}
+
+async function probeOrigin(originName) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+  try {
+    const response = await fetch(ORIGINS[originName] + "/health", {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      signal: controller.signal,
+      cf: { cacheTtl: 0, cacheEverything: false },
+    });
+    if (!response.ok) return false;
+    const body = await response.json();
+    return body?.ok === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function chooseHealthyOrigin() {
+  const [server1Healthy, server2Healthy] = await Promise.all([
+    probeOrigin("server1"),
+    probeOrigin("server2"),
+  ]);
+
+  if (server1Healthy && server2Healthy) {
+    return chooseOrigin();
+  }
+  if (server1Healthy) return "server1";
+  if (server2Healthy) return "server2";
+
+  // Do not block the website if both probes time out or fail transiently.
+  // The request itself will still be attempted and safe GET/HEAD can fail over.
+  return chooseOrigin();
 }
 
 async function sendToOrigin(request, originName) {
@@ -51,8 +88,6 @@ async function sendToOrigin(request, originName) {
   headers.set("X-Forwarded-Proto", "https");
   headers.set("X-SSAuction-Origin", originName);
 
-  // Construct a fresh request for the selected Render origin while
-  // preserving method, body, headers, and streaming request semantics.
   const upstreamRequest = new Request(targetUrl.toString(), request);
   const forwardedRequest = new Request(upstreamRequest, { headers });
   return fetch(forwardedRequest, {
@@ -61,13 +96,15 @@ async function sendToOrigin(request, originName) {
   });
 }
 
-function withAffinityCookie(response, originName) {
+function withRoutingHeaders(response, originName, setCookie = false) {
   const headers = new Headers(response.headers);
-  headers.append(
-    "Set-Cookie",
-    `${COOKIE_NAME}=${originName}; Path=/; Max-Age=${COOKIE_MAX_AGE}; Secure; HttpOnly; SameSite=Lax`
-  );
   headers.set("X-SSAuction-Edge", originName);
+  if (setCookie) {
+    headers.append(
+      "Set-Cookie",
+      `${COOKIE_NAME}=${originName}; Path=/; Max-Age=${COOKIE_MAX_AGE}; Secure; HttpOnly; SameSite=Lax`
+    );
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -82,6 +119,7 @@ function edgeError() {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
       "Retry-After": "10",
+      "X-SSAuction-Edge": "unavailable",
     },
   });
 }
@@ -91,38 +129,47 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/__edge-health") {
+      const [server1Healthy, server2Healthy] = await Promise.all([
+        probeOrigin("server1"),
+        probeOrigin("server2"),
+      ]);
       return Response.json({
         ok: true,
         service: "ss-auction-edge-router",
+        origins: {
+          server1: server1Healthy ? "healthy" : "unhealthy",
+          server2: server2Healthy ? "healthy" : "unhealthy",
+        },
         timestamp: new Date().toISOString(),
       }, {
         headers: { "Cache-Control": "no-store" },
       });
     }
 
+    const cookieOrigin = readCookie(request, COOKIE_NAME);
+    const isNewVisitor = !cookieOrigin;
+    let selected = cookieOrigin;
+
     if (request.method === "OPTIONS") {
-      const origin = readCookie(request, COOKIE_NAME) || chooseOrigin();
+      selected = selected || await chooseHealthyOrigin();
       try {
-        return withAffinityCookie(await sendToOrigin(request, origin), origin);
+        return withRoutingHeaders(await sendToOrigin(request, selected), selected, isNewVisitor);
       } catch {
         return edgeError();
       }
     }
 
-    let selected = readCookie(request, COOKIE_NAME);
-    const isNewVisitor = !selected;
-    if (!selected) selected = chooseOrigin();
+    if (!selected) selected = await chooseHealthyOrigin();
 
     try {
       let response = await sendToOrigin(request, selected);
-
-      // Only retry safe requests. Never replay POST/PUT/PATCH/DELETE:
-      // those may create rooms, submit bids, or mutate auction state.
       const safeToRetry = request.method === "GET" || request.method === "HEAD";
       const retryableStatus = [502, 503, 504].includes(response.status);
 
+      // Never replay state-changing requests such as bids, room creation,
+      // or auction submissions. Only retry safe GET/HEAD requests.
       if (safeToRetry && retryableStatus) {
-        const alternate = selected === "server1" ? "server2" : "server1";
+        const alternate = alternateOrigin(selected);
         try {
           const alternateResponse = await sendToOrigin(request, alternate);
           if (alternateResponse.status < 500) {
@@ -130,23 +177,20 @@ export default {
             response = alternateResponse;
           }
         } catch {
-          // Keep the original upstream response if the alternate is also down.
+          // Preserve the original upstream response if alternate also fails.
         }
       }
 
-      return isNewVisitor || selected !== readCookie(request, COOKIE_NAME)
-        ? withAffinityCookie(response, selected)
-        : new Response(response.body, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-          });
+      return withRoutingHeaders(
+        response,
+        selected,
+        isNewVisitor || selected !== cookieOrigin
+      );
     } catch {
-      // A network-level failure is safe to retry only for GET/HEAD.
       if (request.method === "GET" || request.method === "HEAD") {
-        const alternate = selected === "server1" ? "server2" : "server1";
+        const alternate = alternateOrigin(selected);
         try {
-          return withAffinityCookie(await sendToOrigin(request, alternate), alternate);
+          return withRoutingHeaders(await sendToOrigin(request, alternate), alternate, true);
         } catch {
           return edgeError();
         }
