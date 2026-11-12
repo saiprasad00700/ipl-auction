@@ -1959,11 +1959,36 @@ useEffect(() => {
                   <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all mt-1 ${mobileTab === 'arena' ? 'text-emerald-500' : 'text-gray-500'}`}>Arena</span>
                </button>
 
-               <button onClick={() => setMobileTab('activity')} className={`flex flex-col items-center justify-center w-16 gap-0.5 transition-all duration-300 ${mobileTab === 'activity' ? 'text-green-500 translate-y-0' : 'text-gray-500 hover:text-gray-400 translate-y-0.5'}`}>
-                  <div className={`p-1 rounded-lg transition-colors duration-300 ${mobileTab === 'activity' ? 'bg-green-500/10' : 'bg-transparent'}`}>
-                     <History size={16} strokeWidth={mobileTab === 'activity' ? 2.5 : 2} />
+               <button
+                  onClick={() => {
+                     setSidebarTab('chat');
+                     setMobileTab('activity');
+                  }}
+                  className={`flex flex-col items-center justify-center min-w-[4.5rem] gap-0.5 transition-all duration-300 ${
+                     unreadChatCount > 0
+                        ? 'text-red-400'
+                        : mobileTab === 'activity' && sidebarTab === 'chat'
+                           ? 'text-green-500'
+                           : 'text-gray-500 hover:text-gray-400'
+                  }`}
+               >
+                  <div className={`p-1 rounded-lg transition-colors duration-300 ${
+                     unreadChatCount > 0
+                        ? 'bg-red-500/10'
+                        : mobileTab === 'activity' && sidebarTab === 'chat'
+                           ? 'bg-green-500/10'
+                           : 'bg-transparent'
+                  }`}>
+                     <MessageSquare size={16} strokeWidth={unreadChatCount > 0 || (mobileTab === 'activity' && sidebarTab === 'chat') ? 2.5 : 2} />
                   </div>
-                  <span className={`text-[7px] font-black uppercase tracking-widest ${mobileTab === 'activity' ? 'opacity-100' : 'opacity-70'}`}>Logs</span>
+                  <span className="flex items-center gap-1 text-[7px] font-black uppercase tracking-widest whitespace-nowrap">
+                     <span className={unreadChatCount > 0 ? 'text-red-400 opacity-100' : mobileTab === 'activity' && sidebarTab === 'chat' ? 'opacity-100' : 'opacity-70'}>Voice Chat</span>
+                     {unreadChatCount > 0 && (
+                        <span className="inline-flex min-w-[14px] h-[14px] items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black leading-none text-white">
+                           {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                        </span>
+                     )}
+                  </span>
                </button>
             </div>
          </div>
