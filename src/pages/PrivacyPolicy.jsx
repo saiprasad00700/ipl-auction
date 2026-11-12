@@ -19,13 +19,14 @@ const PrivacyPolicy = () => {
     { id: 'how-use', label: '2. How we use information' },
     { id: 'auth', label: '3. Authentication' },
     { id: 'auction-data', label: '4. Auction and room data' },
-    { id: 'analytics', label: '5. Analytics and diagnostics' },
-    { id: 'storage', label: '6. Data storage and retention' },
-    { id: 'third-party', label: '7. Third-party services' },
-    { id: 'choices', label: '8. Your choices' },
-    { id: 'children', label: '9. Children\'s privacy' },
-    { id: 'changes', label: '10. Changes to this policy' },
-    { id: 'contact', label: '11. Contact' },
+    { id: 'chats', label: '5. Text chat and voice chat' },
+    { id: 'analytics', label: '6. Analytics and diagnostics' },
+    { id: 'storage', label: '7. Data storage and retention' },
+    { id: 'third-party', label: '8. Third-party services' },
+    { id: 'choices', label: '9. Your choices' },
+    { id: 'children', label: '10. Children\'s privacy' },
+    { id: 'changes', label: '11. Changes to this policy' },
+    { id: 'contact', label: '12. Contact' },
   ];
 
   useEffect(() => {
@@ -118,7 +119,7 @@ const PrivacyPolicy = () => {
 
           <div className="mb-8 sm:mb-12 border-b border-white/10 pb-6 sm:pb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Privacy Policy</h1>
-            <p className="text-sm text-gray-500 mb-6">Last updated: October 2, 2026</p>
+            <p className="text-sm text-gray-500 mb-6">Last updated: November 13, 2026</p>
             <p className="text-base text-[#E5E5E5] leading-relaxed">
               This policy explains what information SSAUCTION collects, how it is used, and which third-party services are involved. We aim to collect only the minimal data necessary to provide a real-time multiplayer auction experience.
             </p>
@@ -168,6 +169,24 @@ const PrivacyPolicy = () => {
               </div>
             </section>
 
+            <section id="chats" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-4">5. Text chat and voice chat</h2>
+              <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
+                <p>
+                  <strong className="text-gray-200">Text messages:</strong> Messages, stickers, and shared GIF references sent in an auction room are stored in the Firebase Realtime Database so they can be delivered and displayed to participants in that room. We do not routinely read, monitor, or review private conversations, and we do not use message contents for advertising.
+                </p>
+                <p>
+                  Because text messages are stored in our database, authorized technical administrators may be able to access them. Access is not part of routine operation and may occur only when reasonably necessary to maintain or secure the service, investigate abuse or technical problems, respond to a support request, or comply with a legal obligation. Other participants in the same room can see messages shared in that room.
+                </p>
+                <p>
+                  <strong className="text-gray-200">Voice chat:</strong> Voice chat is provided as live audio communication through LiveKit. SSAUCTION does not make or store recordings of voice conversations, and we do not routinely listen to or monitor what participants say. Audio is transmitted in real time so that connected participants can hear one another; LiveKit processes the audio to provide this service. We do not provide a feature to replay past voice conversations.
+                </p>
+                <p>
+                  Please remember that other participants may independently record, capture, or repeat conversations using their own devices or software. Do not share information in text or voice chat that you do not want other room participants to hear or see.
+                </p>
+              </div>
+            </section>
+
             <section id="analytics" className="scroll-mt-24">
               <h2 className="text-xl font-semibold text-white mb-4">5. Analytics and diagnostics</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
@@ -178,7 +197,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="storage" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">6. Data storage and retention</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">7. Data storage and retention</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   Your data is stored securely on Google Cloud Platform via Firebase services. We retain your account data and auction history for as long as your account is active. Non-active auction rooms may be periodically purged to minimize our storage footprint.
@@ -190,11 +209,13 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="third-party" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">7. Third-party services</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">8. Third-party services</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>SSAUCTION integrates with the following third-party services:</p>
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
-                  <li><strong>Firebase (Google):</strong> For authentication, real-time database, and hosting.</li>
+                  <li><strong>Firebase (Google):</strong> For authentication, real-time database, and hosting, including storage and delivery of room text messages.</li>
+                  <li><strong>LiveKit:</strong> For real-time voice communication between participants. Audio is transmitted to provide the live call; SSAUCTION does not record or store voice conversations.</li>
+                  <li><strong>Supabase:</strong> For user-uploaded sticker storage where that feature is enabled.</li>
                 </ul>
                 <p>
                   These services have their own privacy policies governing how they handle data processed on our behalf.
@@ -203,7 +224,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="choices" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">8. Your choices</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">9. Your choices</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   You have the right to request the deletion of your account and associated data. If you wish to have your data removed from our systems, please contact us. You can also revoke SSAUCTION's access to your Google account via your Google Account permissions dashboard.
@@ -212,7 +233,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="children" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">9. Children's privacy</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">10. Children's privacy</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   SSAUCTION is not directed at children under the age of 13. We do not knowingly collect personal information from children. If we become aware that we have collected personal data from a child under 13, we will take steps to delete that information.
@@ -221,7 +242,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="changes" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">10. Changes to this policy</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">11. Changes to this policy</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the new policy on this page and updating the "Last updated" date at the top.
@@ -230,7 +251,7 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="contact" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">11. Contact</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">12. Contact</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
                   If you have questions about this Privacy Policy or how we handle your data, please contact the engineering team at:
