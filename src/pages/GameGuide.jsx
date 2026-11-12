@@ -1,322 +1,202 @@
-// Modified from the upstream project by saiprasad00700.
+// Updated SSAUCTION Rulebook
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, ChevronRight, ChevronDown } from 'lucide-react';
 import Footer from '../components/Footer';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const GameGuide = () => {
-  useDocumentTitle('Rulebook', 'Comprehensive guide on how to play SSAUCTION.');
+  useDocumentTitle('Rulebook', 'Official game rules and auction guide for SSAUCTION.');
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const [activeSection, setActiveSection] = useState('modes');
+  const [activeSection, setActiveSection] = useState('mega-mode');
   const [openFaq, setOpenFaq] = useState(null);
-
-  const toggleFaq = (idx) => {
-    setOpenFaq(openFaq === idx ? null : idx);
-  };
+  const toggleFaq = (idx) => setOpenFaq(openFaq === idx ? null : idx);
 
   const sections = [
-    { id: 'modes', label: '1. Game modes' },
-    { id: 'how-to-play', label: '2. How to play' },
-    { id: 'bots', label: '3. AI bots' },
-    { id: 'faq', label: '4. FAQ' },
+    { id: 'mega-mode', label: '1. MEGA mode' },
+    { id: 'auction', label: '2. Auction & bidding' },
+    { id: 'squad', label: '3. Squad rules' },
+    { id: 'rtm', label: '4. Retention (RTM) cards' },
+    { id: 'playing-xi', label: '5. Playing XI submission' },
+    { id: 'rankings', label: '6. AI rankings' },
+    { id: 'faq', label: '7. FAQ' },
   ];
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: '-20% 0px -70% 0px' }
-    );
-
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (entry.isIntersecting) setActiveSection(entry.target.id); });
+    }, { rootMargin: '-20% 0px -70% 0px' });
     sections.forEach((s) => {
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
     });
-
     const handleScroll = () => {
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 10) {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 10) {
         setActiveSection(sections[sections.length - 1].id);
       }
     };
     window.addEventListener('scroll', handleScroll);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
-    };
+    return () => { observer.disconnect(); window.removeEventListener('scroll', handleScroll); };
   }, []);
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-      setActiveSection(id);
-    }
+    if (el) { el.scrollIntoView({ behavior: 'smooth' }); setActiveSection(id); }
   };
 
-  const gameModes = [
-    {
-      id: 'mega',
-      title: 'Mega Auction',
-      subtitle: 'Full rules',
-      budget: '₹120.0 Cr',
-      squad: '25 players',
-      overseas: '8 maximum',
-      description: 'The complete IPL auction experience. Bid across all player pools to construct a full 25-man squad.',
-    },
-    {
-      id: 'sprint11',
-      title: '11-Player Classic',
-      subtitle: 'Fast paced',
-      budget: '₹60.0 Cr',
-      squad: '11 players',
-      overseas: '4 maximum',
-      description: 'Quick competitive mode where each franchise builds a playing XI directly without bench filler.',
-    },
-    {
-      id: 'sprint5',
-      title: '5-Player Mini Sprint',
-      subtitle: '10-minute battle',
-      budget: '₹30.0 Cr',
-      squad: '5 players',
-      overseas: '2 maximum',
-      description: 'Ultra-fast battle for quick sessions. Pick only top core superstars to construct a high-impact core.',
-    }
-  ];
-
-  const auctionSteps = [
-    {
-      step: '1',
-      title: 'Create or join a hub',
-      desc: 'Host a fresh auction room or join using a 6-character room code. Choose your preferred franchise logo.'
-    },
-    {
-      step: '2',
-      title: 'Claim franchises & fill bots',
-      desc: 'Each real player selects one of the 10 franchises. The host can tap "Fill bots" to add smart AI bidders to empty teams.'
-    },
-    {
-      step: '3',
-      title: 'Live bidding & timer',
-      desc: 'Players are presented one by one. Click "+ Bid" to raise the price. When the timer hits zero, the highest bidder wins the player.'
-    },
-    {
-      step: '4',
-      title: 'Roster & budget management',
-      desc: 'Monitor your remaining purse. Reserve purse space for your mandatory squad capacity and respect the overseas player quota.'
-    },
-    {
-      step: '5',
-      title: 'Summary & rating',
-      desc: 'At the end of the auction, inspect the leaderboard, review total purse spent, and view complete team rosters.'
-    }
-  ];
-
-  const botFeatures = [
-    {
-      title: 'Smart valuation engine',
-      desc: 'Bots evaluate players based on base price, star rating, role balance, and team personality.'
-    },
-    {
-      title: 'Dynamic slot protection',
-      desc: 'Bots dynamically reserve purse per remaining empty slot so they never run out of funds prematurely.'
-    },
-    {
-      title: 'Overseas & role compliance',
-      desc: 'AI managers track overseas quotas and role distribution to prevent unbalanced squads.'
-    }
-  ];
-
   const faqs = [
-    {
-      q: 'How do I start a game with friends?',
-      a: 'Simply click "Create Room" on the home page, select an auction mode, pick your franchise, and share the 6-character room code with your friends.'
-    },
-    {
-      q: 'Can I play solo against AI Bots?',
-      a: 'Yes. Create a room, select your team, and click the "Fill bots" button at the top. Smart AI franchise managers will immediately fill all remaining empty franchises.'
-    },
-    {
-      q: 'What happens if the bid timer reaches zero?',
-      a: 'When the countdown expires, the player is sold to the franchise holding the highest bid. If no one bids, they are marked as unsold.'
-    },
-    {
-      q: 'Is there a limit on how many overseas players I can buy?',
-      a: 'Yes. In Mega Auction mode, squads are capped at a maximum of 8 overseas players. In 11-Player mode the limit is 4, and in 5-Player Mini Sprint the limit is 2.'
-    },
-    {
-      q: 'What happens if a player disconnects during the auction?',
-      a: 'The game uses real-time state synchronization. If a player refreshes their browser, they will seamlessly rejoin the live bidding room.'
-    }
+    { q: 'Do all game modes require Playing XI submission?', a: 'No. Playing XI submission and AI franchise rankings apply only to MEGA mode.' },
+    { q: 'What if a franchise buys fewer than 18 players in MEGA mode?', a: 'That franchise is disqualified. If every participating franchise has fewer than 18 players, the site skips the five-minute submission wait and goes directly to the rankings page, showing each franchise its purchased player count and disqualification reason.' },
+    { q: 'How long do franchises get to submit their Playing XI?', a: 'In MEGA mode, franchises have five minutes after the host ends the auction to submit their Playing XI.' },
+    { q: 'What happens if a franchise does not submit an XI in time?', a: 'The system automatically selects the best eligible Playing XI from that franchise’s squad.' },
+    { q: 'How many overseas players are allowed?', a: 'A MEGA mode franchise can have a maximum of four overseas players in its squad.' },
+    { q: 'How many RTM cards does each franchise get?', a: 'Each franchise gets two RTM cards. An RTM can be used only when the player is eligible for that franchise based on the player’s original IPL franchise.' },
+    { q: 'Are the rankings based only on AI knowledge?', a: 'No. The analysis uses the stored player statistics dataset. It primarily considers the last three years of IPL performance and uses international performance when a player has insufficient IPL data.' },
   ];
+
+  const nav = (
+    <nav className="flex flex-col gap-2.5 border-l border-white/10">
+      {sections.map((s) => (
+        <button key={s.id} onClick={() => scrollTo(s.id)}
+          className={`text-sm text-left pl-4 -ml-[1px] border-l ${activeSection === s.id ? 'border-emerald-300 text-white' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-white/30'} transition-colors`}>
+          {s.label}
+        </button>
+      ))}
+    </nav>
+  );
 
   return (
     <div className="min-h-screen bg-[#0E0F10] text-[#E5E5E5] font-sans selection:bg-white/20 selection:text-white flex flex-col">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-[#0E0F10]/90 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium tracking-wide">
-          <Link to="/" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
-            <Home size={14} />
-            <span>Home</span>
-          </Link>
-          <ChevronRight size={14} className="text-gray-600" />
-          <span className="text-gray-500">Legal</span>
-          <ChevronRight size={14} className="text-gray-600" />
-          <span className="text-white">Rulebook</span>
+          <Link to="/" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5"><Home size={14} /><span>Home</span></Link>
+          <ChevronRight size={14} className="text-gray-600" /><span className="text-gray-500">Guide</span>
+          <ChevronRight size={14} className="text-gray-600" /><span className="text-white">Rulebook</span>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col lg:flex-row gap-8 lg:gap-24 items-start w-full flex-1">
-        {/* Left TOC */}
         <aside className="hidden lg:block w-64 shrink-0 sticky top-28">
-          <h3 className="text-white font-semibold text-sm mb-4">On this page</h3>
-          <nav className="flex flex-col gap-2.5 border-l border-white/10">
-            {sections.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => scrollTo(s.id)}
-                className={`text-sm text-left pl-4 -ml-[1px] border-l ${activeSection === s.id ? 'border-emerald-300 text-white' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-white/30'} transition-colors`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </nav>
+          <h3 className="text-white font-semibold text-sm mb-4">On this page</h3>{nav}
         </aside>
 
-        {/* Main Content */}
         <main className="flex-1 max-w-3xl w-full pb-20">
           <div className="mb-8 sm:mb-12 border-b border-white/10 pb-6 sm:pb-8">
-            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Rulebook</h1>
-            <p className="text-sm text-gray-500 mb-6">Last updated: October 2, 2026</p>
-            <p className="text-base text-[#E5E5E5] leading-relaxed">
-              This guide outlines how to host live bidding sessions, build balanced championship rosters, manage purse budgets, and utilize AI bots in SSAUCTION.
-            </p>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">SSAUCTION Rulebook</h1>
+            <p className="text-sm text-gray-500 mb-6">Last updated: November 13, 2026</p>
+            <p className="text-base text-[#E5E5E5] leading-relaxed">Read the rules before starting an auction. This guide explains MEGA mode, bidding, squad requirements, RTM cards, Playing XI submission and AI rankings.</p>
           </div>
 
           <details className="lg:hidden mb-8 border border-white/10 rounded-md p-4 bg-white/[0.01]">
             <summary className="cursor-pointer text-sm font-medium text-white">On this page</summary>
-            <nav className="flex flex-col gap-2 mt-3 border-l border-white/10">
-              {sections.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => scrollTo(s.id)}
-                  className={`text-sm text-left pl-3 -ml-[1px] border-l ${activeSection === s.id ? 'border-emerald-300 text-white' : 'border-transparent text-gray-400'} transition-colors`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </nav>
+            <div className="mt-3">{nav}</div>
           </details>
 
           <div className="space-y-10 sm:space-y-16">
-            
-            {/* 1. Game Modes */}
-            <section id="modes" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-6">1. Game modes</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {gameModes.map(mode => (
-                  <div key={mode.id} className="border border-white/10 rounded-md p-5 bg-white/[0.01]">
-                    <div className="mb-4">
-                      <h3 className="font-semibold text-white text-base">{mode.title}</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{mode.subtitle}</p>
-                    </div>
-                    
-                    <div className="space-y-2 mb-5 text-sm">
-                      <div className="flex justify-between border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Purse</span>
-                        <span className="text-white font-medium">{mode.budget}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Squad</span>
-                        <span className="text-white font-medium">{mode.squad}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Overseas</span>
-                        <span className="text-white font-medium">{mode.overseas}</span>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-gray-400 leading-relaxed">
-                      {mode.description}
-                    </p>
-                  </div>
-                ))}
+            <section id="mega-mode" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">1. MEGA mode</h2>
+              <div className="border border-white/10 rounded-md p-5 bg-white/[0.01] space-y-3 text-sm text-gray-300 leading-relaxed">
+                <p>MEGA mode is the full squad-building auction. Each franchise starts with a virtual purse of <strong className="text-white">₹120 crore</strong>.</p>
+                <ul className="list-disc pl-5 space-y-2">
+                  <li>Each franchise must buy at least <strong className="text-white">18 players</strong> to qualify for the final rankings.</li>
+                  <li>A franchise can buy a maximum of <strong className="text-white">4 overseas players</strong>.</li>
+                  <li>Each franchise receives <strong className="text-white">2 RTM cards</strong>.</li>
+                  <li>Playing XI submission and the final AI ranking process are applicable only in MEGA mode.</li>
+                </ul>
+                <p>All purse values and bids are virtual game values. No real money is wagered or paid.</p>
               </div>
             </section>
 
-            {/* 2. How to play */}
-            <section id="how-to-play" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-6">2. How to play</h2>
-              <div className="space-y-6">
-                {auctionSteps.map((s) => (
-                  <div key={s.step} className="flex gap-4 items-start">
-                    <div className="w-6 h-6 shrink-0 rounded-full border border-white/10 flex items-center justify-center text-xs font-semibold text-gray-400 bg-white/5 mt-0.5">
-                      {s.step}
-                    </div>
-                    <div>
-                      <h3 className="text-base font-medium text-white mb-1.5">{s.title}</h3>
-                      <p className="text-sm text-gray-400 leading-relaxed">{s.desc}</p>
-                    </div>
-                  </div>
-                ))}
+            <section id="auction" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">2. Auction & bidding</h2>
+              <div className="space-y-4 text-sm text-gray-300 leading-relaxed">
+                <p>Host a room and share its room code with friends. Each participant joins and selects an available franchise. During the auction, players are presented one at a time and franchises compete by placing bids before the timer expires.</p>
+                <div className="border border-white/10 rounded-md p-5 bg-white/[0.01] space-y-3">
+                  <h3 className="font-semibold text-white">Bid increments</h3>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li><strong className="text-white">Marquee / Set 1:</strong> minimum bid increment is ₹0.25 crore.</li>
+                    <li><strong className="text-white">Set 2 onwards:</strong> minimum bid increment is ₹0.15 crore.</li>
+                    <li>For a player with a base price below ₹1 crore, the minimum bid amount is ₹0.15 crore.</li>
+                  </ul>
+                </div>
+                <p>The auction timer resets when a valid bid is placed. When the timer expires, the player is sold to the highest bidder. If there is no valid bid, the player is marked unsold. The host controls the auction flow and configured timer.</p>
               </div>
             </section>
 
-            {/* 3. AI bots */}
-            <section id="bots" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-6">3. AI bots</h2>
-              <p className="text-sm text-gray-400 leading-relaxed mb-6">
-                If friends cannot make it, AI bots step in as full, intelligent franchise managers with unique team personalities.
-              </p>
-              <div className="space-y-4">
-                {botFeatures.map(f => (
-                  <div key={f.title} className="border-l-2 border-white/10 pl-4">
-                    <h3 className="text-sm font-medium text-white mb-1">{f.title}</h3>
-                    <p className="text-sm text-gray-400 leading-relaxed">{f.desc}</p>
-                  </div>
-                ))}
+            <section id="squad" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">3. Squad rules</h2>
+              <div className="border border-white/10 rounded-md p-5 bg-white/[0.01]">
+                <ul className="list-disc pl-5 space-y-3 text-sm text-gray-300 leading-relaxed">
+                  <li>Minimum squad size for MEGA mode qualification: <strong className="text-white">18 players</strong>.</li>
+                  <li>Maximum overseas players: <strong className="text-white">4</strong>.</li>
+                  <li>Keep enough purse balance to complete the minimum squad requirement; do not spend the entire purse too early.</li>
+                  <li>Only eligible players in the franchise squad can be selected for the final Playing XI.</li>
+                </ul>
               </div>
             </section>
 
-            {/* 4. FAQ */}
+            <section id="rtm" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">4. Retention (RTM) cards</h2>
+              <div className="space-y-4 text-sm text-gray-300 leading-relaxed">
+                <p>Each franchise has two Retention To Match (RTM) cards. Eligibility is based on the player’s original IPL franchise, not simply the franchise that currently bids for the player.</p>
+                <ol className="list-decimal pl-5 space-y-3">
+                  <li>When another franchise wins the bidding for an RTM-eligible player, the player’s original franchise receives a prompt to use an RTM card.</li>
+                  <li>If the original franchise accepts, the bidding franchise gets 15 seconds to enter a counter-price higher than the current highest bid.</li>
+                  <li>If no valid counter-price is submitted in time, the original franchise gets the player at the current highest bid.</li>
+                  <li>If a valid counter-price is submitted, the original franchise gets 10 seconds to decide whether to match it.</li>
+                  <li>If the original franchise matches, it gets the player at the counter-price. If it declines or the decision timer expires, the bidding franchise gets the player at the counter-price.</li>
+                </ol>
+                <p>Each successful use consumes one of the franchise’s two RTM cards. The prompts are time-limited, so respond before the countdown ends.</p>
+              </div>
+            </section>
+
+            <section id="playing-xi" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">5. Playing XI submission</h2>
+              <div className="border border-white/10 rounded-md p-5 bg-white/[0.01] space-y-3 text-sm text-gray-300 leading-relaxed">
+                <p>This stage applies <strong className="text-white">only to MEGA mode</strong>. After the host ends the auction:</p>
+                <ul className="list-disc pl-5 space-y-2">
+                  <li>Each qualified franchise gets <strong className="text-white">5 minutes</strong> to submit its Playing XI.</li>
+                  <li>Players must be arranged in the chosen batting/bowling order.</li>
+                  <li>The XI must include at least <strong className="text-white">2 all-rounders</strong> and a total of <strong className="text-white">5 bowlers</strong>.</li>
+                  <li>One Impact Player can also be selected. The analysis considers 11 starting players plus 1 Impact Player (12 players in total).</li>
+                  <li>If a franchise does not submit before the deadline, the system automatically selects the best eligible XI from its squad.</li>
+                </ul>
+                <p>If every participating franchise has bought fewer than 18 players, the system does not wait for the five-minute XI window. It goes directly to the rankings page and marks every franchise as disqualified, showing the number of players each one purchased and explaining that at least 18 players were required.</p>
+              </div>
+            </section>
+
+            <section id="rankings" className="scroll-mt-24">
+              <h2 className="text-xl font-semibold text-white mb-5">6. AI rankings</h2>
+              <div className="space-y-4 text-sm text-gray-300 leading-relaxed">
+                <p>After the MEGA mode submission stage, SSAUCTION analyses the eligible franchise teams and displays a ranked leaderboard.</p>
+                <ul className="list-disc pl-5 space-y-2">
+                  <li>The analysis primarily uses each player’s real performance statistics from the <strong className="text-white">last three IPL seasons</strong>.</li>
+                  <li>If a player has insufficient IPL match data, international performance is used as a fallback.</li>
+                  <li>The analysis considers relevant batting, bowling and all-round performance statistics, such as matches, runs, average, strike rate, wickets and economy.</li>
+                  <li>Each franchise receives a unique rank from 1 to the number of participating franchises. There are no tied ranks.</li>
+                  <li>For position-by-position comparison, the corresponding player positions in each franchise’s submitted XI are evaluated.</li>
+                  <li>Franchises that fail the 18-player minimum are disqualified and are identified as such on the results page.</li>
+                </ul>
+                <p>AI rankings are game results generated from the available statistics and analysis rules; they are not a guarantee of real-world cricket performance.</p>
+              </div>
+            </section>
+
             <section id="faq" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-6">4. FAQ</h2>
+              <h2 className="text-xl font-semibold text-white mb-5">7. FAQ</h2>
               <div className="border-t border-white/10">
                 {faqs.map((faq, idx) => (
                   <div key={idx} className="border-b border-white/10">
-                    <button
-                      onClick={() => toggleFaq(idx)}
-                      className="w-full py-4 flex items-center justify-between text-left hover:text-white transition-colors text-[#E5E5E5] group"
-                    >
+                    <button onClick={() => toggleFaq(idx)} className="w-full py-4 flex items-center justify-between text-left hover:text-white transition-colors text-[#E5E5E5] group">
                       <span className="text-sm font-medium">{faq.q}</span>
-                      <ChevronDown
-                        size={16}
-                        className={`text-gray-500 transition-transform duration-200 shrink-0 ${openFaq === idx ? 'rotate-180 text-white' : 'group-hover:text-gray-400'}`}
-                      />
+                      <ChevronDown size={16} className={`text-gray-500 transition-transform duration-200 shrink-0 ${openFaq === idx ? 'rotate-180 text-white' : 'group-hover:text-gray-400'}`} />
                     </button>
                     <AnimatePresence>
                       {openFaq === idx && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pb-4 text-sm text-gray-400 leading-relaxed">
-                            {faq.a}
-                          </div>
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                          <div className="pb-4 text-sm text-gray-400 leading-relaxed">{faq.a}</div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -324,11 +204,9 @@ const GameGuide = () => {
                 ))}
               </div>
             </section>
-
           </div>
         </main>
       </div>
-
       <Footer />
     </div>
   );
