@@ -559,7 +559,7 @@ const LandingPage = () => {
           <div className="lg:col-span-7 w-full p-4 sm:p-6 md:p-8 flex flex-col bg-[#0a1221]/70">
             {/* Flat Tab Bar Navigation: Create / Join / History */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/5 mb-5 sm:mb-8 gap-3 sm:gap-4">
-              <div className="flex">
+              <div className="flex flex-wrap items-center gap-y-2">
                 <button
                   type="button"
                   onClick={() => setActiveTab("new")}
@@ -599,18 +599,18 @@ const LandingPage = () => {
                   History
                 </button>
 
-                <div className="flex flex-col justify-center gap-1.5 self-center px-2 pb-3 sm:pb-0 sm:ml-2 sm:pl-3 sm:border-l sm:border-white/10">
+                <div className="flex basis-full sm:basis-auto w-full sm:w-auto flex-col justify-center gap-1.5 px-4 py-2 sm:px-2 sm:py-0 sm:self-center sm:ml-2 sm:pl-3 sm:border-l sm:border-white/10 rounded-xl sm:rounded-none border border-white/10 sm:border-0 bg-white/[0.025] sm:bg-transparent">
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">
                     Auction Server
                   </span>
-                  <div className="inline-flex items-center rounded-lg border border-white/10 bg-black/20 p-0.5" role="group" aria-label="Select auction server">
+                  <div className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto items-center rounded-lg border border-white/10 bg-black/30 p-1" role="group" aria-label="Select auction server">
                     {[{ id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }].map(({ id, label }) => (
                       <button
                         key={id}
                         type="button"
                         onClick={() => setSelectedServer(id)}
                         aria-pressed={selectedServer === id}
-                        className={`rounded-md px-2.5 py-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${selectedServer === id
+                        className={`min-h-10 sm:min-h-0 rounded-md px-3 py-2 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[9px] font-black uppercase tracking-wide transition-all whitespace-nowrap ${selectedServer === id
                           ? "border border-white/20 bg-white/10 text-white shadow-inner"
                           : "border border-transparent text-gray-400 hover:text-white hover:bg-white/5"}`}
                       >
