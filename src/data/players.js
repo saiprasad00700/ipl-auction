@@ -1666,7 +1666,6 @@ export const IPL_PLAYERS = [
       "hs": "103"
     },
   },
-  },
   {
     "id": "p_189",
     "name": "Devdutt Padikkal",
