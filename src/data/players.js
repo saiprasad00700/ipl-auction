@@ -1666,22 +1666,6 @@ export const IPL_PLAYERS = [
       "hs": "103"
     },
   },
-  {
-    "id": "p_188",
-    "name": "Ajinkya Rahane",
-    "role": "Batsman",
-    "type": "Indian",
-    "country": "IND",
-    "basePrice": 0.5,
-    "set": "Set 2",
-    "image": "https://documents.iplt20.com/ipl/IPLHeadshot2026/44.png",
-    "stats": {
-      "matches": 212,
-      "runs": 5367,
-      "avg": 30.15,
-      "sr": 125.6,
-      "hs": "105*"
-    },
   },
   {
     "id": "p_189",
