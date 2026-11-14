@@ -1438,8 +1438,9 @@ useEffect(() => {
                                                 const squadWithDisplayData = teamDoc.squad.map(s => {
                                                    const pid = typeof s === 'string' ? s : s.id;
                                                    const bidVal = typeof s === 'string' ? null : s.bid;
+                                                   const rtmUsed = typeof s === 'object' && Boolean(s.rtmUsed);
                                                    const pInfo = IPL_PLAYERS.find(pl => pl.id === pid);
-                                                   return { ...pInfo, bidVal };
+                                                   return { ...pInfo, bidVal, rtmUsed };
                                                 });
 
                                                 const playersInRole = squadWithDisplayData.filter(p => p?.role === role);
@@ -1460,7 +1461,7 @@ useEffect(() => {
                                                                   <img src={p?.image} alt={p?.name || 'Player'} className="w-5 h-5 object-contain rounded bg-white/5" />
                                                                   <div className="overflow-hidden">
                                                                      <div className="flex items-center gap-1">
-                                                                        <h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5> </div>
+                                                                        <div className="flex items-center gap-1 min-w-0"><h5 className="text-[10px] font-semibold text-gray-200 truncate max-w-[80px]">{p?.name}</h5>{p?.rtmUsed && <span className="shrink-0 rounded px-1 py-0.5 text-[7px] font-black uppercase tracking-wide text-amber-300 bg-amber-300/10 border border-amber-300/25">Used RTM</span>}</div> </div>
                                                                   </div>
                                                                </div>
                                                                <span className="text-[9px] font-bold text-emerald-500">
