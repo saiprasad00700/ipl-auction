@@ -135,16 +135,50 @@ export function autoSelectBestXI(squad, playerCatalog = []) {
   addBest(() => true, PLAYING_XI_SIZE - selected.length);
 
   const startingXI = selected.slice(0, PLAYING_XI_SIZE);
+  // Always place Suryakumar Yadav at No. 4 in the automatically selected XI.
+  const suryakumar = unique.find((player) => String(player.name || '').trim().toLowerCase() === 'suryakumar yadav');
+  if (suryakumar) {
+    const currentIndex = startingXI.findIndex((player) => player.id === suryakumar.id);
+    if (currentIndex >= 0) startingXI.splice(currentIndex, 1);
+    else if (startingXI.length === PLAYING_XI_SIZE) startingXI.pop();
+    startingXI.splice(Math.min(3, startingXI.length), 0, suryakumar);
+  }
   const impactCandidates = unique
     .filter((p) => !startingXI.some((s) => s.id === p.id))
     .filter((candidate) => overseasCount([...startingXI, candidate]) <= MAX_OVERSEAS_PLAYERS_IN_SELECTION);
-  const impactPlayer = [
-    ...ordered(impactCandidates.filter((player) => !isOverseasPlayer(player))),
-    ...ordered(impactCandidates.filter(isOverseasPlayer))
-  ][0] || null;
-
-  const valid = validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog);
-  return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayer : null, impactPlayerChasing: valid ? impactPlayer : null, impactPlayerDefending: valid ? impactPlayer : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
+  const rolePerformanceScore = (player, mode) => {
+    const role = normalizeRole(player);
+    const runs = numericStat(player, ['runsLast3Years', 'recentRuns', 'runs']);
+    const average = numericStat(player, ['averageLast3Years', 'recentAverage', 'average', 'avg']);
+    const strikeRate = numericStat(player, ['strikeRateLast3Years', 'recentStrikeRate', 'strikeRate', 'sr']);
+    const wickets = numericStat(player, ['wicketsLast3Years', 'recentWickets', 'wickets']);
+    const economy = numericStat(player, ['economyLast3Years', 'recentEconomy', 'economy', 'econ']);
+    if (mode === 'bat') {
+      const values = [runs === null ? null : Math.min(runs / 100, 100), average === null ? null : Math.min(average * 2, 100), strikeRate === null ? null : Math.min(strikeRate / 2, 100)].filter((v) => v !== null);
+      const roleBonus = ['bat', 'wk'].includes(role) ? 1000 : role === 'ar' ? 500 : 0;
+      return roleBonus + (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
+    }
+    const values = [wickets === null ? null : Math.min(wickets * 2, 100), economy === null ? null : Math.max(0, 100 - economy * 8)].filter((v) => v !== null);
+    const roleBonus = role === 'bowl' ? 1000 : role === 'ar' ? 500 : 0;
+    return roleBonus + (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
+  };
+  const pickImpact = (mode) => {
+    const roles = mode === 'bat' ? ['bat', 'wk', 'ar'] : ['bowl', 'ar'];
+    const preferred = impactCandidates.filter((player) => roles.includes(normalizeRole(player)));
+    const candidates = preferred.length ? preferred : impactCandidates;
+    return [...candidates].sort((a, b) => {
+      const difference = rolePerformanceScore(b, mode) - rolePerformanceScore(a, mode);
+      if (difference) return difference;
+      return (performanceScore(b) ?? -1) - (performanceScore(a) ?? -1);
+    })[0] || null;
+  };
+  // Choose a batting option for a chase and a bowling option while defending.
+  // The two tactical Impact slots may contain the same player if that player
+  // is the best available option for both situations.
+  const impactPlayerChasing = pickImpact('bat');
+  const impactPlayerDefending = pickImpact('bowl');
+  const valid = validatePlayingXIOptions(startingXI, impactPlayerChasing, impactPlayerDefending, squad, playerCatalog);
+  return { startingXI: valid ? startingXI : [], impactPlayer: valid ? impactPlayerChasing : null, impactPlayerChasing: valid ? impactPlayerChasing : null, impactPlayerDefending: valid ? impactPlayerDefending : null, autoSelected: true, selectionStatus: valid ? 'selected' : 'ineligible_squad' };
 }
 
 export function validatePlayingXI(startingXI, impactPlayer, squad, playerCatalog = []) {
