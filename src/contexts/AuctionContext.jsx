@@ -795,7 +795,7 @@ export const AuctionProvider = ({ children }) => {
             retentionCardsRemaining: successfullyRetainedPlayer
               ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
               : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid }]
+            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid, rtmUsed: successfullyRetainedPlayer }]
           };
         });
 
@@ -969,7 +969,7 @@ export const AuctionProvider = ({ children }) => {
           retentionCardsRemaining: successfullyRetainedPlayer
             ? Math.max(0, Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
             : Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0) }]
+          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0), rtmUsed: successfullyRetainedPlayer }]
         };
       });
       const finalTeam = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
