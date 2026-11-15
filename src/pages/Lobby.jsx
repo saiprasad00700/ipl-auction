@@ -73,6 +73,7 @@ const Lobby = () => {
   const [banError, setBanError] = useState(null);
   const [teamSelectError, setTeamSelectError] = useState('');
   const [showBotInfo, setShowBotInfo] = useState(false);
+  const [showStartRequirementPopup, setShowStartRequirementPopup] = useState(false);
 
   const [spectateMode, setSpectateMode] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -215,6 +216,11 @@ const Lobby = () => {
         navigate(`/auction/${id}`);
       } catch (error) {
         setIsStarting(false);
+        if (error?.code === 'MINIMUM_MEMBERS_REQUIRED') {
+          setShowStartRequirementPopup(true);
+        } else {
+          console.warn('[Lobby] Could not start auction:', error?.message || error);
+        }
       }
     }
   };
@@ -596,6 +602,48 @@ const Lobby = () => {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showStartRequirementPopup && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+            <motion.button
+              type="button"
+              aria-label="Close popup"
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowStartRequirementPopup(false)}
+            />
+            <motion.div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="minimum-members-title"
+              className="relative w-full max-w-md rounded-3xl border border-emerald-400/20 bg-[#08111d] p-7 text-center shadow-2xl"
+              initial={{ opacity: 0, scale: 0.92, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 18 }}
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
+                <Users size={28} />
+              </div>
+              <h2 id="minimum-members-title" className="mb-3 text-lg font-black uppercase tracking-wide text-white">
+                More Members Needed
+              </h2>
+              <p className="mb-6 text-sm font-medium leading-relaxed text-gray-300">
+                Invite at least 1 friend or add a bot to start the auction.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowStartRequirementPopup(false)}
+                className="w-full rounded-xl bg-gradient-to-r from-emerald-400 to-teal-300 px-5 py-3 text-xs font-black uppercase tracking-widest text-[#06111b] transition-all hover:brightness-110"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <motion.div
         {...enterProps({ opacity: 0, y: 30 }, { transition: { delay: 0.1 } })}
