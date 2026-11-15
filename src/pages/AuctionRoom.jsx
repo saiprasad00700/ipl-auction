@@ -1596,7 +1596,7 @@ useEffect(() => {
                                               {isSold ? (
                                                  <>
                                                     <span className="text-[9px] sm:text-[10px] font-bold text-white/50 leading-none block">Sold to</span>
-                                                    <span className="text-xs sm:text-sm font-black text-white block mt-0.5">{displayAuctionState.highBidderName || buyerTeam?.name}</span>
+                                                    <span className="text-xs sm:text-sm font-black text-white block mt-0.5">{buyerTeam?.id || displayAuctionState.highBidderName}</span>
                                                  </>
                                               ) : (
                                                  <span className="text-xs sm:text-sm font-black text-red-400 block mt-0.5">Unsold</span>
@@ -2138,13 +2138,13 @@ useEffect(() => {
                            <div>
                               <h2 className="text-xl font-black text-white">{player?.name || 'Player'}</h2>
                               <p className="text-sm text-gray-400">Winning bid: <span className="text-emerald-400 font-black">₹{Number(offer.bid).toFixed(2)} Cr</span></p>
-                              <p className="text-xs text-gray-500 mt-1">Original franchise: {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId}</p>
+                              <p className="text-xs text-gray-500 mt-1">Original franchise: {offer.originalFranchiseId}</p>
                            </div>
                         </div>
                         {offer.phase === 'initial_decision' ? (
                            eligible ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-4">Do you want to use your RTM card? If you choose YES, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} gets one chance to raise the price. You then decide whether to match their new price. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-4">Do you want to use your RTM card? If you choose YES, {offer.buyerTeamId || offer.buyerName} gets one chance to raise the price. You then decide whether to match their new price. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
@@ -2173,7 +2173,7 @@ useEffect(() => {
                                  </div>
                               </>
                            ) : (
-                              <p className="text-sm text-gray-300">Waiting for {TEAMS.find((t) => t.id === offer.originalFranchiseId)?.name || offer.originalFranchiseId} to decide whether to use RTM. Current winning bid is on hold. Time left: {secondsLeft}s.</p>
+                              <p className="text-sm text-gray-300">Waiting for {offer.originalFranchiseId} to decide whether to use RTM. Current winning bid is on hold. Time left: {secondsLeft}s.</p>
                            )
                         ) : offer.phase === 'counter_bid' ? (
                            counterBidder ? (
@@ -2204,12 +2204,12 @@ useEffect(() => {
                                  </form>
                               </>
                            ) : (
-                              <p className="text-sm text-gray-300">RTM has been exercised. Waiting for {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} to submit a higher price. If they do not respond in time, the original franchise gets the player at ₹{Number(offer.bid).toFixed(2)} Cr. Time left: {secondsLeft}s.</p>
+                              <p className="text-sm text-gray-300">RTM has been exercised. Waiting for {offer.buyerTeamId || offer.buyerName} to submit a higher price. If they do not respond in time, the original franchise gets the player at ₹{Number(offer.bid).toFixed(2)} Cr. Time left: {secondsLeft}s.</p>
                            )
                         ) : offer.phase === 'match_decision' ? (
                            eligible ? (
                               <>
-                                 <p className="text-sm text-gray-300 mb-4">{TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} raised the price to <span className="font-black text-emerald-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to use your RTM card to match this price? You have up to 10 seconds. Choosing YES or NO immediately advances the auction. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
+                                 <p className="text-sm text-gray-300 mb-4">{offer.buyerTeamId || offer.buyerName} raised the price to <span className="font-black text-emerald-400">₹{Number(offer.counterBid).toFixed(2)} Cr</span>. Do you want to use your RTM card to match this price? You have up to 10 seconds. Choosing YES or NO immediately advances the auction. Time left: <span className="font-black text-emerald-400">{secondsLeft}s</span>.</p>
                                  <div className="grid grid-cols-2 gap-3">
                                     <button onClick={async () => {
                                        setRetentionDecisionPendingFor(String(offer.expiresAt));
@@ -2226,7 +2226,7 @@ useEffect(() => {
                                  </div>
                               </>
                            ) : (
-                              <p className="text-sm text-gray-300">The price has been raised to ₹{Number(offer.counterBid).toFixed(2)} Cr. Waiting for the original franchise to match or decline. If they decline or time out, {TEAMS.find((t) => t.id === offer.buyerTeamId)?.name || offer.buyerName} wins at this price. Time left: {secondsLeft}s.</p>
+                              <p className="text-sm text-gray-300">The price has been raised to ₹{Number(offer.counterBid).toFixed(2)} Cr. Waiting for the original franchise to match or decline. If they decline or time out, {offer.buyerTeamId || offer.buyerName} wins at this price. Time left: {secondsLeft}s.</p>
                            )
                         ) : <p className="text-sm text-gray-300">RTM decision in progress…</p>}
                      </motion.div>
