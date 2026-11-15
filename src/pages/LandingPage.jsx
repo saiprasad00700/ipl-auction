@@ -691,9 +691,9 @@ const LandingPage = () => {
                           />
                         </div>
                         <span
-                          className={`text-[7px] sm:text-[8px] font-black uppercase text-center tracking-tighter truncate w-full ${selectedTeam === t.id ? "text-white" : "text-gray-400"}`}
+                          className={`text-[10px] sm:text-xs md:text-[13px] font-black uppercase text-center tracking-wide truncate w-full ${selectedTeam === t.id ? "text-white" : "text-gray-300"}`}
                         >
-                          {t.name.split(" ").slice(0, 1)}
+                          {t.id}
                         </span>
                       </button>
                     ))}
