@@ -1392,7 +1392,22 @@ useEffect(() => {
                                           <>
                                              <div className={`w-1.5 h-1.5 rounded-full ${manager.isOnline ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)] animate-pulse' : 'bg-gray-600'}`} />
                                              <span className="text-[9px] font-semibold text-gray-400 truncate max-w-[110px]">
-                                                {manager.name} {isMyTeam ? '(You)' : ''}
+                                                {(() => {
+                                                   const botDisplayNames = {
+                                                      CSK: 'kaasi ji',
+                                                      RCB: 'honesty malya',
+                                                      RR: '10th class kids',
+                                                      GT: 'Nehra ji',
+                                                      PBKS: 'angel queen preety',
+                                                      SRH: 'kayva queen',
+                                                      MI: 'mbani ji',
+                                                      LSG: 'joenka uncle',
+                                                      DC: 'panter saab',
+                                                      KKR: 'shah rukh ji'
+                                                   };
+                                                   const isBotManager = Boolean(manager.isBot) || /bot/i.test(String(manager.name || '')) || /^(bot[_-]|auctionbot[_-])/i.test(String(manager.id || ''));
+                                                   return isBotManager ? (botDisplayNames[t.id] || manager.name) : manager.name;
+                                                })()} {isMyTeam ? '(You)' : ''}
                                              </span>
                                           </>
                                        ) : (
