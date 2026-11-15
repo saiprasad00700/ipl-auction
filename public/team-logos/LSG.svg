@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24a9f3"/><stop offset="1" stop-color="#092b65"/></linearGradient><linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff4c8"/><stop offset=".5" stop-color="#e8b84d"/><stop offset="1" stop-color="#9a5b19"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="8"/></filter></defs>
+ <path d="M256 24L454 111v147c0 113-79 184-198 230C137 442 58 371 58 258V111z" fill="#000" opacity=".38" filter="url(#s)"/>
+ <path d="M256 20L454 106v151c0 112-79 184-198 230C137 441 58 369 58 257V106z" fill="url(#g)" stroke="url(#metal)" stroke-width="13"/>
+ <path d="M256 48L426 121v134c0 94-66 154-170 196-104-42-170-102-170-196V121z" fill="#08172b" stroke="#24a9f3" stroke-width="7"/>
+ <g transform="translate(0 4)"><path d="M90 235l145-118-39 87 116-49-93 117 32-70-161 83z" fill="#f8a42f" stroke="#bfeaff" stroke-width="8"/><path d="M235 117l145 118-161-48 93 103-93-48" fill="#2bb9f4" stroke="#bfeaff" stroke-width="8"/></g>
+ <path d="M95 292h322l-20 85H115z" fill="#07101e" stroke="url(#metal)" stroke-width="8"/>
+ <text x="256" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="94" font-weight="900" font-style="italic" letter-spacing="-3" fill="white" stroke="#092b65" stroke-width="3" paint-order="stroke">LSG</text>
+ <path d="M180 401h152" stroke="url(#metal)" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="256" cy="425" r="10" fill="#24a9f3" stroke="#fff1c4" stroke-width="4"/>
+ </svg>
