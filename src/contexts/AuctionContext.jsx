@@ -338,6 +338,19 @@ export const AuctionProvider = ({ children }) => {
     // Fetch room data to determine auction type
     const roomSnap = await get(rtdbRoomRef);
     const roomData = roomSnap.exists() ? roomSnap.val() : {};
+    const roster = Array.isArray(roomData.players)
+      ? roomData.players
+      : Object.values(roomData.players || {});
+    const uniqueParticipants = new Map();
+    roster.forEach((player) => {
+      const participantId = String(player?.id || player?.userId || '').trim();
+      if (participantId) uniqueParticipants.set(participantId, player);
+    });
+    if (uniqueParticipants.size < 2) {
+      const error = new Error('Invite at least 1 friend or add a bot to start the auction.');
+      error.code = 'MINIMUM_MEMBERS_REQUIRED';
+      throw error;
+    }
     const auctionType = roomData.auctionType || 'mega';
 
     // Calculate target players
