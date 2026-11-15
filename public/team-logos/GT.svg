@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9ad42"/><stop offset="1" stop-color="#10294d"/></linearGradient><linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff4c8"/><stop offset=".5" stop-color="#e8b84d"/><stop offset="1" stop-color="#9a5b19"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="8"/></filter></defs>
+ <path d="M256 24L454 111v147c0 113-79 184-198 230C137 442 58 371 58 258V111z" fill="#000" opacity=".38" filter="url(#s)"/>
+ <path d="M256 20L454 106v151c0 112-79 184-198 230C137 441 58 369 58 257V106z" fill="url(#g)" stroke="url(#metal)" stroke-width="13"/>
+ <path d="M256 48L426 121v134c0 94-66 154-170 196-104-42-170-102-170-196V121z" fill="#08172b" stroke="#d9ad42" stroke-width="7"/>
+ <g transform="translate(0 4)"><path d="M90 250l91-113 47 55 51-99 143 157z" fill="#f1cb68" stroke="#fff1ad" stroke-width="9"/><path d="M181 137l47 55 51-99 47 80 32-36 64 113H90z" fill="#193f6b"/><path d="M90 250h332" stroke="#f6d989" stroke-width="12"/></g>
+ <path d="M95 292h322l-20 85H115z" fill="#07101e" stroke="url(#metal)" stroke-width="8"/>
+ <text x="256" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="94" font-weight="900" font-style="italic" letter-spacing="-3" fill="white" stroke="#10294d" stroke-width="3" paint-order="stroke">GT</text>
+ <path d="M180 401h152" stroke="url(#metal)" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="256" cy="425" r="10" fill="#d9ad42" stroke="#fff1c4" stroke-width="4"/>
+ </svg>
