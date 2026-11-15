@@ -231,6 +231,10 @@ export const AuctionProvider = ({ children }) => {
     } catch (historyError) {
       console.warn('Could not save room history entry:', historyError?.message || historyError);
     }
+    // Keep a compact participant index so completed history can expire without
+    // scanning every user's entire history tree.
+    try { await set(ref(rtdb, `completedRoomHistory/${roomId}/users/${userId}`), true); }
+    catch (indexError) { console.warn('Could not index room history participant:', indexError?.message || indexError); }
 
     // Write to Supabase (primary database index, 0 Firestore cost)
     try {
@@ -1138,6 +1142,8 @@ export const AuctionProvider = ({ children }) => {
     } catch (historyError) {
       console.error('Could not save room history entry:', historyError?.message || historyError);
     }
+    try { await set(ref(rtdb, `completedRoomHistory/${roomId}/users/${userId}`), true); }
+    catch (indexError) { console.warn('Could not index room history participant:', indexError?.message || indexError); }
 
     // Refresh the inactivity heartbeat separately; do not let it block history.
     try {
@@ -2258,13 +2264,21 @@ export const AuctionProvider = ({ children }) => {
         };
       });
       const rankings = [...eligibleRankings, ...disqualifiedRankings].sort((a, b) => a.rank - b.rank);
+      const completedAt = getSyncedTime();
       await updateRtdb(roomRef, {
         status: 'completed',
+        completedAt,
         winnerAnalysisStatus: 'completed',
         winnerRankings: rankings,
         winnerAnalysisModel: analysisModel,
-        winnerAnalysisCompletedAt: getSyncedTime()
+        winnerAnalysisCompletedAt: completedAt
       });
+      // Start the 48-hour history retention clock only after final rankings are saved.
+      try {
+        await set(ref(rtdb, `completedRoomHistory/${roomId}/completedAt`), completedAt);
+      } catch (historyIndexError) {
+        console.warn('Could not schedule completed history expiry:', historyIndexError?.message || historyIndexError);
+      }
       void trackAnalyticsEvent('auction_completed', roomId);
       // Mark the public directory entry completed before removing it. The lobby
       // filters out completed entries, so a temporary RTDB delete failure cannot
