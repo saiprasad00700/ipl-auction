@@ -355,6 +355,26 @@ async function cleanupAbandonedRooms() {
       console.log('[Room cleanup] Removed abandoned room from Firebase:', roomId);
       }
     }
+
+    // Expire only the user's history references 48 hours after an auction is
+    // completed. The archived auction/results data itself is left untouched.
+    const HISTORY_RETENTION_MS = 48 * 60 * 60 * 1000;
+    const historyIndexRef = primaryDatabase.ref('completedRoomHistory');
+    const historyIndexSnapshot = await historyIndexRef.get();
+    if (historyIndexSnapshot.exists()) {
+      const historyIndex = historyIndexSnapshot.val() || {};
+      const now = Date.now();
+      for (const [roomId, entry] of Object.entries(historyIndex)) {
+        const completedAt = Number(entry?.completedAt || 0);
+        if (!Number.isFinite(completedAt) || completedAt <= 0 || now - completedAt < HISTORY_RETENTION_MS) continue;
+        const users = entry?.users || {};
+        await Promise.all(Object.keys(users).map((userId) =>
+          primaryDatabase.ref('userAuctionHistory/' + userId + '/' + roomId).remove()
+        ));
+        await historyIndexRef.child(roomId).remove();
+        console.log('[Room cleanup] Expired 48-hour history entries for room:', roomId);
+      }
+    }
   } catch (error) {
     console.warn('[Room cleanup] Cleanup pass failed:', error?.message || error);
   }
