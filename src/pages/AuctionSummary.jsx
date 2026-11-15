@@ -296,7 +296,7 @@ const AuctionSummary = () => {
                         <div className="flex items-center gap-3 min-w-0">
                           {teamInfo?.logo && <img src={teamInfo.logo} alt="" className="w-11 h-11 object-contain shrink-0" />}
                           <div className="min-w-0">
-                            <h3 className="font-black uppercase truncate">{teamInfo?.name || teamDoc.teamName || teamDoc.teamId}</h3>
+                            <h3 className="font-black uppercase truncate">{teamDoc.teamId || teamInfo?.id}</h3>
                             <p className="text-[10px] text-gray-500 uppercase tracking-wider">{teamDoc.disqualified ? 'Disqualified' : 'View Playing XI'}</p>
                           </div>
                         </div>
