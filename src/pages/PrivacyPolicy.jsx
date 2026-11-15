@@ -188,11 +188,11 @@ const PrivacyPolicy = () => {
             </section>
 
             <section id="analytics" className="scroll-mt-24">
-              <h2 className="text-xl font-semibold text-white mb-4">6. Analytics and diagnostics</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">6. AI analysis, analytics and advertising</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
-                <p>
-                  
-                </p>
+                <p><strong className="text-gray-200">AI-assisted winner analysis:</strong> In supported auction modes, SSAUCTION sends submitted franchise information to the Google Gemini API to generate comparative team rankings and explanations. This may include franchise identifiers and names, submitted Playing XI and batting order, Impact Player selections, squad/player names and roles, and player-performance statistics associated with those players. The analysis is automated and may be inaccurate; it assists the game's ranking process and is not a guarantee of actual team performance or professional advice. Google processes submitted information to provide the AI service under its applicable terms and privacy policy. Do not include sensitive personal information in player names, room names, or other submitted fields.</p>
+                <p><strong className="text-gray-200">Analytics and diagnostics:</strong> We use Umami and Cloudflare Web Analytics, together with application event tracking, to understand visits, feature usage, performance, and errors. These services and our server infrastructure may process technical information such as IP address, browser/device details, page or event information, and timestamps for analytics, security, rate limiting, and diagnostics. Their providers handle information under their own privacy terms.</p>
+                <p><strong className="text-gray-200">Advertising:</strong> If Google AdSense or other advertising services are enabled, Google and its advertising partners may use cookies, web beacons, IP addresses, device identifiers, and similar technologies to serve, measure, and personalize ads based on visits to this site or other sites. You can manage Google's personalized advertising settings at <a className="text-blue-400 hover:text-blue-300" href="https://adssettings.google.com/" target="_blank" rel="noreferrer">Google Ads Settings</a>. You can also visit <a className="text-blue-400 hover:text-blue-300" href="https://www.aboutads.info/choices/" target="_blank" rel="noreferrer">AboutAds.info</a> for information about interest-based advertising choices. Advertising technologies will be used only when advertising is enabled and subject to applicable consent requirements.</p>
               </div>
             </section>
 
