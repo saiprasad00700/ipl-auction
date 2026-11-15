@@ -196,7 +196,9 @@ const VoiceChat = ({ roomId }) => {
     try {
       await track.setMuted(micOn);
       if (!micOn && roomDatabaseRef.current) {
-        await update(ref(roomDatabaseRef.current, `auctions/${roomId}/room`), { lastActivityAt: Date.now() });
+        void update(ref(roomDatabaseRef.current, `auctions/${roomId}/room`), { lastActivityAt: Date.now() }).catch((activityError) => {
+          console.warn('[Agora Voice] Could not record microphone activity:', activityError?.message || activityError);
+        });
       }
       setMicOn(!micOn);
       setError('');
