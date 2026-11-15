@@ -16,6 +16,10 @@ const AuctionRoom     = lazy(() => import('./pages/AuctionRoom'))
 const AuctionSummary  = lazy(() => import('./pages/AuctionSummary'))
 const Lobby           = lazy(() => import('./pages/Lobby'))
 const GameGuide       = lazy(() => import('./pages/GameGuide'))
+const AboutPage       = lazy(() => import('./pages/AboutPage'))
+const AIAnalysisPage  = lazy(() => import('./pages/AIAnalysisPage'))
+const CricketStatsPage = lazy(() => import('./pages/CricketStatsPage'))
+const FAQPage         = lazy(() => import('./pages/FAQPage'))
 const PrivacyPolicy   = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsConditions = lazy(() => import('./pages/TermsConditions'))
 const AdminPanel      = lazy(() => import('./pages/AdminPanel'))
@@ -73,6 +77,18 @@ function App() {
                   } />
                   <Route path="/admin/:tab" element={
                     <Suspense fallback={<PageFallback />}><AdminPanel /></Suspense>
+                  } />
+                  <Route path="/about" element={
+                    <Suspense fallback={<PageFallback />}><AboutPage /></Suspense>
+                  } />
+                  <Route path="/ai-analysis" element={
+                    <Suspense fallback={<PageFallback />}><AIAnalysisPage /></Suspense>
+                  } />
+                  <Route path="/cricket-stats" element={
+                    <Suspense fallback={<PageFallback />}><CricketStatsPage /></Suspense>
+                  } />
+                  <Route path="/faq" element={
+                    <Suspense fallback={<PageFallback />}><FAQPage /></Suspense>
                   } />
                   <Route path="/guide" element={
                     <Suspense fallback={<PageFallback />}><GameGuide /></Suspense>

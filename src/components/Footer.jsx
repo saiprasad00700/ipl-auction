@@ -15,9 +15,13 @@ const Footer = () => {
         </div>
 
         <div className="grid grid-cols-2 lg:flex lg:flex-row lg:flex-nowrap border-l-0 lg:border-l border-white/10 justify-center w-full lg:w-auto">
+          <Link to="/about" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 border-r border-white/10 flex items-center justify-center whitespace-nowrap">About</Link>
           <Link to="/guide" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 border-r border-white/10 flex items-center justify-center whitespace-nowrap">
             Game Guide
           </Link>
+          <Link to="/ai-analysis" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 border-r border-white/10 flex items-center justify-center whitespace-nowrap">AI Analysis</Link>
+          <Link to="/cricket-stats" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 border-r border-white/10 flex items-center justify-center whitespace-nowrap">Cricket Stats</Link>
+          <Link to="/faq" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 border-r border-white/10 flex items-center justify-center whitespace-nowrap">FAQ</Link>
           <Link to="/privacy" className="px-2 sm:px-6 py-4 hover:text-white hover:bg-white/5 transition-colors border-b lg:border-b-0 lg:border-r border-white/10 flex items-center justify-center whitespace-nowrap">
             Privacy Policy
           </Link>
