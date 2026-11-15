@@ -34,10 +34,12 @@ export default function CookieConsent() {
   const handleAccept = () => {
     localStorage.setItem('cookie_consent_status', 'accepted')
     loadOptionalAnalytics()
+    window.dispatchEvent(new CustomEvent('ssauction-consent-updated', { detail: 'accepted' }))
     setIsVisible(false)
   }
   const handleDecline = () => {
     localStorage.setItem('cookie_consent_status', 'declined')
+    window.dispatchEvent(new CustomEvent('ssauction-consent-updated', { detail: 'declined' }))
     setIsVisible(false)
   }
   return (
