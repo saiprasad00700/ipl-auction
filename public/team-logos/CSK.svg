@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6c928"/><stop offset="1" stop-color="#073b83"/></linearGradient><linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff4c8"/><stop offset=".5" stop-color="#e8b84d"/><stop offset="1" stop-color="#9a5b19"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="8"/></filter></defs>
+ <path d="M256 24L454 111v147c0 113-79 184-198 230C137 442 58 371 58 258V111z" fill="#000" opacity=".38" filter="url(#s)"/>
+ <path d="M256 20L454 106v151c0 112-79 184-198 230C137 441 58 369 58 257V106z" fill="url(#g)" stroke="url(#metal)" stroke-width="13"/>
+ <path d="M256 48L426 121v134c0 94-66 154-170 196-104-42-170-102-170-196V121z" fill="#08172b" stroke="#f6c928" stroke-width="7"/>
+ <g transform="translate(0 4)"><circle cx="256" cy="170" r="92" fill="#ffcf39" opacity=".2"/><path d="M160 250V155h24v-28h22v28h20V98h30v57h20v-28h22v28h24v95M148 250h216M176 250v-48h32v48m96 0v-48h32v48M224 250v-70h64v70" fill="none" stroke="#f9d65b" stroke-width="13" stroke-linejoin="round"/><path d="M214 98h84l-42-48z" fill="#f9d65b"/></g>
+ <path d="M95 292h322l-20 85H115z" fill="#07101e" stroke="url(#metal)" stroke-width="8"/>
+ <text x="256" y="355" text-anchor="middle" font-family="Arial,sans-serif" font-size="94" font-weight="900" font-style="italic" letter-spacing="-3" fill="white" stroke="#073b83" stroke-width="3" paint-order="stroke">CSK</text>
+ <path d="M180 401h152" stroke="url(#metal)" stroke-width="8" stroke-linecap="round"/>
+ <circle cx="256" cy="425" r="10" fill="#f6c928" stroke="#fff1c4" stroke-width="4"/>
+ </svg>
