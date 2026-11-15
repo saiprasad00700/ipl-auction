@@ -1384,9 +1384,8 @@ useEffect(() => {
                                     <img src={t.logo} alt={`${t.id} ${t.name} Logo`} className="w-full h-full object-contain" />
                                  </div>
                                  <div className="overflow-hidden min-w-0">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                       <h5 className="text-[11px] font-bold text-white leading-tight truncate">{t.name}</h5>
-                                       <span className="shrink-0 rounded bg-amber-400/15 border border-amber-300/30 px-1 py-0.5 text-[8px] font-black leading-none tracking-wide text-amber-300">{t.id}</span>
+                                    <div className="flex items-center min-w-0">
+                                       <h5 className="text-xs font-black text-white leading-tight tracking-wide truncate">{t.id}</h5>
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                        {manager ? (
