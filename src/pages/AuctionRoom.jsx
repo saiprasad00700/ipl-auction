@@ -2629,7 +2629,7 @@ const SoldCard = ({ msg }) => {
                   <div className="text-right uppercase tracking-[0.15em] sm:tracking-[0.2em]">
                      <p className="text-[7px] sm:text-[8px] font-black text-blue-500 mb-0.5">IPL Auction</p>
                      <p className="text-[9px] sm:text-[10px] font-bold text-white/50 leading-none">Sold to</p>
-                     <p className="text-[11px] sm:text-[12px] font-black text-white">{msg.metadata.buyerName}</p>
+                     <p className="text-[11px] sm:text-[12px] font-black text-white">{team?.id || msg.metadata.buyerName}</p>
                   </div>
                </div>
 
