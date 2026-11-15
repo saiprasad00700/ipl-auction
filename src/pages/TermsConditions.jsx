@@ -119,7 +119,7 @@ const TermsConditions = () => {
 
           <div className="mb-8 sm:mb-12 border-b border-white/10 pb-6 sm:pb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Terms of Service</h1>
-            <p className="text-sm text-gray-500 mb-6">Last updated: October 2, 2026</p>
+            <p className="text-sm text-gray-500 mb-6">Last updated: November 15, 2026</p>
             <p className="text-base text-[#E5E5E5] leading-relaxed">
               These Terms of Service govern your use of SSAUCTION. By accessing or using the platform, you agree to be bound by these terms.
             </p>
@@ -176,7 +176,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">5. Fan-made / non-affiliation notice</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  SSAUCTION is an unofficial, non-commercial fan project created for entertainment and strategy practice. 
+                  SSAUCTION is an independently operated, unofficial fan-made simulation platform. It may be supported by advertising or other permitted monetization, and is provided for entertainment and strategy practice. 
                 </p>
                 <p>
                   We are <strong>not affiliated with, endorsed by, sponsored by, or associated with</strong> the Board of Control for Cricket in India (BCCI), the Indian Premier League (IPL), or any official franchise team.
@@ -188,7 +188,7 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">6. Intellectual property</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  All team names, player names, logos, and trademarks mentioned or displayed in the simulation belong to their respective owners. Their use within this platform falls under fair use for transformative, non-commercial entertainment purposes.
+                  All team names, player names, logos, and trademarks mentioned or displayed in the simulation belong to their respective owners. Their appearance on this platform does not mean that SSAUCTION owns or is licensed to use them. We do not make a legal determination that any particular use is fair use or otherwise authorized. We aim to use only assets we own, have permission to use, or are otherwise legally entitled to use, and will review credible rights-holder requests.
                 </p>
                 <p>
                   The underlying codebase, UI design, and specific auction algorithms of SSAUCTION are the intellectual property of the developers, unless otherwise open-sourced.
@@ -200,8 +200,10 @@ const TermsConditions = () => {
               <h2 className="text-xl font-semibold text-white mb-4">7. Third-party services</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  SSAUCTION relies on third-party infrastructure (such as Google Firebase) for hosting, database management, and authentication. Your use of the service is also subject to the terms and acceptable use policies of these providers.
+                  SSAUCTION relies on third-party providers including Google Firebase for authentication and databases, Agora for real-time voice chat, Google Gemini for AI-assisted winner analysis, Supabase for selected data services, and hosting, security, and analytics providers. If advertising is enabled, Google AdSense and its partners may also process information using cookies and similar technologies. Your use of features provided by these services is subject to the providers’ applicable terms and privacy policies.
                 </p>
+                <p><strong>AI-assisted rankings:</strong> In supported modes, an automated AI service analyses submitted franchise squads, Playing XIs, Impact Player choices, and available player-performance data to produce rankings and explanations. AI outputs can be incomplete, biased, or incorrect and are not a guarantee of actual team performance. Rankings are game results generated from the available data and model output; users should not treat them as professional, financial, or other real-world advice.</p>
+                <p><strong>Voice chat:</strong> Voice chat uses Agora RTC to transmit live audio between room participants. You are responsible for granting microphone permission and for what you choose to say. SSAUCTION does not intentionally record voice conversations. Other participants may independently record or capture audio using their own devices or software.</p>
               </div>
             </section>
 
