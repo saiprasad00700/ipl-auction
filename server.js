@@ -988,7 +988,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const RtcTokenBuilder = agoraToken.RtcTokenBuilder || agoraToken.default?.RtcTokenBuilder;
       const RtcRole = agoraToken.RtcRole || agoraToken.Role || agoraToken.default?.RtcRole || agoraToken.default?.Role;
       if (!RtcTokenBuilder || !RtcRole) throw new Error('Agora token builder is unavailable');
-      const token = RtcTokenBuilder.buildTokenWithAccount(
+      const token = RtcTokenBuilder.buildTokenWithUserAccount(
         appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
         tokenExpirationSeconds, privilegeExpirationSeconds
       );
