@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
     { id: 'auth', label: '3. Authentication' },
     { id: 'auction-data', label: '4. Auction and room data' },
     { id: 'chats', label: '5. Text chat and voice chat' },
-    { id: 'analytics', label: '6. Analytics and diagnostics' },
+    { id: 'analytics', label: '6. AI analysis, analytics and advertising' },
     { id: 'storage', label: '7. Data storage and retention' },
     { id: 'third-party', label: '8. Third-party services' },
     { id: 'choices', label: '9. Your choices' },
@@ -119,7 +119,7 @@ const PrivacyPolicy = () => {
 
           <div className="mb-8 sm:mb-12 border-b border-white/10 pb-6 sm:pb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-4">Privacy Policy</h1>
-            <p className="text-sm text-gray-500 mb-6">Last updated: November 13, 2026</p>
+            <p className="text-sm text-gray-500 mb-6">Last updated: November 15, 2026</p>
             <p className="text-base text-[#E5E5E5] leading-relaxed">
               This policy explains what information SSAUCTION collects, how it is used, and which third-party services are involved. We aim to collect only the minimal data necessary to provide a real-time multiplayer auction experience.
             </p>
@@ -133,7 +133,7 @@ const PrivacyPolicy = () => {
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
                   <li><strong className="text-gray-200">Account information:</strong> If you sign in with Google, we collect your display name, email address, and profile picture URL.</li>
                   <li><strong className="text-gray-200">Auction data:</strong> We store the state of the auction rooms you create or join, including team configurations, bids, and chat messages.</li>
-                  <li><strong className="text-gray-200">Device information:</strong> We may collect non-personally identifiable information such as browser type, screen resolution, and operating system for diagnostic purposes.</li>
+                  <li><strong className="text-gray-200">Device and technical information:</strong> Our analytics and server infrastructure may process browser type, screen resolution, operating system, IP address, timestamps, page views, and feature events for analytics, security, rate limiting, and diagnostics.</li>
                 </ul>
               </div>
             </section>
@@ -179,7 +179,7 @@ const PrivacyPolicy = () => {
                   Because text messages are stored in our database, authorized technical administrators may be able to access them. Access is not part of routine operation and may occur only when reasonably necessary to maintain or secure the service, investigate abuse or technical problems, respond to a support request, or comply with a legal obligation. Other participants in the same room can see messages shared in that room.
                 </p>
                 <p>
-                  <strong className="text-gray-200">Voice chat:</strong> Voice chat is provided as live audio communication through LiveKit. SSAUCTION does not make or store recordings of voice conversations, and we do not routinely listen to or monitor what participants say. Audio is transmitted in real time so that connected participants can hear one another; LiveKit processes the audio to provide this service. We do not provide a feature to replay past voice conversations.
+                  <strong className="text-gray-200">Voice chat:</strong> Voice chat is provided through Agora RTC. When you join a voice channel, your browser requests microphone permission and live audio is transmitted in real time to other participants in the same auction room. Agora processes the audio and related connection information to provide the service. SSAUCTION does not intentionally record or store voice conversations and does not provide a replay feature. We may process room identifiers and participant identifiers to authenticate and manage the voice session. Agora may process technical and connection metadata under its own privacy terms.
                 </p>
                 <p>
                   Please remember that other participants may independently record, capture, or repeat conversations using their own devices or software. Do not share information in text or voice chat that you do not want other room participants to hear or see.
@@ -191,7 +191,7 @@ const PrivacyPolicy = () => {
               <h2 className="text-xl font-semibold text-white mb-4">6. Analytics and diagnostics</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  We may use privacy-respecting analytics tools to understand how the platform is used. These tools do not track you across other websites and do not sell your data. We rely on aggregate telemetry to identify which features are most popular and where errors occur.
+                  
                 </p>
               </div>
             </section>
@@ -200,7 +200,7 @@ const PrivacyPolicy = () => {
               <h2 className="text-xl font-semibold text-white mb-4">7. Data storage and retention</h2>
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>
-                  Your data is stored securely on Google Cloud Platform via Firebase services. We retain your account data and auction history for as long as your account is active. Non-active auction rooms may be periodically purged to minimize our storage footprint.
+                  Account, room, and auction data is stored using Firebase and other service providers described in this policy. We retain account data and auction history while needed to provide the service and for legitimate operational, security, and legal purposes. Inactive rooms may be automatically deleted under our room-retention rules. Voice conversations are not intentionally recorded or stored by SSAUCTION.
                 </p>
                 <p>
                   Certain application preferences, such as volume level and active room IDs, are stored locally on your device using <code>localStorage</code>. You can clear these at any time via your browser settings.
@@ -214,7 +214,10 @@ const PrivacyPolicy = () => {
                 <p>SSAUCTION integrates with the following third-party services:</p>
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
                   <li><strong>Firebase (Google):</strong> For authentication, real-time database, and hosting, including storage and delivery of room text messages.</li>
-                  <li><strong>LiveKit:</strong> For real-time voice communication between participants. Audio is transmitted to provide the live call; SSAUCTION does not record or store voice conversations.</li>
+                  <li><strong>Agora:</strong> For real-time voice communication. Live audio and technical connection metadata are processed to provide voice sessions; SSAUCTION does not intentionally record or store voice conversations.</li>
+                  <li><strong>Google Gemini:</strong> For AI-assisted analysis of auction squads and player-performance information to generate franchise rankings and explanations in supported modes.</li>
+                  <li><strong>Umami and Cloudflare Web Analytics:</strong> For website usage, performance, and diagnostic analytics.</li>
+                  <li><strong>Google AdSense (if enabled):</strong> For advertising, which may involve cookies and similar technologies as described above.</li>
                   <li><strong>Supabase:</strong> For user-uploaded sticker storage where that feature is enabled.</li>
                 </ul>
                 <p>
