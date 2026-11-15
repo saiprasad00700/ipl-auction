@@ -98,7 +98,7 @@ const SquadRating = ({ roomTeams = [], currentAuction }) => {
               <div className="text-left min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <span className="text-gray-400 font-bold text-xs sm:text-base shrink-0">#{idx + 1}</span>
-                  <h3 className={`text-sm sm:text-2xl font-black uppercase tracking-tight sm:tracking-tighter transition-colors truncate ${team.isDisqualified ? 'text-gray-500' : 'text-white group-hover:text-orange-500'}`}>{team.teamName}</h3>
+                  <h3 className={`text-sm sm:text-2xl font-black uppercase tracking-tight sm:tracking-tighter transition-colors truncate ${team.isDisqualified ? 'text-gray-500' : 'text-white group-hover:text-orange-500'}`}>{team.teamId}</h3>
                 </div>
                 <div className="flex items-center gap-2 mt-1 sm:mt-1.5">
                   <p className={`text-[7px] sm:text-[10px] font-black uppercase tracking-[0.1em] sm:tracking-[0.4em] leading-none truncate ${team.isDisqualified ? 'text-red-500' : 'text-gray-500'}`}>{team.playerCount} / {minPlayers} Players</p>
