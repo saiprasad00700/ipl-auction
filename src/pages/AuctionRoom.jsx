@@ -1735,7 +1735,7 @@ useEffect(() => {
                                                          </div>
                                                          <span className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-gray-300 uppercase tracking-widest">{displayAuctionState.highBidderTeamId}</span>
                                                       </div>
-                                                      <span className="max-w-[110px] truncate text-[8px] sm:text-[9px] font-semibold normal-case text-gray-400">
+                                                      <span className="max-w-[130px] truncate text-[10px] sm:text-[11px] font-bold normal-case text-gray-200">
                                                          {(() => {
                                                             const bidderId = displayAuctionState?.highBidderId;
                                                             const players = Array.isArray(currentAuction?.players) ? currentAuction.players : Object.values(currentAuction?.players || {});
