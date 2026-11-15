@@ -1380,7 +1380,7 @@ useEffect(() => {
                            >
                               <div className="flex items-center gap-2.5">
                                  <span className="w-4 text-[10px] font-black text-gray-500 text-center shrink-0">{idx + 1}</span>
-                                 <div className="w-10 h-10 rounded-lg bg-white/5 p-0.5 flex items-center justify-center shrink-0">
+                                 <div className="w-[60px] h-[60px] rounded-lg bg-white/5 p-0.5 flex items-center justify-center shrink-0">
                                     <img src={t.logo} alt={`${t.id} ${t.name} Logo`} className="w-full h-full object-contain" />
                                  </div>
                                  <div className="overflow-hidden min-w-0">
