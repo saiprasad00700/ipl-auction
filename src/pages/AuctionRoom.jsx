@@ -719,7 +719,7 @@ useEffect(() => {
          // 2. A new bid is placed
          else if (currentBid > lastSpokenBidRef.current) {
             lastSpokenBidRef.current = currentBid;
-            const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.name || highBidderTeamId || "a manager";
+            const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.id || highBidderTeamId || "a franchise";
             const bidValStr = formatPriceForSpeech(currentBid);
 
             const bidPhrases = [
@@ -733,7 +733,7 @@ useEffect(() => {
          }
       } else if (status === 'sold' && lastSpokenStatusRef.current !== 'sold') {
          lastSpokenStatusRef.current = 'sold';
-         const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.name || highBidderTeamId || "a franchise";
+         const teamName = TEAMS.find(t => t.id === highBidderTeamId)?.id || highBidderTeamId || "a franchise";
          const bidValStr = formatPriceForSpeech(currentBid);
          speak(`Sold! ${currentPlayer?.name || "Player"} goes to ${teamName} for ${bidValStr}!`);
       } else if (status === 'unsold' && lastSpokenStatusRef.current !== 'unsold') {
