@@ -927,7 +927,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not record room activity' });
     }
   }
-  if (pathname === '/api/voice-token') {
+  if (pathname === '/api/agora-voice-token') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
       const authorization = String(req.headers.authorization || '');
@@ -936,35 +936,71 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const rtcAccount = String(body.rtcAccount || '').trim();
+      const serverId = String(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
-      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
-        return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
-      }
+      if (!/^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount)) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
+      if (!['1', '2'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
+
+      const { database } = serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
       const roomSnapshot = await database.ref(`auctions/${roomId}/room`).get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
       const roomData = roomSnapshot.val() || {};
-      const roster = Array.isArray(roomData.players)
-        ? roomData.players
-        : Object.values(roomData.players || {});
+      const roster = Array.isArray(roomData.players) ? roomData.players : Object.values(roomData.players || {});
       const rosterEntry = roster.find((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
       const isHost = roomData.hostId === decoded.uid;
       if (!isHost && !rosterEntry) return sendJson(res, 403, { error: 'You must join this auction before using voice chat' });
-      if (!process.env.LIVEKIT_URL || !process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET) {
-        return sendJson(res, 503, { error: 'Voice chat is not configured on the server' });
+
+      const appId = String(process.env.AGORA_APP_ID || '').trim();
+      const certificate = String(process.env.AGORA_APP_CERTIFICATE || '').trim();
+      const publicAppId = String(process.env.VITE_AGORA_APP_ID || '').trim();
+      if (!appId || !certificate || (publicAppId && publicAppId !== appId)) {
+        return sendJson(res, 503, { error: 'Agora voice chat is not configured correctly on this server' });
       }
-      const participantName = String(rosterEntry?.name || decoded.name || 'Player').trim().slice(0, 60);
-      const { AccessToken } = await import('livekit-server-sdk');
-      const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
-        identity: decoded.uid,
-        name: participantName,
-        ttl: '1h'
+
+      // Reserve five participant-minutes per short-lived token. The 8,000-minute
+      // application cap leaves a 20% safety buffer below Agora's published 10,000
+      // free-minute allowance. The transaction is shared through primary Firebase
+      // so both Render servers consume one common budget.
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const usageRef = (await getFirebaseAdminServices()).database.ref('agoraVoiceUsage/' + monthKey);
+      const blockMinutes = 5;
+      const applicationLimitMinutes = 8000;
+      const reservation = await usageRef.transaction((current) => {
+        const usage = current || { reservedMinutes: 0, updatedAt: Date.now() };
+        const reservedMinutes = Math.max(0, Number(usage.reservedMinutes) || 0);
+        if (reservedMinutes + blockMinutes > applicationLimitMinutes) return;
+        return { ...usage, reservedMinutes: reservedMinutes + blockMinutes, updatedAt: Date.now() };
       });
-      token.addGrant({ roomJoin: true, room: 'auction-' + roomId, canPublish: true, canSubscribe: true });
-      return sendJson(res, 200, { token: await token.toJwt(), url: process.env.LIVEKIT_URL, identity: decoded.uid });
+      if (!reservation.committed) {
+        return sendJson(res, 429, {
+          error: 'SS AUCTION monthly free voice allowance has been reached. Voice chat will be available again next month.',
+          code: 'AGORA_FREE_LIMIT_REACHED',
+          limitMinutes: applicationLimitMinutes
+        });
+      }
+
+      const channelName = 'ssauction-' + roomId;
+      const tokenExpirationSeconds = 300;
+      const privilegeExpirationSeconds = 300;
+      const agoraToken = await import('agora-token');
+      const RtcTokenBuilder = agoraToken.RtcTokenBuilder || agoraToken.default?.RtcTokenBuilder;
+      const RtcRole = agoraToken.RtcRole || agoraToken.Role || agoraToken.default?.RtcRole || agoraToken.default?.Role;
+      if (!RtcTokenBuilder || !RtcRole) throw new Error('Agora token builder is unavailable');
+      const token = RtcTokenBuilder.buildTokenWithAccount(
+        appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
+        tokenExpirationSeconds, privilegeExpirationSeconds
+      );
+      return sendJson(res, 200, {
+        appId, channelName, token, uid: rtcAccount,
+        expiresIn: tokenExpirationSeconds,
+        reservedMinutes: Number(reservation.snapshot.val()?.reservedMinutes || 0),
+        limitMinutes: applicationLimitMinutes
+      });
     } catch (error) {
-      console.error('[Voice] Token request failed:', error?.message || error);
-      return sendJson(res, 500, { error: 'Could not start voice chat. Check server configuration.' });
+      console.error('[Agora Voice] Token request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not start voice chat. Check Agora server configuration.' });
     }
   }
   if (pathname === '/api/analyze-winner') {

@@ -92,7 +92,6 @@ export const PLAYER_ORIGINAL_FRANCHISES = {
   p_168: "GT", // Washington Sundar,
 
   // KKR
-  p_188: "KKR", // Ajinkya Rahane
   p_209: "KKR", // Angkrish Raghuvanshi
   p_213: "KKR", // Anukul Roy
   p_908: "KKR", // Blessing Muzarabani

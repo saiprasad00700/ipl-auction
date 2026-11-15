@@ -1,122 +1,195 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Room, RoomEvent, Track } from 'livekit-client';
+import AgoraRTC from 'agora-rtc-sdk-ng';
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { ref, update } from 'firebase/database';
+import { ref, update, onValue } from 'firebase/database';
 import { rtdb, ensureServer2Auth } from '../lib/firebase';
 import { trackAnalyticsEvent } from '../lib/insights';
 
+const TOKEN_REFRESH_MS = 4 * 60 * 1000;
+
 const VoiceChat = ({ roomId }) => {
   const { user } = useAuth();
-  const roomRef = useRef(null);
+  const clientRef = useRef(null);
+  const localTrackRef = useRef(null);
+  const refreshTimerRef = useRef(null);
+  const rosterUnsubscribeRef = useRef(null);
   const lastVoiceActivityPingRef = useRef(0);
-  const audioElementsRef = useRef(new Map());
+  const speakerOnRef = useRef(true);
+  const volumesRef = useRef({});
+  const participantNamesRef = useRef({});
   const [connected, setConnected] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [micOn, setMicOn] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
   const [volumes, setVolumes] = useState({});
-  const speakerOnRef = useRef(true);
-  const volumesRef = useRef({});
   const [error, setError] = useState('');
 
-  const syncParticipants = (room) => {
-    const list = [...room.remoteParticipants.values()].map((p) => ({
-      id: p.identity,
-      name: p.name || 'Player'
-    }));
+  const syncParticipants = (client) => {
+    const list = (client?.remoteUsers || []).map((remote) => {
+      const id = String(remote.uid);
+      return { id, name: participantNamesRef.current[id] || 'Player' };
+    });
     setParticipants(list);
+    for (const remote of client?.remoteUsers || []) {
+      const volume = speakerOnRef.current ? (volumesRef.current[String(remote.uid)] ?? 1) : 0;
+      remote.audioTrack?.setVolume?.(Math.round(volume * 100));
+    }
   };
 
   useEffect(() => {
     let cancelled = false;
-    let room;
+    let client;
+    let roomDatabase;
+    let channelName;
+    let rtcAccount = user?.uid;
     let didConnect = false;
+
+    const requestVoiceToken = async () => {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/agora-voice-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + idToken },
+        body: JSON.stringify({ roomId, serverId, rtcAccount })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const err = new Error(data.error || 'Voice chat is unavailable');
+        err.code = data.code;
+        throw err;
+      }
+      return data;
+    };
+
+    let serverId = '1';
     const start = async () => {
       if (!roomId || !user || user.isAnonymous === undefined) return;
+      if (!rtcAccount || rtcAccount.length > 255) {
+        setError('Your account cannot be used for voice chat.');
+        return;
+      }
       try {
-        let serverId = '1';
         try {
           const savedServer = window.localStorage.getItem('ssauction:room-server:' + roomId);
           serverId = savedServer === '2' || (!savedServer && String(roomId).startsWith('2')) ? '2' : '1';
-        } catch (e) {}
-        const roomDatabase = serverId === '2' ? await ensureServer2Auth() : rtdb;
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/voice-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + idToken },
-          body: JSON.stringify({ roomId, serverId, participantName: user.displayName || 'Player' })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Voice chat is unavailable');
+        } catch {}
+        roomDatabase = serverId === '2' ? await ensureServer2Auth() : rtdb;
+        const initial = await requestVoiceToken();
         if (cancelled) return;
-        room = new Room({ adaptiveStream: true, dynacast: true });
-        roomRef.current = room;
-        const refresh = () => syncParticipants(room);
-        room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          // Real speaking by any participant keeps the room alive; a connected-but-silent
-          // voice panel does not. Write directly to the authorized RTDB activity field.
-          if (!speakers.length) return;
+        channelName = initial.channelName;
+
+        const rosterRef = ref(roomDatabase, `auctions/${roomId}/room`);
+        rosterUnsubscribeRef.current = onValue(rosterRef, (snapshot) => {
+          const room = snapshot.val() || {};
+          const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+          const names = {};
+          for (const player of roster) {
+            const id = String(player?.id || player?.userId || '');
+            if (id) names[id] = String(player?.name || 'Player');
+          }
+          if (room.hostId && room.hostName) names[String(room.hostId)] = String(room.hostName);
+          participantNamesRef.current = names;
+          syncParticipants(client);
+        });
+
+        client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        clientRef.current = client;
+        client.on('user-published', async (remoteUser, mediaType) => {
+          try {
+            await client.subscribe(remoteUser, mediaType);
+            if (mediaType === 'audio') remoteUser.audioTrack?.play();
+            syncParticipants(client);
+          } catch (joinError) {
+            console.warn('[Agora Voice] Could not subscribe to participant:', joinError?.message || joinError);
+          }
+        });
+        client.on('user-unpublished', () => syncParticipants(client));
+        client.on('user-left', () => syncParticipants(client));
+        client.enableAudioVolumeIndicator();
+        client.on('volume-indicator', (levels) => {
+          if (!levels.some((entry) => Number(entry.level) > 5)) return;
           const now = Date.now();
           if (now - lastVoiceActivityPingRef.current < 10000) return;
           lastVoiceActivityPingRef.current = now;
-          void update(ref(roomDatabase, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((err) => {
-            console.warn('[VoiceChat] Could not update room activity:', err?.message || err);
+          void update(ref(roomDatabase, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((activityError) => {
+            console.warn('[Agora Voice] Could not update room activity:', activityError?.message || activityError);
           });
         });
-        room.on(RoomEvent.ParticipantConnected, refresh);
-        room.on(RoomEvent.ParticipantDisconnected, refresh);
-        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-          if (track.kind !== Track.Kind.Audio) return;
-          const audio = track.attach();
-          audio.autoplay = true;
-          audio.dataset.voiceParticipant = participant.identity;
-          audio.volume = speakerOnRef.current ? (volumesRef.current[participant.identity] ?? 1) : 0;
-          document.body.appendChild(audio);
-          audioElementsRef.current.set(participant.identity + ':' + track.sid, audio);
-        });
-        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-          track.detach().forEach((element) => element.remove());
-          for (const [key, element] of audioElementsRef.current) {
-            if (key === participant.identity + ':' + track.sid) audioElementsRef.current.delete(key);
+        client.on('connection-state-change', (currentState) => {
+          if (currentState === 'DISCONNECTED') {
+            setConnected(false);
+            setMicOn(false);
           }
         });
-        room.on(RoomEvent.Disconnected, () => { setConnected(false); setMicOn(false); });
-        await room.connect(data.url, data.token);
-        if (cancelled) { await room.disconnect(); return; }
+
+        await client.join(initial.appId, channelName, initial.token, rtcAccount);
+        if (cancelled) { await client.leave(); return; }
+        const localTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        localTrackRef.current = localTrack;
+        await localTrack.setEnabled(false);
+        await client.publish([localTrack]);
+        if (cancelled) { localTrack.close(); await client.leave(); return; }
+
         didConnect = true;
         setConnected(true);
-        syncParticipants(room);
+        syncParticipants(client);
         void trackAnalyticsEvent('voice_join', roomId);
+
+        // Short-lived five-minute tokens are renewed every four minutes. Each
+        // renewal reserves another five participant-minutes from the shared
+        // monthly cap in Firebase. If the cap is reached, this client leaves.
+        refreshTimerRef.current = window.setInterval(async () => {
+          try {
+            const renewed = await requestVoiceToken();
+            if (!cancelled && clientRef.current === client) await client.renewToken(renewed.token);
+          } catch (renewError) {
+            console.warn('[Agora Voice] Token renewal stopped:', renewError?.message || renewError);
+            if (!cancelled && clientRef.current === client) {
+              setError(renewError?.message || 'The monthly free voice allowance has been reached.');
+              setMicOn(false);
+              try { await localTrackRef.current?.setEnabled(false); } catch {}
+              try { await client.leave(); } catch {}
+              setConnected(false);
+            }
+          }
+        }, TOKEN_REFRESH_MS);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Voice chat could not connect');
       }
     };
+
     start();
     return () => {
       cancelled = true;
+      if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+      rosterUnsubscribeRef.current?.();
+      rosterUnsubscribeRef.current = null;
       if (didConnect) void trackAnalyticsEvent('voice_leave', roomId);
-      room?.disconnect();
-      roomRef.current = null;
-      audioElementsRef.current.forEach((audio) => audio.remove());
-      audioElementsRef.current.clear();
+      try { localTrackRef.current?.close(); } catch {}
+      localTrackRef.current = null;
+      if (client) void client.leave().catch(() => {});
+      clientRef.current = null;
+      setConnected(false);
+      setMicOn(false);
     };
   }, [roomId, user]);
 
   useEffect(() => {
     speakerOnRef.current = speakerOn;
     volumesRef.current = volumes;
-    for (const [key, audio] of audioElementsRef.current) {
-      const participantId = key.split(':')[0];
-      audio.volume = speakerOn ? (volumes[participantId] ?? 1) : 0;
+    const client = clientRef.current;
+    for (const remote of client?.remoteUsers || []) {
+      const volume = speakerOn ? (volumes[String(remote.uid)] ?? 1) : 0;
+      remote.audioTrack?.setVolume?.(Math.round(volume * 100));
     }
   }, [speakerOn, volumes]);
 
   const toggleMic = async () => {
-    const room = roomRef.current;
-    if (!room || participants.length < 1) return;
+    const track = localTrackRef.current;
+    if (!track || participants.length < 1) return;
     try {
-      await room.localParticipant.setMicrophoneEnabled(!micOn);
+      await track.setEnabled(!micOn);
       setMicOn(!micOn);
       setError('');
     } catch {
@@ -124,7 +197,6 @@ const VoiceChat = ({ roomId }) => {
     }
   };
 
-  // Automated auction bot identities must never join voice rooms or request microphone access.
   const isBotUser = Boolean(user?.uid && /^(bot[_-]|auctionbot[_-])/i.test(user.uid));
   if (!user || !roomId || isBotUser) return null;
   const canUseVoice = connected && participants.length > 0;
