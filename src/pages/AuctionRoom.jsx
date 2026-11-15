@@ -1380,11 +1380,14 @@ useEffect(() => {
                            >
                               <div className="flex items-center gap-2.5">
                                  <span className="w-4 text-[10px] font-black text-gray-500 text-center shrink-0">{idx + 1}</span>
-                                 <div className="w-8 h-8 rounded-lg bg-white/5 p-1 flex items-center justify-center shrink-0">
-                                    <img src={t.logo} alt={`${t.name} Logo`} className="w-full h-full object-contain" />
+                                 <div className="w-10 h-10 rounded-lg bg-white/5 p-0.5 flex items-center justify-center shrink-0">
+                                    <img src={t.logo} alt={`${t.id} ${t.name} Logo`} className="w-full h-full object-contain" />
                                  </div>
-                                 <div className="overflow-hidden">
-                                    <h5 className="text-[11px] font-bold text-white leading-tight truncate max-w-[110px]">{t.name}</h5>
+                                 <div className="overflow-hidden min-w-0">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                       <h5 className="text-[11px] font-bold text-white leading-tight truncate">{t.name}</h5>
+                                       <span className="shrink-0 rounded bg-amber-400/15 border border-amber-300/30 px-1 py-0.5 text-[8px] font-black leading-none tracking-wide text-amber-300">{t.id}</span>
+                                    </div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                        {manager ? (
                                           <>
