@@ -126,8 +126,10 @@ const VoiceChat = ({ roomId }) => {
         if (cancelled) { await client.leave(); return; }
         const localTrack = await AgoraRTC.createMicrophoneAudioTrack();
         localTrackRef.current = localTrack;
-        await localTrack.setEnabled(false);
+        // Agora cannot publish a disabled track. Publish it first, then mute it
+        // without disabling the track so it can be safely enabled on demand.
         await client.publish([localTrack]);
+        await localTrack.setMuted(true);
         if (cancelled) { localTrack.close(); await client.leave(); return; }
 
         didConnect = true;
@@ -189,7 +191,7 @@ const VoiceChat = ({ roomId }) => {
     const track = localTrackRef.current;
     if (!track || participants.length < 1) return;
     try {
-      await track.setEnabled(!micOn);
+      await track.setMuted(micOn);
       setMicOn(!micOn);
       setError('');
     } catch {
