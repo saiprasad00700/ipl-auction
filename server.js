@@ -936,10 +936,10 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const rtcUid = Number(body.rtcUid);
+      const rtcAccount = String(body.rtcAccount || '').trim();
       const serverId = String(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
-      if (!Number.isSafeInteger(rtcUid) || rtcUid < 1 || rtcUid > 2_147_483_647) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
+      if (!/^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount)) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
       if (!['1', '2'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
 
@@ -988,12 +988,12 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const RtcTokenBuilder = agoraToken.RtcTokenBuilder || agoraToken.default?.RtcTokenBuilder;
       const RtcRole = agoraToken.RtcRole || agoraToken.Role || agoraToken.default?.RtcRole || agoraToken.default?.Role;
       if (!RtcTokenBuilder || !RtcRole) throw new Error('Agora token builder is unavailable');
-      const token = RtcTokenBuilder.buildTokenWithUid(
-        appId, certificate, channelName, rtcUid, RtcRole.PUBLISHER,
+      const token = RtcTokenBuilder.buildTokenWithAccount(
+        appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
         tokenExpirationSeconds, privilegeExpirationSeconds
       );
       return sendJson(res, 200, {
-        appId, channelName, token, uid: rtcUid,
+        appId, channelName, token, uid: rtcAccount,
         expiresIn: tokenExpirationSeconds,
         reservedMinutes: Number(reservation.snapshot.val()?.reservedMinutes || 0),
         limitMinutes: applicationLimitMinutes
