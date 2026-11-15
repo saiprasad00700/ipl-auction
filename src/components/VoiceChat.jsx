@@ -105,6 +105,16 @@ const VoiceChat = ({ roomId }) => {
         });
         client.on('user-unpublished', () => syncParticipants(client));
         client.on('user-left', () => syncParticipants(client));
+        client.enableAudioVolumeIndicator();
+        client.on('volume-indicator', (levels) => {
+          if (!levels.some((entry) => Number(entry.level) > 5)) return;
+          const now = Date.now();
+          if (now - lastVoiceActivityPingRef.current < 10000) return;
+          lastVoiceActivityPingRef.current = now;
+          void update(ref(roomDatabase, `auctions/${roomId}/room`), { lastActivityAt: now }).catch((activityError) => {
+            console.warn('[Agora Voice] Could not update room activity:', activityError?.message || activityError);
+          });
+        });
         client.on('connection-state-change', (currentState) => {
           if (currentState === 'DISCONNECTED') {
             setConnected(false);
