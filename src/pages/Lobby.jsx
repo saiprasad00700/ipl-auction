@@ -812,7 +812,7 @@ const Lobby = () => {
                                 {player.id === user?.uid && <span className="text-[8px] font-black bg-white/10 px-1.5 py-0.5 rounded text-gray-400 shrink-0">YOU</span>}
                               </div>
                               <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] mt-0.5 truncate">
-                                {playerTeam?.name || (player.team === '' ? 'CALIBRATING...' : player.team)}
+                                {playerTeam?.id || (player.team === '' ? 'CALIBRATING...' : player.team)}
                               </p>
                             </div>
                           </div>
