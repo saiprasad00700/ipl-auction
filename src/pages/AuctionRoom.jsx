@@ -1520,15 +1520,7 @@ useEffect(() => {
                            <span className="text-[11px] sm:text-sm md:text-base font-black text-white whitespace-nowrap">₹{currentPlayer?.basePrice?.toFixed(2)} Cr</span>
                         </div>
                      </div>
-                     <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                        <div className="w-px h-3.5 sm:h-4 bg-white/10 shrink-0" />
-                        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                           <span className="text-[7.5px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Bidder:</span>
-                           <div className="bg-green-500/20 border border-green-500/30 px-1.5 sm:px-2 py-0.5 rounded-md max-w-[85px] xs:max-w-[120px] sm:max-w-[180px] truncate">
-                              <span className="text-[7.5px] sm:text-[9px] font-black text-green-400 uppercase tracking-wider truncate block">{displayAuctionState?.highBidderName}</span>
-                           </div>
-                        </div>
-                     </div>
+
                   </div>
                </div>
 
@@ -1736,11 +1728,23 @@ useEffect(() => {
                                              <div className="flex items-center gap-2 sm:gap-3">
                                                 <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-none tracking-tight">₹{(displayAuctionState?.currentBid || 0).toFixed(2)} Cr</span>
                                                 {displayAuctionState?.highBidderTeamId && (
-                                                   <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
-                                                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-white/5 border border-white/10 p-0.5 flex items-center justify-center">
-                                                         <img src={TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.logo} alt="High Bidder Team Logo" className="w-full h-full object-contain" />
+                                                   <div className="flex flex-col items-center gap-0.5 bg-white/5 border border-white/10 px-2 py-1 rounded-xl">
+                                                      <div className="flex items-center gap-1.5">
+                                                         <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-white/5 border border-white/10 p-0.5 flex items-center justify-center">
+                                                            <img src={TEAMS.find(t => t.id === displayAuctionState.highBidderTeamId)?.logo} alt="High Bidder Team Logo" className="w-full h-full object-contain" />
+                                                         </div>
+                                                         <span className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-gray-300 uppercase tracking-widest">{displayAuctionState.highBidderTeamId}</span>
                                                       </div>
-                                                      <span className="text-[8px] sm:text-[9px] md:text-[10px] font-bold text-gray-300 uppercase tracking-widest">{displayAuctionState.highBidderTeamId}</span>
+                                                      <span className="max-w-[110px] truncate text-[8px] sm:text-[9px] font-semibold normal-case text-gray-400">
+                                                         {(() => {
+                                                            const bidderId = displayAuctionState?.highBidderId;
+                                                            const players = Array.isArray(currentAuction?.players) ? currentAuction.players : Object.values(currentAuction?.players || {});
+                                                            const bidder = players.find(p => p?.id === bidderId);
+                                                            const botNames = { CSK: 'kaasi ji', RCB: 'honesty malya', RR: '10th class kids', GT: 'Nehra ji', PBKS: 'angel queen preety', SRH: 'kayva queen', MI: 'mbani ji', LSG: 'joenka uncle', DC: 'panter saab', KKR: 'shah rukh ji' };
+                                                            const isBot = Boolean(bidder?.isBot) || /bot/i.test(String(bidder?.name || '')) || /^(bot[_-]|auctionbot[_-])/i.test(String(bidderId || ''));
+                                                            return isBot ? botNames[displayAuctionState.highBidderTeamId] : (displayAuctionState?.highBidderName || bidder?.name || '');
+                                                         })()}
+                                                      </span>
                                                    </div>
                                                 )}
                                              </div>
