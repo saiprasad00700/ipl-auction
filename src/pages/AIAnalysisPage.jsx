@@ -19,8 +19,8 @@ const AIAnalysisPage = () => (
       </ul>
     </section>
     <section>
-      <h2 className="text-xl font-semibold text-white mb-3">Classic and Sprint modes</h2>
-      <p>For Classic (11-player) and Sprint (5-player) analysis, the model compares each franchise's complete purchased squad. It considers role coverage, batting and bowling options, all-rounders, depth and balance for the selected format. These modes do not use a submitted Playing XI or Impact Player selection, and the analysis endpoint does not apply the MEGA 18-player qualification rule to these modes.</p>
+      <h2 className="text-xl font-semibold text-white mb-3">SPRINT 11 and SPRINT 5 modes</h2>
+      <p>For SPRINT 11 (11-player) and SPRINT 5 (5-player) analysis, the model compares each franchise's complete purchased squad. It considers role coverage, batting and bowling options, all-rounders, depth and balance for the selected format. These modes do not use a submitted Playing XI or Impact Player selection, and the analysis endpoint does not apply the MEGA 18-player qualification rule to these modes.</p>
     </section>
     <section>
       <h2 className="text-xl font-semibold text-white mb-3">Data, AI limitations and user choices</h2>
