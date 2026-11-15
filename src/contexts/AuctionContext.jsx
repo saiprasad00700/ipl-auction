@@ -1274,9 +1274,38 @@ export const AuctionProvider = ({ children }) => {
     let currentRoomData = null;
     let currentRtdbData = null;
     let currentPresences = {};
+    let unsubConnected = null;
+    let unsubPresence = null;
+    let unsubAuction = null;
+    let unsubLive = null;
+    let unsubTeams = null;
+    let unsubMessages = null;
+    let completedCleanupStarted = false;
+
+    // Once final rankings are saved, keep the already-loaded results on screen
+    // but stop room subscriptions so idle completed rooms do not keep streaming.
+    const stopCompletedRoomListeners = () => {
+      if (completedCleanupStarted) return;
+      completedCleanupStarted = true;
+      Promise.resolve().then(async () => {
+        unsubConnected?.();
+        unsubPresence?.();
+        unsubLive?.();
+        unsubTeams?.();
+        unsubMessages?.();
+        unsubAuction?.();
+        clearInterval(watchdog);
+        try {
+          await set(myPresenceRef, { online: false, lastSeen: serverTimestampRtdb() });
+        } catch (presenceError) {
+          console.warn('Could not clear completed-room presence:', presenceError?.message || presenceError);
+        }
+        try { goOffline(roomDatabase); } catch (e) {}
+      });
+    };
 
     // Set presence status on connect/disconnect
-    const unsubConnected = onValue(connectedRef, async (snap) => {
+    unsubConnected = onValue(connectedRef, async (snap) => {
       socketConnected = snap.val() === true;
       if (snap.val() === true) {
         // Reaching the server means any "cannot connect" notice is stale now.
@@ -1357,7 +1386,7 @@ export const AuctionProvider = ({ children }) => {
 
     // Presence listener (all users' presence)
     const presenceRef = ref(roomDatabase, `auctions/${auctionId}/presence`);
-    const unsubPresence = onValue(presenceRef, (snap) => {
+    unsubPresence = onValue(presenceRef, (snap) => {
       currentPresences = snap.val() || {};
       checkAndSet();
     });
@@ -1365,7 +1394,7 @@ export const AuctionProvider = ({ children }) => {
     let didFallbackFetch = false;
     let didTeamsFallback = false;
 
-    const unsubAuction = onValue(ref(roomDatabase, `auctions/${auctionId}/room`), async (snapshot) => {
+    unsubAuction = onValue(ref(roomDatabase, `auctions/${auctionId}/room`), async (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         
@@ -1386,6 +1415,7 @@ export const AuctionProvider = ({ children }) => {
         currentRoomData = data;
         checkAndSet();
         checkLoaded();
+        if (data.status === 'completed') stopCompletedRoomListeners();
       } else if (!didFallbackFetch) {
         didFallbackFetch = true;
         // Wait 500ms grace period before hitting persistent store fallback
@@ -1438,7 +1468,7 @@ export const AuctionProvider = ({ children }) => {
       handleFirebaseError(error);
     });
 
-    const unsubLive = onValue(ref(roomDatabase, `auctions/${auctionId}/live`), (snapshot) => {
+    unsubLive = onValue(ref(roomDatabase, `auctions/${auctionId}/live`), (snapshot) => {
       currentRtdbData = snapshot.val();
       checkAndSet();
     }, (error) => {
@@ -1446,7 +1476,7 @@ export const AuctionProvider = ({ children }) => {
     });
 
 
-    const unsubTeams = onValue(ref(roomDatabase, `auctions/${auctionId}/teams`), async (snapshot) => {
+    unsubTeams = onValue(ref(roomDatabase, `auctions/${auctionId}/teams`), async (snapshot) => {
       if (snapshot.exists()) {
         teamsLoaded = true;
         const teamsObj = snapshot.val();
@@ -1518,7 +1548,7 @@ export const AuctionProvider = ({ children }) => {
     // Do not cap this subscription with limitToLast(), which hides older messages
     // as new messages arrive.
     const msgQuery = ref(roomDatabase, `auctions/${auctionId}/messages`);
-    const unsubMessages = onValue(msgQuery, (snapshot) => {
+    unsubMessages = onValue(msgQuery, (snapshot) => {
       messagesLoaded = true;
       if (snapshot.exists()) {
         const msgs = [];
