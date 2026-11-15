@@ -328,8 +328,10 @@ export const AuctionProvider = ({ children }) => {
   }, []);
 
   const startAuction = useCallback(async (roomId) => {
-    // Fetch room data to determine auction type
+    // Record the host's start request immediately, even before auction setup runs.
     const rtdbRoomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
+    await updateRtdb(rtdbRoomRef, { lastActivityAt: Date.now() });
+    // Fetch room data to determine auction type
     const roomSnap = await get(rtdbRoomRef);
     const roomData = roomSnap.exists() ? roomSnap.val() : {};
     const auctionType = roomData.auctionType || 'mega';

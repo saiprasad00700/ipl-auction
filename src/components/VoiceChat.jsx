@@ -12,6 +12,7 @@ const VoiceChat = ({ roomId }) => {
   const { user } = useAuth();
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
+  const roomDatabaseRef = useRef(null);
   const refreshTimerRef = useRef(null);
   const rosterUnsubscribeRef = useRef(null);
   const lastVoiceActivityPingRef = useRef(0);
@@ -74,6 +75,7 @@ const VoiceChat = ({ roomId }) => {
           serverId = savedServer === '2' || (!savedServer && String(roomId).startsWith('2')) ? '2' : '1';
         } catch {}
         roomDatabase = serverId === '2' ? await ensureServer2Auth() : rtdb;
+        roomDatabaseRef.current = roomDatabase;
         const initial = await requestVoiceToken();
         if (cancelled) return;
         channelName = initial.channelName;
@@ -170,6 +172,7 @@ const VoiceChat = ({ roomId }) => {
       if (didConnect) void trackAnalyticsEvent('voice_leave', roomId);
       try { localTrackRef.current?.close(); } catch {}
       localTrackRef.current = null;
+      roomDatabaseRef.current = null;
       if (client) void client.leave().catch(() => {});
       clientRef.current = null;
       setConnected(false);
@@ -192,6 +195,11 @@ const VoiceChat = ({ roomId }) => {
     if (!track || participants.length < 1) return;
     try {
       await track.setMuted(micOn);
+      if (!micOn && roomDatabaseRef.current) {
+        void update(ref(roomDatabaseRef.current, `auctions/${roomId}/room`), { lastActivityAt: Date.now() }).catch((activityError) => {
+          console.warn('[Agora Voice] Could not record microphone activity:', activityError?.message || activityError);
+        });
+      }
       setMicOn(!micOn);
       setError('');
     } catch {

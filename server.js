@@ -239,10 +239,8 @@ async function getFirebaseServer2AdminServices() {
   return firebaseServer2AdminPromise;
 }
 
-// Remove idle waiting rooms after 15 minutes and idle started auctions after 30 minutes.
-// Presence alone does not count as activity for started auctions.
-const WAITING_ROOM_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-const ACTIVE_ROOM_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+// Remove any waiting or started room after 10 minutes without recorded activity.
+const ROOM_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const ROOM_CLEANUP_INTERVAL_MS = 60 * 1000;
 let roomCleanupStarted = false;
 
@@ -273,14 +271,12 @@ async function cleanupAbandonedRooms() {
       if (!isWaiting && !isStarted) continue;
 
       const presence = roomNode?.presence || {};
-      const online = Object.values(presence).some((entry) => entry?.online === true);
-      // Online participants protect waiting rooms, but do not keep a started auction alive.
-      if (isWaiting && online) continue;
-
-      const presenceActivity = isWaiting ? Object.values(presence).reduce((latest, entry) => {
+      // A participant connecting/reconnecting counts as activity, but merely
+      // remaining online does not keep an otherwise idle room alive.
+      const presenceActivity = Object.values(presence).reduce((latest, entry) => {
         const seen = Number(entry?.lastSeen || 0);
         return Number.isFinite(seen) ? Math.max(latest, seen) : latest;
-      }, 0) : 0;
+      }, 0);
       const messageActivity = Object.values(roomNode?.messages || {}).reduce((latest, message) => {
         const stamp = Number(message?.timestamp || message?.createdAt || 0);
         return Number.isFinite(stamp) ? Math.max(latest, stamp) : latest;
@@ -294,8 +290,7 @@ async function cleanupAbandonedRooms() {
       );
       // Do not guess when a legacy room has no trustworthy timestamp.
       if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
-      const idleTimeout = isWaiting ? WAITING_ROOM_IDLE_TIMEOUT_MS : ACTIVE_ROOM_IDLE_TIMEOUT_MS;
-      if (now - lastActivityAt < idleTimeout) continue;
+      if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
 
       // Supabase is also used as a fallback for joining by room ID. Delete its
       // index first, and only delete RTDB data after that succeeds, to avoid
