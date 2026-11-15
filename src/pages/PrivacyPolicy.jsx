@@ -213,12 +213,13 @@ const PrivacyPolicy = () => {
               <div className="space-y-4 text-[#E5E5E5] text-base leading-relaxed">
                 <p>SSAUCTION integrates with the following third-party services:</p>
                 <ul className="list-disc pl-5 space-y-2 text-gray-400">
-                  <li><strong>Firebase (Google):</strong> For authentication, real-time database, and hosting, including storage and delivery of room text messages.</li>
+                  <li><strong>Firebase (Google):</strong> For Google sign-in and real-time database services, including auction-room data, presence, and text messages.</li>
+                  <li><strong>Render and Cloudflare:</strong> For application hosting, server requests, routing, delivery, and website security. These providers may process technical connection information such as IP addresses and request metadata.</li>
                   <li><strong>Agora:</strong> For real-time voice communication. Live audio and technical connection metadata are processed to provide voice sessions; SSAUCTION does not intentionally record or store voice conversations.</li>
                   <li><strong>Google Gemini:</strong> For AI-assisted analysis of auction squads and player-performance information to generate franchise rankings and explanations in supported modes.</li>
                   <li><strong>Umami and Cloudflare Web Analytics:</strong> For website usage, performance, and diagnostic analytics.</li>
                   <li><strong>Google AdSense (if enabled):</strong> For advertising, which may involve cookies and similar technologies as described above.</li>
-                  <li><strong>Supabase:</strong> For user-uploaded sticker storage where that feature is enabled.</li>
+                  <li><strong>Supabase:</strong> For selected application analytics and stored cricket player-match statistics used by winner analysis, and for sticker-related storage where enabled.</li>
                 </ul>
                 <p>
                   These services have their own privacy policies governing how they handle data processed on our behalf.
