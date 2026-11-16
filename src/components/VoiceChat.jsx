@@ -42,7 +42,6 @@ const VoiceChat = ({ roomId }) => {
     let cancelled = false;
     let client;
     let roomDatabase;
-    let channelName;
     let rtcAccount = user?.uid;
     let didConnect = false;
 
@@ -78,7 +77,6 @@ const VoiceChat = ({ roomId }) => {
         roomDatabaseRef.current = roomDatabase;
         const initial = await requestVoiceToken();
         if (cancelled) return;
-        channelName = initial.channelName;
 
         const rosterRef = ref(roomDatabase, `auctions/${roomId}/room`);
         rosterUnsubscribeRef.current = onValue(rosterRef, (snapshot) => {
@@ -124,24 +122,16 @@ const VoiceChat = ({ roomId }) => {
           }
         });
 
-        await client.join(initial.appId, channelName, initial.token, rtcAccount);
+        await client.join(initial.appId, initial.channelName, initial.token, rtcAccount);
         if (cancelled) { await client.leave(); return; }
-        const localTrack = await AgoraRTC.createMicrophoneAudioTrack();
-        localTrackRef.current = localTrack;
-        // Agora cannot publish a disabled track. Publish it first, then mute it
-        // without disabling the track so it can be safely enabled on demand.
-        await client.publish([localTrack]);
-        await localTrack.setMuted(true);
-        if (cancelled) { localTrack.close(); await client.leave(); return; }
 
+        // Join receive-only. Do not request a microphone until the user
+        // explicitly enables it; a missing input device must not break listening.
         didConnect = true;
         setConnected(true);
         syncParticipants(client);
         void trackAnalyticsEvent('voice_join', roomId);
 
-        // Short-lived five-minute tokens are renewed every four minutes. Each
-        // renewal reserves another five participant-minutes from the shared
-        // monthly cap in Firebase. If the cap is reached, this client leaves.
         refreshTimerRef.current = window.setInterval(async () => {
           try {
             const renewed = await requestVoiceToken();
@@ -151,7 +141,8 @@ const VoiceChat = ({ roomId }) => {
             if (!cancelled && clientRef.current === client) {
               setError(renewError?.message || 'The monthly free voice allowance has been reached.');
               setMicOn(false);
-              try { await localTrackRef.current?.setEnabled(false); } catch {}
+              try { localTrackRef.current?.close(); } catch {}
+              localTrackRef.current = null;
               try { await client.leave(); } catch {}
               setConnected(false);
             }
@@ -191,19 +182,51 @@ const VoiceChat = ({ roomId }) => {
   }, [speakerOn, volumes]);
 
   const toggleMic = async () => {
-    const track = localTrackRef.current;
-    if (!track || participants.length < 1) return;
+    if (participants.length < 1 || !clientRef.current) return;
     try {
-      await track.setMuted(micOn);
-      if (!micOn && roomDatabaseRef.current) {
+      if (micOn) {
+        if (localTrackRef.current) await localTrackRef.current.setMuted(true);
+        setMicOn(false);
+        return;
+      }
+
+      // Device access occurs only after an explicit Mic ON click.
+      let track = localTrackRef.current;
+      if (!track) {
+        track = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+        localTrackRef.current = track;
+        try {
+          await clientRef.current.publish([track]);
+        } catch (publishError) {
+          track.close();
+          localTrackRef.current = null;
+          throw publishError;
+        }
+      } else {
+        await track.setMuted(false);
+      }
+
+      if (roomDatabaseRef.current) {
         void update(ref(roomDatabaseRef.current, `auctions/${roomId}/room`), { lastActivityAt: Date.now() }).catch((activityError) => {
           console.warn('[Agora Voice] Could not record microphone activity:', activityError?.message || activityError);
         });
       }
-      setMicOn(!micOn);
+      setMicOn(true);
       setError('');
-    } catch {
-      setError('Allow microphone access in your browser to speak.');
+    } catch (micError) {
+      const name = micError?.name || '';
+      const code = micError?.code || '';
+      if (name === 'NotFoundError' || code === 'DEVICE_NOT_FOUND') {
+        setError('No microphone was found. Connect or enable a microphone, then try again. You can still hear other players.');
+      } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || code === 'PERMISSION_DENIED') {
+        setError('Microphone access is blocked. Allow microphone permission in your browser settings, then try again.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setError('Your microphone is being used by another app. Close that app and try again.');
+      } else {
+        console.warn('[Agora Voice] Microphone could not start:', micError?.message || micError);
+        setError('Could not start your microphone. Check your device and browser permissions, then try again.');
+      }
+      setMicOn(false);
     }
   };
 
