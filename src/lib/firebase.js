@@ -30,6 +30,37 @@ const server2Config = {
   messagingSenderId: "541583284758",
   appId: "1:541583284758:web:f706cf9cd15a6472cd7337"
 };
+const server3Config = {
+  apiKey: import.meta.env.VITE_SERVER3_FIREBASE_API_KEY,
+  authDomain: "ss-auction-server-3.firebaseapp.com",
+  databaseURL: "https://ss-auction-server-3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ss-auction-server-3",
+  storageBucket: "ss-auction-server-3.firebasestorage.app",
+  messagingSenderId: "927894920165",
+  appId: "1:927894920165:web:9527bf71b06f0374c0ed0c"
+};
+const server3App = initializeApp(server3Config, "ss-auction-server-3");
+export const server3Auth = getAuth(server3App);
+export const server3Rtdb = getDatabase(server3App);
+let server3AuthPromise = null;
+export const ensureServer3Auth = async () => {
+  const primaryUser = auth.currentUser;
+  if (!primaryUser) throw new Error("Please sign in before joining this auction.");
+  if (server3Auth.currentUser?.uid === primaryUser.uid) return server3Rtdb;
+  if (!server3AuthPromise) server3AuthPromise = (async () => {
+    const idToken = await primaryUser.getIdToken();
+    const response = await fetch("/api/server3-token", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}` }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.customToken) throw new Error(payload.error || "Server 3 authentication failed.");
+    await signInWithCustomToken(server3Auth, payload.customToken);
+    return server3Rtdb;
+  })().finally(() => { server3AuthPromise = null; });
+  return server3AuthPromise;
+};
+
 const server2App = initializeApp(server2Config, "ss-auction-server-2");
 export const server2Auth = getAuth(server2App);
 export const server2Rtdb = getDatabase(server2App);
@@ -112,6 +143,7 @@ const registerServerTimeSync = (database, label) => {
 
 registerServerTimeSync(rtdb, 'server-1');
 registerServerTimeSync(server2Rtdb, 'server-2');
+registerServerTimeSync(server3Rtdb, 'server-3');
 
 export const getServerTime = (database = rtdb) =>
   Date.now() + (timeSyncByDatabase.get(database)?.offset || 0);

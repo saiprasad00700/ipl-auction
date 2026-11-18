@@ -1,6 +1,6 @@
 // Modified from the upstream project by saiprasad00700.
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { db, getServerTime, isServerTimeSynced, rtdb, server2Rtdb, ensureServer2Auth } from '../lib/firebase';
+import { db, getServerTime, isServerTimeSynced, rtdb, server2Rtdb, ensureServer2Auth, server3Rtdb, ensureServer3Auth } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { trackAnalyticsEvent } from '../lib/insights';
 import { reportGuardianError } from '../lib/guardian';
@@ -75,11 +75,14 @@ const getRoomServerId = (roomId) => {
   if (roomServerMap.has(key)) return roomServerMap.get(key);
   try {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem(ROOM_SERVER_KEY_PREFIX + key) : null;
-    if (saved === '1' || saved === '2') { roomServerMap.set(key, saved); return saved; }
+    if (saved === '1' || saved === '2' || saved === '3') { roomServerMap.set(key, saved); return saved; }
   } catch (e) {}
-  return key.startsWith('2') ? '2' : '1';
+  return key.startsWith('3') ? '3' : key.startsWith('2') ? '2' : '1';
 };
-const getRoomDatabase = (roomId) => getRoomServerId(roomId) === '2' ? server2Rtdb : rtdb;
+const getRoomDatabase = (roomId) => {
+  const serverId = getRoomServerId(roomId);
+  return serverId === '3' ? server3Rtdb : serverId === '2' ? server2Rtdb : rtdb;
+};
 
 const AuctionContext = createContext();
 
@@ -137,8 +140,9 @@ export const AuctionProvider = ({ children }) => {
 
   // Create a new room in DB (RTDB + Supabase index, zero Firestore load)
   const createRoom = useCallback(async (roomId, userId, playerDetails, auctionType = 'mega', isPublic = true) => {
-    const roomServerId = String(roomId).startsWith('2') ? '2' : '1';
-    if (roomServerId === '2') await ensureServer2Auth();
+    const roomServerId = String(roomId).startsWith('3') ? '3' : String(roomId).startsWith('2') ? '2' : '1';
+    if (roomServerId === '3') await ensureServer3Auth();
+    else if (roomServerId === '2') await ensureServer2Auth();
     rememberRoomServer(roomId, roomServerId);
     const roomDatabase = getRoomDatabase(roomId);
     // Explicitly connect RTDB WebSocket for room creation
@@ -1065,22 +1069,25 @@ export const AuctionProvider = ({ children }) => {
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     // Room codes are allocated with their first digit identifying the Firebase server.
     // Route directly to the assigned server; only probe the other server as a fallback.
-    const preferredServerId = String(roomId || '').startsWith('2') ? '2' : '1';
-    let roomDatabase = preferredServerId === '2' ? await ensureServer2Auth() : rtdb;
+    const preferredServerId = String(roomId || '').startsWith('3') ? '3' : String(roomId || '').startsWith('2') ? '2' : '1';
+    const getDatabaseById = async (serverId) => serverId === '3' ? await ensureServer3Auth() : serverId === '2' ? await ensureServer2Auth() : rtdb;
+    let roomDatabase = await getDatabaseById(preferredServerId);
     rememberRoomServer(roomId, preferredServerId);
     try { goOnline(roomDatabase); } catch (e) {}
     const teamDetails = TEAMS.find(t => t.id === playerDetails.team);
     let rtdbRoomSnap = await get(ref(roomDatabase, `auctions/${roomId}/room`));
     let data = null;
     if (!rtdbRoomSnap.exists()) {
-      const alternateServerId = preferredServerId === '2' ? '1' : '2';
-      const alternateDatabase = alternateServerId === '2' ? await ensureServer2Auth() : rtdb;
-      try { goOnline(alternateDatabase); } catch (e) {}
-      const alternateSnap = await get(ref(alternateDatabase, `auctions/${roomId}/room`));
-      if (alternateSnap.exists()) {
-        roomDatabase = alternateDatabase;
-        rtdbRoomSnap = alternateSnap;
-        rememberRoomServer(roomId, alternateServerId);
+      for (const alternateServerId of ['1', '2', '3'].filter((id) => id !== preferredServerId)) {
+        const alternateDatabase = await getDatabaseById(alternateServerId);
+        try { goOnline(alternateDatabase); } catch (e) {}
+        const alternateSnap = await get(ref(alternateDatabase, `auctions/${roomId}/room`));
+        if (alternateSnap.exists()) {
+          roomDatabase = alternateDatabase;
+          rtdbRoomSnap = alternateSnap;
+          rememberRoomServer(roomId, alternateServerId);
+          break;
+        }
       }
     }
     if (rtdbRoomSnap.exists()) {

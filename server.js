@@ -153,12 +153,9 @@ function roomLoadWeight(auctionType) {
 }
 
 async function getDatabaseForServer(serverId) {
-  if (String(serverId) === '2') {
-    const services = await getFirebaseServer2AdminServices();
-    return services.database;
-  }
-  const services = await getFirebaseAdminServices();
-  return services.database;
+  if (String(serverId) === '2') return (await getFirebaseServer2AdminServices()).database;
+  if (String(serverId) === '3') return (await getFirebaseServer3AdminServices()).database;
+  return (await getFirebaseAdminServices()).database;
 }
 
 async function getEstimatedServerLoad(serverId) {
@@ -193,8 +190,8 @@ async function getEstimatedServerLoad(serverId) {
 }
 
 async function reserveEstimatedRoom(serverId, roomId, auctionType) {
-  if (!['1', '2'].includes(String(serverId))) throw new Error('Invalid Firebase server selection');
-  if (!/^[12][A-Z0-9]{4,12}$/.test(String(roomId))) throw new Error('Invalid room code for server reservation');
+  if (!['1', '2', '3'].includes(String(serverId))) throw new Error('Invalid Firebase server selection');
+  if (!/^[123][A-Z0-9]{4,12}$/.test(String(roomId))) throw new Error('Invalid room code for server reservation');
   const database = await getDatabaseForServer(serverId);
   const weight = roomLoadWeight(auctionType);
   const reservationRef = database.ref(ALLOCATOR_PATH + '/' + roomId);
@@ -211,13 +208,19 @@ async function reserveEstimatedRoom(serverId, roomId, auctionType) {
 }
 
 async function chooseAutomaticFirebaseServer() {
-  const [server1, server2] = await Promise.all([
-    getEstimatedServerLoad('1'),
-    getEstimatedServerLoad('2')
-  ]);
-  // Stable tie-breaker: prefer Server 1 until its estimated load exceeds Server 2.
-  const selected = server1.estimatedUnits <= server2.estimatedUnits ? server1 : server2;
-  return { serverId: selected.serverId, servers: [server1, server2] };
+  // A quota-exhausted or unreachable server must not block allocation on a healthy server.
+  const checks = await Promise.all(['1', '2', '3'].map(async (serverId) => {
+    try {
+      return { ...(await getEstimatedServerLoad(serverId)), available: true };
+    } catch (error) {
+      console.warn(`[Server allocator] Server ${serverId} load check failed:`, error?.message || error);
+      return { serverId, estimatedUnits: Number.POSITIVE_INFINITY, available: false };
+    }
+  }));
+  const available = checks.filter((server) => server.available);
+  if (!available.length) throw new Error('No Firebase server is currently available for room allocation');
+  available.sort((a, b) => a.estimatedUnits - b.estimatedUnits || Number(a.serverId) - Number(b.serverId));
+  return { serverId: available[0].serverId, servers: checks };
 }
 
 let firebaseServer2AdminPromise;
@@ -239,6 +242,25 @@ async function getFirebaseServer2AdminServices() {
   return firebaseServer2AdminPromise;
 }
 
+let firebaseServer3AdminPromise;
+async function getFirebaseServer3AdminServices() {
+  if (!firebaseServer3AdminPromise) firebaseServer3AdminPromise = (async () => {
+    const raw = process.env.SERVER3_FIREBASE_SERVICE_ACCOUNT_JSON;
+    const databaseURL = process.env.SERVER3_FIREBASE_DATABASE_URL;
+    if (!raw || !databaseURL) throw new Error('Server 3 is not configured');
+    const { initializeApp, cert, getApps } = await import('firebase-admin/app');
+    const { getAuth } = await import('firebase-admin/auth');
+    const { getDatabase } = await import('firebase-admin/database');
+    const serviceAccount = JSON.parse(raw);
+    if (serviceAccount.project_id !== 'ss-auction-server-3') throw new Error('Server 3 service account project mismatch');
+    const appName = 'ss-auction-server-3';
+    const app = getApps().find((item) => item.name === appName) ||
+      initializeApp({ credential: cert(serviceAccount), databaseURL }, appName);
+    return { auth: getAuth(app), database: getDatabase(app) };
+  })();
+  return firebaseServer3AdminPromise;
+}
+
 // Remove any waiting or started room after 10 minutes without recorded activity.
 const ROOM_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const ROOM_CLEANUP_INTERVAL_MS = 60 * 1000;
@@ -253,6 +275,12 @@ async function cleanupAbandonedRooms() {
       databases.push(secondaryDatabase);
     } catch (secondaryError) {
       console.warn('[Room cleanup] Server 2 cleanup is not configured yet:', secondaryError?.message || secondaryError);
+    }
+    try {
+      const { database: tertiaryDatabase } = await getFirebaseServer3AdminServices();
+      databases.push(tertiaryDatabase);
+    } catch (tertiaryError) {
+      console.warn('[Room cleanup] Server 3 cleanup is not configured yet:', tertiaryError?.message || tertiaryError);
     }
     for (const database of databases) {
       const auctionsSnapshot = await database.ref('auctions').get();
@@ -472,6 +500,13 @@ async function recordAnalyticsPresenceSnapshot() {
       if (secondarySnapshot.exists()) allAuctions = { ...allAuctions, ...(secondarySnapshot.val() || {}) };
     } catch (secondaryError) {
       console.warn('[Analytics] Server 2 snapshot unavailable:', secondaryError?.message || secondaryError);
+    }
+    try {
+      const { database: tertiaryDatabase } = await getFirebaseServer3AdminServices();
+      const tertiarySnapshot = await tertiaryDatabase.ref('auctions').get();
+      if (tertiarySnapshot.exists()) allAuctions = { ...allAuctions, ...(tertiarySnapshot.val() || {}) };
+    } catch (tertiaryError) {
+      console.warn('[Analytics] Server 3 snapshot unavailable:', tertiaryError?.message || tertiaryError);
     }
     const { buildLiveAnalyticsSnapshot } = await import('./api/analytics.js');
     const live = buildLiveAnalyticsSnapshot(allAuctions, Date.now());
@@ -907,6 +942,21 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 503, { error: 'Could not authenticate with Server 2' });
     }
   }
+  if (pathname === '/api/server3-token') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      if (!decoded?.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'This account cannot access auction rooms' });
+      const { auth: server3Auth } = await getFirebaseServer3AdminServices();
+      return sendJson(res, 200, { customToken: await server3Auth.createCustomToken(decoded.uid) });
+    } catch (error) {
+      console.error('[Server 3] Token bridge failed:', error?.message || error);
+      return sendJson(res, 503, { error: 'Could not authenticate with Server 3' });
+    }
+  }
   if (pathname === '/api/auction-feedback') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
@@ -919,7 +969,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       }
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const { database } = await getDatabaseForServer(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
 
       const rating = body.rating == null || body.rating === '' ? null : Number(body.rating);
@@ -997,7 +1047,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const { database } = body.serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const { database } = await getDatabaseForServer(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       const roomRef = database.ref(`auctions/${roomId}/room`);
       const roomSnapshot = await roomRef.get();
@@ -1027,10 +1077,10 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const serverId = String(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       if (!/^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount)) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
-      if (!['1', '2'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
+      if (!['1', '2', '3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
 
-      const { database } = serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const { database } = await getDatabaseForServer(serverId);
       const roomSnapshot = await database.ref(`auctions/${roomId}/room`).get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
       const roomData = roomSnapshot.val() || {};
