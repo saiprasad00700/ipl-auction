@@ -208,9 +208,19 @@ async function reserveEstimatedRoom(serverId, roomId, auctionType) {
 }
 
 async function chooseAutomaticFirebaseServer() {
-  const servers = await Promise.all(['1', '2', '3'].map(getEstimatedServerLoad));
-  servers.sort((a, b) => a.estimatedUnits - b.estimatedUnits || Number(a.serverId) - Number(b.serverId));
-  return { serverId: servers[0].serverId, servers };
+  // A quota-exhausted or unreachable server must not block allocation on a healthy server.
+  const checks = await Promise.all(['1', '2', '3'].map(async (serverId) => {
+    try {
+      return { ...(await getEstimatedServerLoad(serverId)), available: true };
+    } catch (error) {
+      console.warn(`[Server allocator] Server ${serverId} load check failed:`, error?.message || error);
+      return { serverId, estimatedUnits: Number.POSITIVE_INFINITY, available: false };
+    }
+  }));
+  const available = checks.filter((server) => server.available);
+  if (!available.length) throw new Error('No Firebase server is currently available for room allocation');
+  available.sort((a, b) => a.estimatedUnits - b.estimatedUnits || Number(a.serverId) - Number(b.serverId));
+  return { serverId: available[0].serverId, servers: checks };
 }
 
 let firebaseServer2AdminPromise;
