@@ -613,7 +613,7 @@ const LandingPage = () => {
                     Auction Server
                   </span>
                   <div className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto items-center rounded-lg border border-white/10 bg-black/30 p-1" role="group" aria-label="Select auction server">
-                    {[{ id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }].map(({ id, label }) => (
+                    {[{ id: "auto", label: "AUTO" }, { id: "1", label: "SERVER 1" }, { id: "2", label: "SERVER 2" }, { id: "3", label: "SERVER 3" }].map(({ id, label }) => (
                       <button
                         key={id}
                         type="button"
@@ -1311,7 +1311,7 @@ const LandingPage = () => {
             </div>
             <h2 id="server-capacity-title" className="text-base font-black uppercase tracking-wide text-white">Server unavailable</h2>
             <p className="mt-3 text-sm leading-relaxed text-gray-300">
-              Server {selectedServer} could not create this room. Please create your auction room using Server {serverCapacityPrompt}.
+              Automatic allocation could not create this room. Please try again in a moment.
             </p>
             <button
               type="button"
