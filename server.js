@@ -270,13 +270,8 @@ async function cleanupAbandonedRooms() {
       const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
       if (!isWaiting && !isStarted) continue;
 
-      const presence = roomNode?.presence || {};
-      // A participant connecting/reconnecting counts as activity, but merely
-      // remaining online does not keep an otherwise idle room alive.
-      const presenceActivity = Object.values(presence).reduce((latest, entry) => {
-        const seen = Number(entry?.lastSeen || 0);
-        return Number.isFinite(seen) ? Math.max(latest, seen) : latest;
-      }, 0);
+      // Presence heartbeats are intentionally excluded: players may remain
+      // online without using the room, and must not prevent idle-room cleanup.
       const messageActivity = Object.values(roomNode?.messages || {}).reduce((latest, message) => {
         const stamp = Number(message?.timestamp || message?.createdAt || 0);
         return Number.isFinite(stamp) ? Math.max(latest, stamp) : latest;
@@ -285,8 +280,7 @@ async function cleanupAbandonedRooms() {
         Number(room.lastActivityAt || 0),
         Number(room.createdAt || 0),
         Number(roomNode?.live?.lastActivityAt || 0),
-        messageActivity,
-        presenceActivity
+        messageActivity
       );
       // Do not guess when a legacy room has no trustworthy timestamp.
       if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
