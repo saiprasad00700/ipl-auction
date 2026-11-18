@@ -6,8 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { IPL_PLAYERS } from '../data/players';
 import { TEAMS } from '../data/teams';
 import { toPng } from 'html-to-image';
-import { db } from '../lib/firebase';
+import { db, rtdb, server2Rtdb, server3Rtdb, ensureServer2Auth, ensureServer3Auth } from '../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { ref, get } from 'firebase/database';
 import {
   Trophy,
   Users,
@@ -39,6 +40,7 @@ const AuctionSummary = () => {
 
   const [dbAuction, setDbAuction] = useState(null);
   const [dbTeams, setDbTeams] = useState([]);
+  const [rtdbTeams, setRtdbTeams] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
   const teamCardRefs = React.useRef({});
@@ -142,10 +144,50 @@ const AuctionSummary = () => {
     return () => { isMounted = false; };
   }, [id, currentAuction?.id, loading]);
 
+  // Read the room's authoritative RTDB team records directly as a summary-page
+  // fallback. This avoids showing an empty franchise list if the context's
+  // live teams listener has not populated before the completed summary renders.
+  useEffect(() => {
+    if (!id || !user?.uid) return;
+    let cancelled = false;
+    const loadRoomTeams = async () => {
+      try {
+        const prefix = String(id).charAt(0);
+        const roomDatabase = prefix === '3'
+          ? await ensureServer3Auth()
+          : prefix === '2'
+            ? await ensureServer2Auth()
+            : rtdb;
+        const snapshot = await get(ref(roomDatabase, `auctions/${id}/teams`));
+        if (cancelled) return;
+        if (!snapshot.exists()) {
+          setRtdbTeams([]);
+          return;
+        }
+        const teamsValue = snapshot.val();
+        const teams = Object.entries(teamsValue || {})
+          .filter(([, value]) => value && typeof value === 'object')
+          .map(([key, value]) => ({
+            id: value.id || key,
+            ...value,
+            userId: value.userId || key.slice(`${id}_`.length)
+          }));
+        setRtdbTeams(teams);
+        console.info(`[AuctionSummary] Loaded ${teams.length} franchise records from RTDB for room ${id}`);
+      } catch (error) {
+        console.error('[AuctionSummary] Failed to load RTDB franchise records:', error);
+      }
+    };
+    loadRoomTeams();
+    return () => { cancelled = true; };
+  }, [id, user?.uid]);
+
   const activeAuction = currentAuction || dbAuction;
   const winnerRankings = activeAuction?.winnerRankings || activeAuction?.settings?.winnerRankings || [];
   const winnerAnalysisStatus = activeAuction?.winnerAnalysisStatus || activeAuction?.settings?.winnerAnalysisStatus;
-  const activeTeams = (roomTeams && roomTeams.length > 0) ? roomTeams : dbTeams;
+  const activeTeams = (roomTeams && roomTeams.length > 0)
+    ? roomTeams
+    : (rtdbTeams.length > 0 ? rtdbTeams : dbTeams);
 
   // Derived Data
   const allSoldPlayers = useMemo(() => {
