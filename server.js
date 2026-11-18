@@ -263,28 +263,52 @@ async function cleanupAbandonedRooms() {
       for (const [roomId, roomNode] of Object.entries(rooms)) {
       const room = roomNode?.room;
       if (!room) continue;
-      // The live node is updated when an auction starts; prefer it over the
-      // room metadata, which may still say "waiting" for compatibility.
-      const status = String(roomNode?.live?.status || room.status || 'waiting').toLowerCase();
-      const isWaiting = status === 'waiting';
-      const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
-      if (!isWaiting && !isStarted) continue;
-
-      // Presence heartbeats are intentionally excluded: players may remain
-      // online without using the room, and must not prevent idle-room cleanup.
-      const messageActivity = Object.values(roomNode?.messages || {}).reduce((latest, message) => {
-        const stamp = Number(message?.timestamp || message?.createdAt || 0);
-        return Number.isFinite(stamp) ? Math.max(latest, stamp) : latest;
-      }, 0);
-      const lastActivityAt = Math.max(
-        Number(room.lastActivityAt || 0),
-        Number(room.createdAt || 0),
-        Number(roomNode?.live?.lastActivityAt || 0),
-        messageActivity
+      // Completed auctions have a separate 48-hour retention period.
+      // Check both room and live status, because older clients may leave stale
+      // live.status values after room.status has changed to completed.
+      const roomStatus = String(room.status || '').toLowerCase();
+      const liveStatus = String(roomNode?.live?.status || '').toLowerCase();
+      const completionStamp = Number(
+        room.completedAt ||
+        room.winnerAnalysisCompletedAt ||
+        roomNode?.live?.completedAt ||
+        0
       );
-      // Do not guess when a legacy room has no trustworthy timestamp.
-      if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
-      if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
+      const isCompleted = roomStatus === 'completed' ||
+        liveStatus === 'completed' ||
+        room.winnerAnalysisStatus === 'completed' ||
+        (Number.isFinite(completionStamp) && completionStamp > 0);
+      const COMPLETED_ROOM_RETENTION_MS = 48 * 60 * 60 * 1000;
+
+      if (isCompleted) {
+        // Never delete a completed room without a reliable completion time.
+        if (!Number.isFinite(completionStamp) || completionStamp <= 0) {
+          console.warn('[Room cleanup] Completed room has no valid completedAt; preserving it:', roomId);
+          continue;
+        }
+        if (now - completionStamp < COMPLETED_ROOM_RETENTION_MS) continue;
+      } else {
+        const status = liveStatus || roomStatus || 'waiting';
+        const isWaiting = status === 'waiting';
+        const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
+        if (!isWaiting && !isStarted) continue;
+
+        // Presence heartbeats are intentionally excluded: players may remain
+        // online without using the room, and must not prevent idle-room cleanup.
+        const messageActivity = Object.values(roomNode?.messages || {}).reduce((latest, message) => {
+          const stamp = Number(message?.timestamp || message?.createdAt || 0);
+          return Number.isFinite(stamp) ? Math.max(latest, stamp) : latest;
+        }, 0);
+        const lastActivityAt = Math.max(
+          Number(room.lastActivityAt || 0),
+          Number(room.createdAt || 0),
+          Number(roomNode?.live?.lastActivityAt || 0),
+          messageActivity
+        );
+        // Do not guess when a legacy room has no trustworthy timestamp.
+        if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
+        if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
+      }
 
       // Supabase is also used as a fallback for joining by room ID. Delete its
       // index first, and only delete RTDB data after that succeeds, to avoid
@@ -346,7 +370,7 @@ async function cleanupAbandonedRooms() {
       await database.ref('auctions/' + roomId).remove();
       await database.ref('publicRooms/' + roomId).remove();
       await database.ref(ALLOCATOR_PATH + '/' + roomId).remove().catch(() => {});
-      console.log('[Room cleanup] Removed abandoned room from Firebase:', roomId);
+      console.log(isCompleted ? '[Room cleanup] Removed completed room after 48-hour retention:' : '[Room cleanup] Removed abandoned room after 10-minute inactivity:', roomId);
       }
 
       // Also remove stale public directory entries whose auction node no longer
