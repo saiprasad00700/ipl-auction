@@ -3,7 +3,7 @@ import AgoraRTC from 'agora-rtc-sdk-ng';
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ref, update, onValue } from 'firebase/database';
-import { rtdb, ensureServer2Auth } from '../lib/firebase';
+import { rtdb, ensureServer2Auth, ensureServer3Auth } from '../lib/firebase';
 import { trackAnalyticsEvent } from '../lib/insights';
 
 const TOKEN_REFRESH_MS = 4 * 60 * 1000;
@@ -71,9 +71,10 @@ const VoiceChat = ({ roomId }) => {
       try {
         try {
           const savedServer = window.localStorage.getItem('ssauction:room-server:' + roomId);
-          serverId = savedServer === '2' || (!savedServer && String(roomId).startsWith('2')) ? '2' : '1';
+          serverId = savedServer === '3' || (!savedServer && String(roomId).startsWith('3')) ? '3'
+            : savedServer === '2' || (!savedServer && String(roomId).startsWith('2')) ? '2' : '1';
         } catch {}
-        roomDatabase = serverId === '2' ? await ensureServer2Auth() : rtdb;
+        roomDatabase = serverId === '3' ? await ensureServer3Auth() : serverId === '2' ? await ensureServer2Auth() : rtdb;
         roomDatabaseRef.current = roomDatabase;
         const initial = await requestVoiceToken();
         if (cancelled) return;
