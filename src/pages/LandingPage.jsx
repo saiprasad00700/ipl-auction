@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useAuction } from "../contexts/AuctionContext";
-import { rtdb, server2Rtdb, ensureServer2Auth } from "../lib/firebase";
+import { auth, rtdb, server2Rtdb, ensureServer2Auth, server3Rtdb, ensureServer3Auth } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
 import { ref, remove, get, goOnline } from "firebase/database";
 import { IPL_PLAYERS } from "../data/players";
@@ -42,7 +42,7 @@ const LandingPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [completedRoomCode, setCompletedRoomCode] = useState("");
-  const [selectedServer, setSelectedServer] = useState("1");
+  const [selectedServer, setSelectedServer] = useState("auto");
   const [serverCapacityPrompt, setServerCapacityPrompt] = useState("");
 
   // Public Lobbies state
@@ -53,9 +53,9 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      const serverIds = selectedServer === "auto" ? ["1", "2"] : [selectedServer];
+      const serverIds = selectedServer === "auto" ? ["1", "2", "3"] : [selectedServer];
       const directories = await Promise.all(serverIds.map(async (serverId) => {
-        const database = serverId === "2" ? await ensureServer2Auth() : rtdb;
+        const database = serverId === "3" ? await ensureServer3Auth() : serverId === "2" ? await ensureServer2Auth() : rtdb;
         goOnline(database);
         const snapshot = await get(ref(database, "publicRooms"));
         return { serverId, directory: snapshot.exists() ? snapshot.val() : {} };
@@ -132,13 +132,14 @@ const LandingPage = () => {
         const allEntries = snapshot.exists() ? Object.values(snapshot.val() || {}) : [];
         const entries = allEntries.filter((entry) => selectedServer === "auto" || String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === selectedServer);
         if (entries.some((entry) => String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === "2")) await ensureServer2Auth();
+        if (entries.some((entry) => String(entry?.serverId || String(entry?.roomId || "").charAt(0)) === "3")) await ensureServer3Auth();
         const sessions = await Promise.all(entries.map(async (entry) => {
           if (!entry?.roomId) return null;
           let teamData = null;
           let roomData = null;
           try {
-            const entryServerId = String(entry.serverId || String(entry.roomId).charAt(0)) === "2" ? "2" : "1";
-            const historyDatabase = entryServerId === "2" ? server2Rtdb : rtdb;
+            const entryServerId = String(entry.serverId || String(entry.roomId).charAt(0));
+            const historyDatabase = entryServerId === "3" ? server3Rtdb : entryServerId === "2" ? server2Rtdb : rtdb;
             const [teamSnap, roomSnap] = await Promise.all([
               get(ref(historyDatabase, `auctions/${entry.roomId}/teams/${entry.roomId}_${user.uid}`)),
               get(ref(historyDatabase, `auctions/${entry.roomId}/room`))
@@ -273,7 +274,15 @@ const LandingPage = () => {
 
       if (activeTab === "new") {
         const roomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-        const newRoomId = String(selectedServer) + roomSuffix;
+        const idToken = await user.getIdToken();
+        const allocationResponse = await fetch("/api/server-capacity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ mode: "allocate", roomSuffix, auctionType })
+        });
+        const allocation = await allocationResponse.json().catch(() => ({}));
+        if (!allocationResponse.ok || !allocation.roomId) throw new Error(allocation.error || "Could not allocate an auction server. Please try again.");
+        const newRoomId = allocation.roomId;
         await createRoom(
           newRoomId,
           user.uid,
