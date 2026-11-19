@@ -501,7 +501,9 @@ const Lobby = () => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
             {TEAMS.map((team) => {
-              const isTaken = teamAssignments[team.id];
+              const assignedPlayer = players.find(p => p.team === team.id);
+              // Bot franchises are open for human takeover.
+              const isTaken = assignedPlayer && !assignedPlayer.isBot ? assignedPlayer.name : '';
               return (
                 <button
                   key={team.id}
