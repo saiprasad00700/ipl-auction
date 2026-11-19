@@ -185,9 +185,26 @@ const AuctionSummary = () => {
   const activeAuction = currentAuction || dbAuction;
   const winnerRankings = activeAuction?.winnerRankings || activeAuction?.settings?.winnerRankings || [];
   const winnerAnalysisStatus = activeAuction?.winnerAnalysisStatus || activeAuction?.settings?.winnerAnalysisStatus;
-  const activeTeams = (roomTeams && roomTeams.length > 0)
-    ? roomTeams
-    : (rtdbTeams.length > 0 ? rtdbTeams : dbTeams);
+  // A non-empty live roomTeams array is not necessarily usable: some listeners
+  // can briefly contain incomplete/stale records without franchise IDs. Build
+  // the summary from valid franchise records across all available sources,
+  // preferring live context data while allowing RTDB/Firestore fallbacks to fill
+  // missing fields or franchises.
+  const activeTeams = useMemo(() => {
+    const sources = [roomTeams, rtdbTeams, dbTeams]
+      .filter(Array.isArray)
+      .map((source) => source.filter((teamDoc) => teamDoc?.teamId && teamDoc.teamId !== 'NONE'));
+    const merged = new Map();
+    sources.forEach((source) => {
+      source.forEach((teamDoc) => {
+        const key = String(teamDoc.teamId);
+        const existing = merged.get(key) || {};
+        // Higher-priority sources (roomTeams first) retain their values.
+        merged.set(key, { ...teamDoc, ...existing });
+      });
+    });
+    return Array.from(merged.values());
+  }, [roomTeams, rtdbTeams, dbTeams]);
 
   // Derived Data
   const allSoldPlayers = useMemo(() => {
