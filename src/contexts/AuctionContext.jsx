@@ -1850,7 +1850,13 @@ export const AuctionProvider = ({ children }) => {
     
     const existingPlayers = Array.isArray(data.players) ? data.players : [];
     const playerIndex = existingPlayers.findIndex(p => p && (p.id === userId || p.userId === userId));
-    const updatedPlayers = existingPlayers.map(p =>
+    // Human players may take over a franchise currently occupied by a bot.
+    // Remove the bot roster entry before assigning the franchise to the human.
+    const botUserId = `bot_${newTeamId}`;
+    const rosterWithoutTeamBot = existingPlayers.filter(p =>
+      !(p && p.isBot && (p.team === newTeamId || p.id === botUserId))
+    );
+    const updatedPlayers = rosterWithoutTeamBot.map(p =>
       p && (p.id === userId || p.userId === userId)
         ? { ...p, id: userId, team: newTeamId, teamName: teamDetails?.name || 'Unknown' }
         : p
@@ -1881,6 +1887,8 @@ export const AuctionProvider = ({ children }) => {
     } catch (sErr) {}
     */
 
+    // Remove the replaced bot's franchise data, then update/create the human team.
+    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
     // Update RTDB team node (0 Firestore cost in lobby!)
     const rtdbTeamSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${userId}`));
     if (rtdbTeamSnap.exists()) {
