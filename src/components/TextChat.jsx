@@ -5,8 +5,6 @@ import { TEAMS } from '../data/teams';
 import { Send, MessageSquare, ChevronUp, ChevronDown, Image as ImageIcon, Smile, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabaseSticker } from '../lib/supabase';
-import { ref as databaseRef, set as setDatabaseValue } from 'firebase/database';
-import { rtdb } from '../lib/firebase';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
 
@@ -34,7 +32,7 @@ const STICKER_PACKS = {
 };
 
 const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
-   const { messages, sendMessage, currentAuction } = useAuction();
+   const { messages, sendMessage, markMessageSeen, currentAuction } = useAuction();
    const { user } = useAuth();
    const [text, setText] = useState('');
    const [showGifPicker, setShowGifPicker] = useState(false);
@@ -73,15 +71,12 @@ const TextChat = ({ roomId, isCollapsed, onToggleCollapse }) => {
       chatMessages.forEach((message) => {
          if (!message.id || message.userId === user.uid || markedSeenMessageIdsRef.current.has(message.id)) return;
          markedSeenMessageIdsRef.current.add(message.id);
-         setDatabaseValue(
-            databaseRef(rtdb, `auctions/${roomId}/messages/${message.id}/seenBy/${user.uid}`),
-            seenBy
-         ).catch((error) => {
+         markMessageSeen(roomId, message.id, user.uid, seenBy).catch((error) => {
             markedSeenMessageIdsRef.current.delete(message.id);
             console.warn('[TextChat] Read receipt could not be saved:', error?.message || error);
          });
       });
-   }, [chatMessages, roomId, user?.uid, isBotUser, roomPlayer?.team, roomPlayer?.teamName]);
+   }, [chatMessages, roomId, user?.uid, isBotUser, roomPlayer?.team, roomPlayer?.teamName, markMessageSeen]);
 
    useEffect(() => {
       let cancelled = false;
