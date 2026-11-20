@@ -62,6 +62,11 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - The host client no longer directly writes RTM decisions for bot identities.
 - Existing RTM helper tests cover decision/counter-bid validation; integration/emulator concurrency testing remains required.
 
+## Room settings endpoint wiring
+- Client room settings now call `POST /api/room-settings`; server verifies the room's assigned Firebase project token and host identity.
+- Settings are committed in a room transaction and restricted to the waiting room. Only `bidTimer` and `budget` are accepted, with supported timer values and mode-specific budget caps.
+- A helper test exists for validation; endpoint integration and Emulator tests remain part of the required verification.
+
 ## Server-authoritative bot team management
 - Bot add/remove/fill requests now call `POST /api/room-bots` with a Firebase ID token.
 - The server verifies the authenticated host, room-code server routing, and waiting-room status; clients cannot manage bots after the auction starts.
