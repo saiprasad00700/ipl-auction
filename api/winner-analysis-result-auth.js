@@ -2,8 +2,8 @@ export function validateWinnerAnalysisResult({ room, teams, uid, rankings, model
   if (!room || typeof room !== 'object') return { allowed:false, status:404, reason:'room_not_found' };
   if (room.hostId !== uid) return { allowed:false, status:403, reason:'host_only' };
   if (room.status !== 'analyzing') return { allowed:false, status:409, reason:'analysis_not_running' };
-  if (!Array.isArray(rankings) || rankings.length > 10 || rankings.length !== teamEntries.length) return { allowed:false, status:400, reason:'invalid_rankings' };
   const teamEntries = Object.values(teams || {}).filter(t => t?.teamId && t.teamId !== 'NONE');
+  if (!Array.isArray(rankings) || rankings.length > 10 || rankings.length !== teamEntries.length) return { allowed:false, status:400, reason:'invalid_rankings' };
   const eligibleIds = new Set(teamEntries.filter(t => !t.disqualified).map(t => String(t.teamId)));
   const seen = new Set();
   for (const item of rankings) {
