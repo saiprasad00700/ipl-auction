@@ -133,14 +133,22 @@ export default async function handler(req, res) {
   }
 
   if (statsRowsLoaded === 0 || recentStatsByPlayer.size === 0) {
-    throw new Error("No recent IPL statistics matched the auction player IDs in Supabase. Check the player mapping before retrying; Gemini ranking was stopped to avoid unsupported rankings.");
-  }
-
-  console.log("[AI stats] Loaded recent IPL records", {
+    // Statistics coverage may be temporarily unavailable or player mappings may
+    // be incomplete. Do not block the entire post-auction analysis: the prompt
+    // explicitly instructs the model to mark IPL data as unavailable and use
+    // cautious fallback evidence without inventing exact statistics.
+    console.warn("[AI stats] No recent IPL records matched this auction. Continuing with clearly marked missing-stat coverage.", {
+      auctionPlayers: playerById.size,
+      matchedPlayers: recentStatsByPlayer.size,
+      matchRecords: statsRowsLoaded
+    });
+  } else {
+    console.log("[AI stats] Loaded recent IPL records", {
     matchRecords: statsRowsLoaded,
     matchedPlayers: recentStatsByPlayer.size,
     auctionPlayers: playerById.size
-  });
+    });
+  }
 
   // Attach season-by-season evidence to both the selected XI and full squad.
   // Raw innings objects are retained so the model can use source field names
