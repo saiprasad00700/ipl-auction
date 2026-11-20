@@ -3,7 +3,8 @@
 export function validateRoomJoin({ room, uid, teamId, bannedPlayers = [] }) {
   if (!room || typeof room !== 'object') return { allowed: false, status: 404, reason: 'room_not_found' };
   if (!uid || typeof uid !== 'string') return { allowed: false, status: 401, reason: 'identity_required' };
-  if (Array.isArray(bannedPlayers) && bannedPlayers.includes(uid)) return { allowed: false, status: 403, reason: 'banned' };
+  const bannedSet = Array.isArray(bannedPlayers) ? bannedPlayers : Object.keys(bannedPlayers || {}).filter((key) => bannedPlayers[key] === true);
+  if (bannedSet.includes(uid)) return { allowed: false, status: 403, reason: 'banned' };
   if (['completed', 'analyzing'].includes(String(room.status || '')) || room.winnerAnalysisStatus === 'completed' || Array.isArray(room.winnerRankings)) {
     return { allowed: false, status: 409, reason: 'room_closed' };
   }
