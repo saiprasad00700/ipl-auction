@@ -48,6 +48,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Pure helper tests cover timer rejection, eligible offer creation, and RTM skip conditions.
 - Cross-path consistency caveat remains: eligibility reads room/team snapshots before the live transaction; trusted settlement still validates purse/card/squad limits. Restrictive Firebase rules are not yet safe to deploy.
 
+## Server-authoritative pause/resume and host end
+- Host pause/resume is now authenticated by the assigned Firebase project and host identity; timer and RTM expiry freezing are applied inside the server transaction.
+- Host end-auction/disqualification is now performed in an atomic auction-root transaction. Mega auction minimum-squad disqualification and XI-phase metadata are calculated server-side.
+- Clients call the trusted APIs and only add the system log messages afterward.
+- Pure helper tests cover pause/resume timer freezing and host end/disqualification rules.
+- Emulator testing is still required for multi-path transaction contention and pause/end races.
+
 ## Server-authoritative auction start
 - `POST /api/start-auction` authenticates the room's assigned Firebase project, requires the recorded host, a waiting room, and at least two distinct participants.
 - Server-generated marquee/role-balanced player order and the initial live lot are committed in a transaction at the room's auction root.
