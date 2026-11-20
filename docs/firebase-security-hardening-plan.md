@@ -25,6 +25,11 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Live player state advances to the next lot and room phase through client-side transactions/updates. This is a correctness/recovery mechanism, not a security boundary.
 - Server-authoritative auction settlement, purse/squad/retention integrity, membership-scoped room reads, and comprehensive Firebase Emulator tests remain unfinished.
 
+## Trusted room-kick mutation
+- `POST /api/room-kick` verifies the Firebase ID token against the room's assigned Firebase project and enforces host-only removal.
+- The room transaction removes the target from the roster, adds their UID to the ban list, and refreshes activity. Team cleanup and system chat logging are follow-up operations; failures are logged and can leave cleanup work, so emulator/concurrency validation is still required.
+- The RTDB client now uses this endpoint instead of directly mutating the room roster, bans, team record, and kick log.
+
 ## Test matrix required before deployment
 - Unauthenticated read/write: denied.
 - Authenticated non-member read/write to private room: denied.
@@ -32,6 +37,7 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Friend joins concurrently with another friend: both remain in roster.
 - Two users claim same franchise concurrently: exactly one succeeds.
 - Host adds/removes bots: allowed and consistent; non-host bot manipulation denied.
+- Host kicks a member: roster removal and ban persist; non-host, self-kick, and missing-target requests are denied.
 - Human takeover of bot franchise: succeeds through intended flow without duplicate team.
 - Participant changes own purse/squad directly: denied.
 - Participant changes another team's purse/squad: denied.
