@@ -842,49 +842,27 @@ export const AuctionProvider = ({ children }) => {
     if (user && user.uid === userId) void trackAnalyticsEvent('room_join', roomId);
   }, [user]);
 
-  // Kick a player from the room
+  // Kick a player from the room through a trusted host-authorized endpoint.
   const kickPlayer = useCallback(async (roomId, playerObj) => {
     try {
-      const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-      if (!rtdbRoomSnap.exists()) return;
-      const data = rtdbRoomSnap.val();
-
-      // 1. Filter out the player and add to banned list
-      const updatedPlayers = (data.players || []).filter(p => p.id !== playerObj.id);
-      const updatedBanned = [...(data.bannedPlayers || []), playerObj.id];
-
-      // 2. Update RTDB
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), {
-        players: updatedPlayers,
-        bannedPlayers: updatedBanned,
-        lastActivityAt: Date.now()
+      if (!user) throw new Error('Sign in to remove a participant.');
+      const serverId = getRoomServerId(roomId);
+      if (serverId === '3') await ensureServer3Auth();
+      else if (serverId === '2') await ensureServer2Auth();
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/room-kick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId, targetUid: String(playerObj?.id || playerObj?.userId || '') })
       });
-
-      // Sync player removal to Supabase
-      /*
-      try {
-        if (supabase) {
-          await supabase.from('auctions').update({ players: updatedPlayers, banned_players: updatedBanned }).eq('id', roomId);
-        }
-      } catch (sErr) {}
-      */
-
-      // 3. Delete team in RTDB
-      await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${playerObj.id}`), null);
-
-      // 4. Add to messages collection
-      const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-      await push(msgRef, {
-        userId: 'system',
-        userName: 'System',
-        text: `${playerObj.name} has been removed from the session.`,
-        type: 'log',
-        timestamp: serverTimestampRtdb()
-      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not remove participant securely.');
+      return result;
     } catch (err) {
-      // Error kicking player
+      reportGuardianError({ operation: 'room-kick', severity: 'warning', message: err?.message || String(err), roomId });
+      throw err;
     }
-  }, []);
+  }, [user]);
 
   // Listen to current auction state live
   const joinAuction = useCallback((auctionId, userId) => {
