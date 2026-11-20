@@ -1061,6 +1061,35 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if(pathname==='/api/room-settings'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      if(!decoded.uid||/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid))return sendJson(res,403,{error:'Automated accounts cannot update settings'});
+      if(!allowRoomActivityRequest(decoded.uid))return sendJson(res,429,{error:'Settings request limit reached. Please wait before retrying.'});
+      const roomRef=services.database.ref(`auctions/${roomId}/room`);
+      const {validateRoomSettings}=await import('./api/room-settings-auth.js');
+      let reason=null,finalSettings=null;
+      const tx=await roomRef.transaction(room=>{
+        const result=validateRoomSettings({room,uid:decoded.uid,settings:body.settings});
+        if(!result.allowed){reason=result.reason;return;}
+        finalSettings=result.settings;
+        return {...room,settings:finalSettings,lastActivityAt:Date.now()};
+      });
+      if(!tx.committed)return sendJson(res,reason==='host_only'?403:400,{error:reason==='host_only'?'Only the host can update room settings.':'Room settings are invalid.',reason});
+      return sendJson(res,200,{ok:true,settings:finalSettings});
+    }catch(error){
+      console.warn('[Room settings] Update failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not update room settings securely'});
+    }
+  }
   if (pathname === '/api/submit-playing-xi') {
     if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
     try{
