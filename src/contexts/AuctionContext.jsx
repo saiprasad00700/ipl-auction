@@ -158,41 +158,16 @@ export const AuctionProvider = ({ children }) => {
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
     const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : MEGA_OVERSEAS_LIMIT;
 
-    const liveRef = ref(roomDatabase, `auctions/${roomId}/live`);
-    await set(liveRef, { status: 'waiting' });
-
-    // Instantly set host online presence in RTDB
-    const hostPresenceRef = ref(roomDatabase, `auctions/${roomId}/presence/${userId}`);
-    await set(hostPresenceRef, {
-      online: true,
-      lastSeen: serverTimestampRtdb()
+    if (!user || user.uid !== userId) throw new Error('Authenticated user does not match room host.');
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/create-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId: roomServerId, teamId: playerDetails.team, name: playerDetails.name, auctionType, isPublic: !!isPublic })
     });
-
-    // Sync to RTDB for real-time reads
-    const rtdbRoomRef = ref(roomDatabase, `auctions/${roomId}/room`);
-    await set(rtdbRoomRef, {
-      hostId: userId,
-      hostName: playerDetails.name,
-      status: 'waiting',
-      auctionType,
-      isPublic: !!isPublic,
-      lastActivityAt: Date.now(),
-      squadLimit,
-      overseasLimit,
-      players: [{
-        id: userId,
-        name: playerDetails.name,
-        team: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        isHost: true
-      }],
-      bannedPlayers: [],
-      settings: {
-        bidTimer: DEFAULT_BID_TIMER_SECONDS,
-        budget
-      }
-    });
-    if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.room) throw new Error(result.error || 'Could not create room securely.');
+        if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
 
 
     // Publish only minimal metadata for public rooms; never expose auction state.
