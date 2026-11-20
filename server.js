@@ -1060,6 +1060,62 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/retention-decision') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const decisionValue = String(body.decision || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot make RTM decisions' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'RTM request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { validateRetentionDecision } = await import('./api/retention-decision-auth.js');
+      const now = Date.now();
+      let decisionError = null;
+      const transaction = await liveRef.transaction((current) => {
+        if (!current || current.status !== 'processing_sale') return;
+        const offer = current.retentionOffer;
+        const validation = validateRetentionDecision({ offer, uid, decision: decisionValue, now });
+        if (!validation.allowed) { decisionError = validation.reason; return; }
+        if (offer.phase === 'initial_decision' && decisionValue === 'accept') {
+          offer.rtmUsed = true;
+          offer.phase = 'counter_bid';
+          offer.decision = 'accept';
+          offer.decidedBy = uid;
+          offer.decidedAt = validation.now;
+          offer.expiresAt = validation.now + 15000;
+        } else {
+          offer.decision = decisionValue;
+          offer.decidedBy = uid;
+          offer.decidedAt = validation.now;
+        }
+        return current;
+      });
+      if (!transaction.committed) return sendJson(res, 409, { error: decisionError === 'offer_expired' ? 'The RTM offer has expired.' : 'Your RTM decision was not saved. Please try again if the offer is still open.', reason: decisionError || 'transaction_not_committed' });
+      return sendJson(res, 200, { ok: true, roomId, decision: decisionValue, phase: transaction.snapshot.val()?.retentionOffer?.phase });
+    } catch (error) {
+      console.warn('[RTM decision] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not save RTM decision securely' });
+    }
+  }
   if (pathname === '/api/place-bid') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
