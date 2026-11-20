@@ -9,6 +9,7 @@ on:
       - cinematic-3d-rebuild
       - feature/ss-auction-insights-phase-1
       - feature/cricketdata-player-stats
+      - security-rules-hardening
   pull_request:
     branches:
       - main
