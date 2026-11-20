@@ -191,66 +191,8 @@ export const AuctionProvider = ({ children }) => {
     }
     if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
 
-    // Instantly set host online presence in RTDB
-    const hostPresenceRef = ref(roomDatabase, `auctions/${roomId}/presence/${userId}`);
-    await set(hostPresenceRef, {
-      online: true,
-      lastSeen: serverTimestampRtdb()
-    });
-
-    // Sync to RTDB for real-time reads
-    const rtdbRoomRef = ref(roomDatabase, `auctions/${roomId}/room`);
-    await set(rtdbRoomRef, {
-      hostId: userId,
-      hostName: playerDetails.name,
-      status: 'waiting',
-      auctionType,
-      isPublic: !!isPublic,
-      lastActivityAt: Date.now(),
-      squadLimit,
-      overseasLimit,
-      players: [{
-        id: userId,
-        name: playerDetails.name,
-        team: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        isHost: true
-      }],
-      bannedPlayers: [],
-      settings: {
-        bidTimer: DEFAULT_BID_TIMER_SECONDS,
-        budget
-      }
-    });
-    if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
-
-
-    // Publish only minimal metadata for public rooms; never expose auction state.
-    const publicRoomRef = ref(roomDatabase, `publicRooms/${roomId}`);
-    if (isPublic) {
-      await set(publicRoomRef, {
-        roomId,
-        hostId: userId,
-        hostName: playerDetails.name || 'Auction host',
-        status: 'waiting',
-        auctionType,
-        createdAt: Date.now()
-      });
-    }
-
-    if (playerDetails.team) {
-      const rtdbTeamRef = ref(roomDatabase, `auctions/${roomId}/teams/${roomId}_${userId}`);
-      await set(rtdbTeamRef, {
-        auctionId: roomId,
-        userId: userId,
-        teamId: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        budgetRemaining: budget,
-        spent: 0,
-        squad: [],
-        retentionCardsRemaining: 2
-      });
-    }
+    // The room, host presence, public listing, and initial team were already written
+    // atomically/with cleanup above. Avoid repeating these writes and declarations.
 
     // Record history without blocking room creation if rules are not deployed yet.
     try {
