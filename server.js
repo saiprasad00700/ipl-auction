@@ -1577,6 +1577,57 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not save RTM decision securely' });
     }
   }
+  if (pathname === '/api/place-bot-bid') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),botUserId=String(body.botUserId||'');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot coordinate bot bids'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Bot-bid request limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room`),liveRef=database.ref(`auctions/${roomId}/live`);
+      const [roomSnap,liveSnap]=await Promise.all([roomRef.get(),liveRef.get()]);
+      if(!roomSnap.exists()||!liveSnap.exists())return sendJson(res,404,{error:'Room or live state not found'});
+      const room=roomSnap.val(),live=liveSnap.val();
+      const teamRef=database.ref(`auctions/${roomId}/teams/${roomId}_${botUserId}`),teamSnap=await teamRef.get();
+      if(!teamSnap.exists())return sendJson(res,404,{error:'Bot team record not found'});
+      const team=teamSnap.val();
+      const {IPL_PLAYERS}=await import('./src/data/players.js');
+      const {evaluateBotBid}=await import('./src/lib/botEngine.js');
+      const {getNextBidAmount}=await import('./src/lib/auctionRules.js');
+      const player=IPL_PLAYERS.find(p=>p.id===live.playerId);
+      if(!player)return sendJson(res,409,{error:'Current player is invalid'});
+      const decision=evaluateBotBid({player,currentBid:Number(live.currentBid||0),highBidderId:live.highBidderId,botTeam:team,squadLimit:Number(room.squadLimit||25),overseasLimit:Number(room.overseasLimit||8),initialBudget:Number(room.settings?.budget||120)});
+      const {validateBotBidRequest}=await import('./api/bot-bid-auth.js');
+      const validation=validateBotBidRequest({room,live,team,uid,botUserId,now:Date.now(),decision});
+      if(!validation.allowed)return sendJson(res,validation.status,{error:'Bot bid is not eligible for this auction state.',reason:validation.reason});
+      const expected={playerId:live.playerId,currentBid:Number(live.currentBid||0),highBidderId:live.highBidderId||'',highBidderTeamId:live.highBidderTeamId||'',timerEndsAt:Number(live.timerEndsAt||0)};
+      let reason=null;
+      const tx=await liveRef.transaction(current=>{
+        if(!current||current.status!=='bidding'||current.isPaused){reason='auction_not_bidding';return;}
+        if(current.playerId!==expected.playerId||Number(current.currentBid||0)!==expected.currentBid||(current.highBidderId||'')!==expected.highBidderId||(current.highBidderTeamId||'')!==expected.highBidderTeamId||Number(current.timerEndsAt||0)!==expected.timerEndsAt){reason='live_state_changed';return;}
+        const fresh=validateBotBidRequest({room,live:current,team,uid,botUserId,now:Date.now(),decision});
+        if(!fresh.allowed){reason=fresh.reason;return;}
+        current.currentBid=fresh.amount;
+        current.highBidderId=botUserId;
+        current.highBidderName=String(body.botName||team.teamName||'Bot').slice(0,80);
+        current.highBidderTeamId=team.teamId;
+        current.timerEndsAt=Date.now()+Math.max(3,Math.min(15,Number(room.settings?.bidTimer||15)))*1000;
+        return current;
+      });
+      if(!tx.committed)return sendJson(res,409,{error:'Bot bid was not committed because the auction state changed.',reason:reason||'transaction_not_committed'});
+      return sendJson(res,200,{ok:true,botUserId,teamId:team.teamId,amount:validation.amount,live:tx.snapshot.val()});
+    }catch(error){
+      console.warn('[Bot bid] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not place bot bid securely'});
+    }
+  }
   if (pathname === '/api/place-bid') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
