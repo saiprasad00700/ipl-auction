@@ -340,63 +340,42 @@ async function cleanupAbandonedRooms() {
         if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
       }
 
-      // Supabase is also used as a fallback for joining by room ID. Delete its
-      // index first, and only delete RTDB data after that succeeds, to avoid
-      // stale Supabase rows recreating an abandoned room.
+      // Firebase Realtime Database is the source of truth for rooms. Never let
+      // optional Supabase indexing/configuration failures block room deletion.
       const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!supabaseUrl || !supabaseServiceKey) {
-        console.warn('[Room cleanup] Skipped cleanup: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured.');
-        return;
-      }
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabaseHeaders = {
+          apikey: supabaseServiceKey,
+          Authorization: 'Bearer ' + supabaseServiceKey,
+          Prefer: 'return=minimal'
+        };
+        try {
+          const teamsQuery = new URL('/rest/v1/teams', supabaseUrl);
+          teamsQuery.searchParams.set('auction_id', 'eq.' + roomId);
+          const teamsResponse = await fetch(teamsQuery, { method: 'DELETE', headers: supabaseHeaders });
+          if (!teamsResponse.ok && teamsResponse.status !== 404) {
+            console.warn('[Room cleanup] Supabase teams cleanup failed (Firebase deletion will continue):', roomId, teamsResponse.status, (await teamsResponse.text()).slice(0, 300));
+          }
 
-      const supabaseHeaders = {
-        apikey: supabaseServiceKey,
-        Authorization: 'Bearer ' + supabaseServiceKey,
-        Prefer: 'return=minimal'
-      };
-
-      // Remove child team rows first in case the database enforces a foreign key.
-      const teamsQuery = new URL('/rest/v1/teams', supabaseUrl);
-      teamsQuery.searchParams.set('auction_id', 'eq.' + roomId);
-      const teamsResponse = await fetch(teamsQuery, {
-        method: 'DELETE',
-        headers: supabaseHeaders
-      });
-      if (!teamsResponse.ok && teamsResponse.status !== 404) {
-        const detail = (await teamsResponse.text()).slice(0, 300);
-        console.warn('[Room cleanup] Supabase team cleanup failed for room', roomId, teamsResponse.status, detail);
-        continue;
-      }
-      if (teamsResponse.status === 404) {
-        // Some Supabase projects do not expose a REST table named "teams".
-        // Continue to the auction delete; if a foreign key blocks it, that
-        // request will fail and the Firebase room will be left untouched.
-        console.warn('[Room cleanup] Supabase teams endpoint returned 404; trying auction cleanup for room', roomId);
-      }
-
-      const query = new URL('/rest/v1/auctions', supabaseUrl);
-      query.searchParams.set('id', 'eq.' + roomId);
-      const response = await fetch(query, {
-        method: 'DELETE',
-        headers: supabaseHeaders
-      });
-      if (!response.ok) {
-        const detail = (await response.text()).slice(0, 500);
-        let errorBody = {};
-        try { errorBody = JSON.parse(detail); } catch {}
-        const tableMissing = response.status === 404 && errorBody.code === 'PGRST205';
-        if (tableMissing) {
-          // This project does not have the optional Supabase auctions table.
-          // Firebase Realtime Database is the actual room store, so continue
-          // with RTDB cleanup instead of blocking deletion on a missing index.
-          console.warn('[Room cleanup] Supabase auctions table is missing; removing room from Firebase only:', roomId);
-        } else {
-          console.warn('[Room cleanup] Supabase cleanup failed for room', roomId, response.status, detail);
-          continue;
+          const auctionQuery = new URL('/rest/v1/auctions', supabaseUrl);
+          auctionQuery.searchParams.set('id', 'eq.' + roomId);
+          const auctionResponse = await fetch(auctionQuery, { method: 'DELETE', headers: supabaseHeaders });
+          if (!auctionResponse.ok) {
+            const detail = (await auctionResponse.text()).slice(0, 500);
+            let errorBody = {};
+            try { errorBody = JSON.parse(detail); } catch {}
+            const tableMissing = auctionResponse.status === 404 && errorBody.code === 'PGRST205';
+            if (!tableMissing) console.warn('[Room cleanup] Supabase auction index cleanup failed (Firebase deletion will continue):', roomId, auctionResponse.status, detail);
+          }
+        } catch (supabaseError) {
+          console.warn('[Room cleanup] Supabase cleanup exception (Firebase deletion will continue):', roomId, supabaseError?.message || supabaseError);
         }
+      } else {
+        console.warn('[Room cleanup] Supabase credentials missing; deleting Firebase room anyway:', roomId);
       }
 
+      // Delete the actual room, public directory entry and capacity reservation.
       await database.ref('auctions/' + roomId).remove();
       await database.ref('publicRooms/' + roomId).remove();
       await database.ref(ALLOCATOR_PATH + '/' + roomId).remove().catch(() => {});
