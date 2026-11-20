@@ -1146,21 +1146,37 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
     if (!allowAnalysis(ip)) return sendJson(res, 429, { error: 'Too many AI analysis requests. Please wait a minute and try again.' });
+    const authorization = String(req.headers.authorization || '');
+    if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+    let decoded;
+    let body;
     try {
-      req.body = await readBody(req);
+      const { auth } = await getFirebaseAdminServices();
+      decoded = await auth.verifyIdToken(authorization.slice(7));
+      body = await readBody(req);
     } catch (error) {
-      return sendJson(res, error.message === 'Request body too large' ? 413 : 400, { error: error.message });
+      return sendJson(res, error.message === 'Request body too large' ? 413 : 401, { error: 'Authentication or request validation failed' });
     }
-    const responseShim = {
-      statusCode: 200,
-      status(code) { this.statusCode = code; return this; },
-      json(body) { sendJson(res, this.statusCode, body); return res; }
-    };
+    const roomId = String(body.roomId || '').trim();
+    if (!/^[123][A-Z0-9]{4,12}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room code' });
     try {
-      const result = await analyzeWinner(req, responseShim);
-      if (result && !res.writableEnded) {
-        sendJson(res, result.statusCode || 500, JSON.parse(result.body || '{}'));
+      const serverId = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      const { database } = await getDatabaseForServer(serverId);
+      const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      if (roomData.hostId !== decoded.uid) return sendJson(res, 403, { error: 'Only the room host can run winner analysis' });
+      if (!['awaiting_xi', 'analyzing'].includes(String(roomData.status || ''))) {
+        return sendJson(res, 409, { error: 'Winner analysis is not currently allowed for this room' });
       }
+      const responseShim = {
+        statusCode: 200,
+        status(code) { this.statusCode = code; return this; },
+        json(body) { sendJson(res, this.statusCode, body); return res; }
+      };
+      req.body = body;
+      const result = await analyzeWinner(req, responseShim);
+      if (result && !res.writableEnded) sendJson(res, result.statusCode || 500, JSON.parse(result.body || '{}'));
     } catch (error) {
       if (!res.writableEnded) sendJson(res, 500, { error: 'Internal server error' });
       console.error('API request failed:', error?.message || error);
