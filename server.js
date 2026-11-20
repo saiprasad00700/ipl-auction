@@ -1655,7 +1655,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
       if(!/^[123][A-Z0-9]{4,12}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
       const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
-      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code');
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
       const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
       const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
       if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot create rooms'});
