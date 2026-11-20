@@ -321,7 +321,10 @@ async function cleanupAbandonedRooms() {
         const status = liveStatus || roomStatus || 'waiting';
         const isWaiting = status === 'waiting';
         const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
-        if (!isWaiting && !isStarted) continue;
+        if (!isWaiting && !isStarted) {
+          console.log('[Room cleanup] Preserving room with unrecognized/non-live status:', roomId, status);
+          continue;
+        }
 
         // Presence heartbeats are intentionally excluded: players may remain
         // online without using the room, and must not prevent idle-room cleanup.
@@ -332,11 +335,13 @@ async function cleanupAbandonedRooms() {
         const lastActivityAt = Math.max(
           Number(room.lastActivityAt || 0),
           Number(room.createdAt || 0),
-          Number(roomNode?.live?.lastActivityAt || 0),
           messageActivity
         );
         // Do not guess when a legacy room has no trustworthy timestamp.
-        if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
+        if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) {
+          console.warn('[Room cleanup] Preserving room with missing/invalid activity timestamp:', roomId);
+          continue;
+        }
         if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
       }
 
@@ -1068,6 +1073,10 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const rosterEntry = roster.find((player) => player && (player.id === decoded.uid || player.userId === decoded.uid));
       const isHost = roomData.hostId === decoded.uid;
       if (!isHost && !rosterEntry) return sendJson(res, 403, { error: 'You must join this auction before using voice chat' });
+
+      // Successful voice-chat access is genuine room activity. Online presence
+      // and heartbeats alone do not reset the room inactivity timer.
+      await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
 
       const appId = String(process.env.AGORA_APP_ID || '').trim();
       const certificate = String(process.env.AGORA_APP_CERTIFICATE || '').trim();
