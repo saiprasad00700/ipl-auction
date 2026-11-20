@@ -2177,6 +2177,54 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not start voice chat. Check Agora server configuration.' });
     }
   }
+  if (pathname === '/api/winner-analysis-result') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[123][A-Z0-9]{4,12}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room code' });
+      const serverId = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot finalize analysis' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Analysis result request limit reached' });
+      const roomRef = services.database.ref('auctions/' + roomId + '/room');
+      const action = String(body.action || 'complete');
+      if (action === 'fail') {
+        let reason = null;
+        const tx = await roomRef.transaction(current => {
+          if (!current) { reason = 'room_not_found'; return; }
+          if (current.hostId !== uid) { reason = 'host_only'; return; }
+          if (current.status !== 'analyzing') { reason = 'analysis_not_running'; return; }
+          return { ...current, status: 'analysis_failed', winnerAnalysisStatus: 'failed', winnerAnalysisError: String(body.error || 'AI analysis failed').slice(0, 300) };
+        });
+        if (!tx.committed) return sendJson(res, reason === 'host_only' ? 403 : 409, { error: reason || 'Could not mark analysis failed', reason });
+        return sendJson(res, 200, { ok: true, status: 'analysis_failed' });
+      }
+      if (action !== 'complete') return sendJson(res, 400, { error: 'Invalid action' });
+      const teamsSnapshot = await services.database.ref('auctions/' + roomId + '/teams').get();
+      const { validateWinnerAnalysisResult } = await import('./api/winner-analysis-result-auth.js');
+      let reason = null, finalRoom = null;
+      const result = validateWinnerAnalysisResult({ room: await roomRef.get().then(s => s.val()), teams: teamsSnapshot.val() || {}, uid, rankings: body.rankings, model: body.model, completedAt: body.completedAt });
+      if (!result.allowed) return sendJson(res, result.status, { error: 'Winner analysis result is not valid for this room', reason: result.reason });
+      const tx = await roomRef.transaction(current => {
+        const checked = validateWinnerAnalysisResult({ room: current, teams: teamsSnapshot.val() || {}, uid, rankings: body.rankings, model: body.model, completedAt: body.completedAt });
+        if (!checked.allowed) { reason = checked.reason; return; }
+        finalRoom = checked.room;
+        return checked.room;
+      });
+      if (!tx.committed) return sendJson(res, reason === 'host_only' ? 403 : 409, { error: 'Winner analysis result could not be saved', reason });
+      const completedAt = finalRoom.completedAt;
+      await services.database.ref('completedRoomHistory/' + roomId + '/completedAt').set(completedAt).catch(() => {});
+      return sendJson(res, 200, { ok: true, room: finalRoom });
+    } catch (error) {
+      console.warn('[Winner analysis result] Failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not save winner analysis securely' });
+    }
+  }
   if (pathname === '/api/analyze-winner') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
