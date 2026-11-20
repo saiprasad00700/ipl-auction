@@ -1469,6 +1469,87 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not finalize RTM securely' });
     }
   }
+  if (pathname === '/api/bot-retention-decision') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const botUserId = String(body.botUserId || '').trim();
+      const decision = String(body.decision || '').trim();
+      const amount = Number(body.amount);
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId) || !/^bot_[A-Z0-9]{2,8}$/.test(botUserId)) return sendJson(res, 400, { error: 'Invalid room/server/bot identity' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const hostUid = decoded.uid;
+      if (!hostUid || /^(bot[_-]|auctionbot[_-])/i.test(hostUid)) return sendJson(res, 403, { error: 'Automated accounts cannot coordinate bot RTM decisions' });
+      if (!allowRoomActivityRequest(hostUid)) return sendJson(res, 429, { error: 'Bot RTM request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      if (room.hostId !== hostUid) return sendJson(res, 403, { error: 'Only the host can coordinate bot RTM decisions' });
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      const bot = roster.find((p) => p && p.id === botUserId && p.isBot === true);
+      if (!bot) return sendJson(res, 403, { error: 'Bot participant not found' });
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${botUserId}`);
+      const teamSnap = await teamRef.get();
+      const botTeam = teamSnap.exists() ? teamSnap.val() : null;
+      const liveSnap = await liveRef.get();
+      const live = liveSnap.val();
+      const { validateRetentionDecision } = await import('./api/retention-decision-auth.js');
+      const { validateRetentionCounterBid } = await import('./api/retention-counter-auth.js');
+      const now = Date.now();
+      let errorReason = null;
+      let transaction;
+      if (decision === 'accept' || decision === 'decline' || decision === 'match' || decision === 'decline_counter') {
+        const offer = live?.retentionOffer;
+        const validation = validateRetentionDecision({ offer, uid: botUserId, decision, now });
+        if (!validation.allowed) return sendJson(res, validation.status, { error: 'Bot RTM decision is not valid for this phase', reason: validation.reason });
+        transaction = await liveRef.transaction((current) => {
+          if (!current || current.status !== 'processing_sale') return;
+          const currentOffer = current.retentionOffer;
+          const check = validateRetentionDecision({ offer: currentOffer, uid: botUserId, decision, now: Date.now() });
+          if (!check.allowed) { errorReason = check.reason; return; }
+          currentOffer.decision = decision;
+          currentOffer.decidedBy = hostUid;
+          currentOffer.decidedAt = check.now;
+          if (currentOffer.phase === 'initial_decision' && decision === 'accept') {
+            currentOffer.rtmUsed = true;
+            currentOffer.phase = 'counter_bid';
+            currentOffer.expiresAt = check.now + 15000;
+          }
+          return current;
+        });
+      } else if (decision === 'counter_bid') {
+        const validation = validateRetentionCounterBid({ offer: live?.retentionOffer, uid: botUserId, amount, team: botTeam, now });
+        if (!validation.allowed) return sendJson(res, validation.status, { error: 'Bot counter-bid is not valid for the current RTM stage', reason: validation.reason });
+        transaction = await liveRef.transaction((current) => {
+          if (!current || current.status !== 'processing_sale') return;
+          const currentOffer = current.retentionOffer;
+          const check = validateRetentionCounterBid({ offer: currentOffer, uid: botUserId, amount, team: botTeam, now: Date.now() });
+          if (!check.allowed) { errorReason = check.reason; return; }
+          currentOffer.counterBid = check.counterBid;
+          currentOffer.phase = 'match_decision';
+          currentOffer.decision = null;
+          currentOffer.expiresAt = Date.now() + 10000;
+          current.currentBid = check.counterBid;
+          return current;
+        });
+      } else return sendJson(res, 400, { error: 'Unsupported bot RTM action' });
+      if (!transaction?.committed) return sendJson(res, 409, { error: 'Bot RTM action was not committed', reason: errorReason || 'transaction_not_committed' });
+      return sendJson(res, 200, { ok: true, action: decision, phase: transaction.snapshot.val()?.retentionOffer?.phase, currentBid: transaction.snapshot.val()?.currentBid });
+    } catch (error) {
+      console.warn('[Bot RTM decision] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not save bot RTM action securely' });
+    }
+  }
   if (pathname === '/api/retention-counter-bid') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
