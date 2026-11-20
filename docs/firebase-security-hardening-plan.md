@@ -25,6 +25,12 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Live player state advances to the next lot and room phase through client-side transactions/updates. This is a correctness/recovery mechanism, not a security boundary.
 - Server-authoritative auction settlement, purse/squad/retention integrity, membership-scoped room reads, and comprehensive Firebase Emulator tests remain unfinished.
 
+## Trusted winner-analysis result persistence
+- The client now sends completion/failure/retry mutations through `POST /api/winner-analysis-result`.
+- Server checks the Firebase token against the room's assigned project, host identity, and analysis phase. Completion payload ranks must use known franchise IDs, have no duplicate IDs, and contain sequential rank numbers.
+- The host still originates the result payload after the trusted AI analysis call; this endpoint protects the Firebase mutation boundary but is not a proof that the ranking payload came from the AI provider.
+- Disqualification/team XI persistence and analysis-phase claim/recovery still include direct client writes and remain audit/migration targets.
+
 ## Trusted franchise-claim migration
 - The client now routes franchise changes through `POST /api/claim-franchise`.
 - The trusted root transaction validates host/member identity, waiting-room phase, bans, and franchise occupancy; it updates the room roster and team state and removes a replaced bot's team record in the same root transaction.
@@ -44,6 +50,7 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Host adds/removes bots: allowed and consistent; non-host bot manipulation denied.
 - Host kicks a member: roster removal and ban persist; non-host, self-kick, and missing-target requests are denied.
 - Franchise claim/change: two concurrent claims for the same franchise produce exactly one winner; bot takeover preserves the human's team purse/squad and removes the bot record.
+- Winner-analysis completion/failure/retry: only host and expected analysis phase can mutate room result status; invalid/duplicate ranking entries rejected.
 - Human takeover of bot franchise: succeeds through intended flow without duplicate team.
 - Participant changes own purse/squad directly: denied.
 - Participant changes another team's purse/squad: denied.
