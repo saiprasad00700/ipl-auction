@@ -1088,14 +1088,16 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const bannedPlayers = Array.isArray(bannedRaw) ? bannedRaw : Object.keys(bannedRaw || {}).filter((key) => bannedRaw[key] === true);
       const transaction = await roomRef.transaction((currentRoom) => {
         if (!currentRoom) return;
-        const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers });
+        const currentBans = currentRoom?.bannedPlayers || bannedPlayers;
+        const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers: currentBans });
         if (!decision.allowed) return;
         const built = buildJoinedRoom({ room: currentRoom, uid, name, teamId, teamName: teamNames[teamId] });
         return { ...currentRoom, players: built.roster, lastActivityAt: Date.now() };
       });
       if (!transaction.committed) {
         const current = transaction.snapshot.val();
-        const decision = validateRoomJoin({ room: current, uid, teamId, bannedPlayers });
+        const currentBans = current?.bannedPlayers || bannedPlayers;
+        const decision = validateRoomJoin({ room: current, uid, teamId, bannedPlayers: currentBans });
         return sendJson(res, decision.status, { error: decision.reason });
       }
       // Team creation is idempotent and separate from the roster transaction.
