@@ -1315,75 +1315,21 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    
-    const data = rtdbRoomSnap.val();
-    const teamDetails = TEAMS.find(t => t.id === newTeamId);
-    
-    const existingPlayers = Array.isArray(data.players) ? data.players : [];
-    const playerIndex = existingPlayers.findIndex(p => p && (p.id === userId || p.userId === userId));
-    // Human players may take over a franchise currently occupied by a bot.
-    // Remove the bot roster entry before assigning the franchise to the human.
-    const botUserId = `bot_${newTeamId}`;
-    const rosterWithoutTeamBot = existingPlayers.filter(p =>
-      !(p && p.isBot && (p.team === newTeamId || p.id === botUserId))
-    );
-    const updatedPlayers = rosterWithoutTeamBot.map(p =>
-      p && (p.id === userId || p.userId === userId)
-        ? { ...p, id: userId, team: newTeamId, teamName: teamDetails?.name || 'Unknown' }
-        : p
-    );
-    // Repair older/malformed room rosters where the signed-in member is not
-    // present under either identifier instead of silently updating zero rows.
-    if (playerIndex === -1) {
-      updatedPlayers.push({
-        id: userId,
-        name: user?.displayName || user?.email || 'Manager',
-        team: newTeamId,
-        teamName: teamDetails?.name || 'Unknown',
-        isHost: false
-      });
-    }
-    // Write only to the child paths explicitly permitted for room members.
-    // A parent-level update at /room is host-only under database.rules.json.
-    await Promise.all([
-      set(ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`), updatedPlayers),
-      set(ref(getRoomDatabase(roomId), `auctions/${roomId}/room/lastActivityAt`), Date.now())
-    ]);
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    // Remove the replaced bot's franchise data, then update/create the human team.
-    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
-    // Update RTDB team node (0 Firestore cost in lobby!)
-    const rtdbTeamSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${userId}`));
-    if (rtdbTeamSnap.exists()) {
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${userId}`), {
-        teamId: newTeamId,
-        teamName: teamDetails?.name || 'Unknown'
-      });
-    } else {
-      const teamDataToSet = {
-        auctionId: roomId,
-        userId: userId,
-        teamId: newTeamId,
-        teamName: teamDetails?.name || 'Unknown',
-        budgetRemaining: data.settings?.budget || 120.0,
-        spent: 0,
-        squad: [],
-        retentionCardsRemaining: 2
-      };
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${userId}`), teamDataToSet);
-    }
+    if (!user || user.uid !== userId) throw new Error('Authenticated user does not match franchise claimant.');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/claim-franchise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, teamId: newTeamId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not claim franchise securely.');
+    return result;
   }, [user]);
-  
+
   const updateRoomSettings = useCallback(async (roomId, settings) => {
     if (!user) throw new Error('Sign in to update room settings.');
     const serverId = getRoomServerId(roomId);
