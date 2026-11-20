@@ -65,8 +65,27 @@ function allowAnalysis(ip) {
 }
 
 const guardianRequestsByIp = new Map();
+const roomActivityRequestsByUid = new Map();
 const analyticsRequestsByUid = new Map();
 const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
+const MAX_ROOM_ACTIVITY_REQUESTS_PER_MINUTE = 30;
+
+function allowRoomActivityRequest(uid) {
+  const now = Date.now();
+  const recent = (roomActivityRequestsByUid.get(uid) || []).filter((time) => now - time < WINDOW_MS);
+  if (recent.length >= MAX_ROOM_ACTIVITY_REQUESTS_PER_MINUTE) {
+    roomActivityRequestsByUid.set(uid, recent);
+    return false;
+  }
+  recent.push(now);
+  roomActivityRequestsByUid.set(uid, recent);
+  if (roomActivityRequestsByUid.size > 5000) {
+    for (const [key, values] of roomActivityRequestsByUid) {
+      if (!values.some((time) => now - time < WINDOW_MS)) roomActivityRequestsByUid.delete(key);
+    }
+  }
+  return true;
+}
 
 function allowAnalyticsRequest(uid) {
   const now = Date.now();
@@ -1049,6 +1068,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const { auth } = await getFirebaseAdminServices();
       const decoded = await auth.verifyIdToken(authorization.slice(7));
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
+      if (!allowRoomActivityRequest(decoded.uid)) return sendJson(res, 429, { error: 'Room activity update limit reached. Please wait before retrying.' });
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
       const { database } = await getDatabaseForServer(body.serverId || '1');
