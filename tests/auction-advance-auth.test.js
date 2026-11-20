@@ -24,6 +24,10 @@ test('advances to next player with reset auction state',()=>{
   assert.equal(result.live.timerEndsAt,16000);
 });
 
+test('rejects a current player not present in the auction order',()=>{
+  assert.equal(resolveAuctionAdvance({live:{...live,playerId:'unknown'},room,order:[0,1],players,now:1000}).reason,'current_player_not_in_order');
+});
+
 test('marks auction finished after final lot',()=>{
   const result=resolveAuctionAdvance({live:{...live,playerId:'p2'},room,order:[0,1],players,now:1000});
   assert.equal(result.action,'finish');
