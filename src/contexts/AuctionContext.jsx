@@ -1297,6 +1297,7 @@ export const AuctionProvider = ({ children }) => {
     // unauthenticated socket on room entry.
     const roomServerId = getRoomServerId(auctionId);
     const roomDatabase = getRoomDatabase(auctionId);
+    setLoading(true);
     const roomAuthReady = roomServerId === '3'
       ? ensureServer3Auth()
       : roomServerId === '2'
@@ -1309,8 +1310,6 @@ export const AuctionProvider = ({ children }) => {
       setLoading(false);
       handleFirebaseError(authError);
     });
-
-    setLoading(true);
     let auctionLoaded = false;
     let teamsLoaded = false;
     let messagesLoaded = false;
