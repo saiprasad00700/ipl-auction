@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Trusted sale-side effects
+- Durable sold-player team updates (squad append, purse deduction, spent total, and RTM card decrement) now call `POST /api/settle-sale`.
+- The endpoint verifies a room participant caller against the assigned Firebase project, validates that the live state is sold, verifies the winner/franchise roster entry and player catalog record, and commits the team record idempotently.
+- Team settlement checks squad size, overseas quota, purse affordability, and RTM-card availability. A repeated request returns the existing team record without double-charging.
+- Client sale settlement and recovery now use this endpoint, then reconcile room roster counters from the trusted team result.
+- Remaining trust gap: the client still controls transitions into `sold`/RTM-finalized live state. The settlement endpoint is not yet a complete trusted auction state machine; the bid-expiry/RTM offer opening/finalization and next-player progression still need server migration before restrictive Firebase live/team rules can safely be deployed.
+
 ## Server-authoritative retention decisions
 - Initial RTM accept/decline and original-franchise match/decline-counter decisions now use `POST /api/retention-decision`.
 - The server verifies the room's assigned Firebase project token, room membership, ban status, RTM phase, eligible manager identity, and offer expiry, then commits the phase/decision through a live-state transaction.
