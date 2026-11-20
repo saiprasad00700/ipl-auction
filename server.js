@@ -8,6 +8,7 @@ import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
 import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
 import { authorizeWinnerAnalysis } from './api/winner-analysis-auth.js';
 import { validateRtcAccount } from './api/voice-token-auth.js';
+import { PLAYING_XI_DEADLINE_MS } from './src/lib/auctionWinnerRules.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
