@@ -961,57 +961,28 @@ export const AuctionProvider = ({ children }) => {
     // This covers a coordinator disconnect after live.status became "sold" but
     // before the team squad/budget or room roster counters finished syncing.
     if (live.status === 'sold' && live.highBidderId && live.playerId) {
-      const [retentionRules, playerFranchises] = await Promise.all([
-        import('../lib/auctionWinnerRules'),
-        import('../data/playerOriginalFranchises')
-      ]);
-      const { RETENTION_CARDS_PER_FRANCHISE } = retentionRules;
-      const { getPlayerOriginalFranchise } = playerFranchises;
+      if (!user) throw new Error('Sign in required to recover sale settlement.');
+      const serverId = getRoomServerId(roomId);
+      if (serverId === '3') await ensureServer3Auth();
+      else if (serverId === '2') await ensureServer2Auth();
+      const idToken = await user.getIdToken();
       const teamDetails = TEAMS.find((t) => t.id === live.highBidderTeamId);
-      const teamRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
-      const defaultBudget = Number(roomData.settings?.budget ?? 120);
-      const offer = live.retentionOffer;
-      const successfullyRetainedPlayer = offer?.status === 'accepted'
-        && live.highBidderTeamId === offer.originalFranchiseId
-        && (offer.decision === 'match'
-          || (offer.phase === 'counter_bid' && offer.decision === 'accept'));
-
-      const teamTx = await runTransactionRtdb(teamRef, (current) => {
-        const team = current || {};
-        const squad = Array.isArray(team.squad) ? team.squad : [];
-        // A player in the squad means another client already applied the charge.
-        if (squad.some((p) => p?.id === live.playerId)) return;
-        return {
-          ...team,
-          auctionId: roomId,
-          userId: live.highBidderId,
-          teamId: live.highBidderTeamId || team.teamId || getPlayerOriginalFranchise(live.playerId) || '',
-          teamName: teamDetails?.name || live.highBidderName || team.teamName || 'Unknown',
-          budgetRemaining: Math.max(0, Number(team.budgetRemaining ?? defaultBudget) - Number(live.currentBid || 0)),
-          spent: Number(team.spent || 0) + Number(live.currentBid || 0),
-          retentionCardsRemaining: successfullyRetainedPlayer
-            ? Math.max(0, Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-            : Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0), rtmUsed: successfullyRetainedPlayer }]
-        };
+      const response = await fetch('/api/settle-sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId, teamName: teamDetails?.name || live.highBidderName || 'Unknown' })
       });
-      const finalTeam = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
-      if (!finalTeam) throw new Error('Sale recovery could not find or create the winning team record.');
-
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.team) throw new Error(result.error || 'Sale settlement recovery failed.');
+      const finalTeam = result.team;
       const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
       const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
         if (!Array.isArray(currentPlayers)) return;
         return currentPlayers.map((p) => p.id === live.highBidderId
-          ? {
-              ...p,
-              spent: Number(finalTeam.spent || 0),
-              squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0
-            }
+          ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0 }
           : p);
       });
-      if (!playersTx.committed) {
-        throw new Error('Sale recovery could not synchronize the room roster totals.');
-      }
+      if (!playersTx.committed) throw new Error('Sale recovery could not synchronize the room roster totals.');
     }
 
     let playerOrder = roomData.playerOrder;
