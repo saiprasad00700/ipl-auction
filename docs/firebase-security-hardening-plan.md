@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative auction progression
+- `POST /api/advance-auction` authenticates the room participant against the assigned Firebase project and validates the sold/unsold transition deadline.
+- It advances to the next ordered player with server-calculated timer reset, or transactionally marks the live auction as `awaiting_xi` and updates the room XI phase metadata at auction completion.
+- Both normal client progression and overdue-transition recovery now call the trusted endpoint rather than writing the next live player directly.
+- Unit tests cover transition wait, next-player advancement, and final-lot completion.
+- Remaining gap: the client still initiates the first expired-bidding transition and retention-offer creation. That is the next server-state-machine migration before restrictive RTDB rules.
+
 ## Server-authoritative RTM finalization
 - The `POST /api/retention-finalize` endpoint authenticates the caller against the room's assigned Firebase project and checks room membership and ban state.
 - Final RTM outcomes (original manager retain after counter-bid timeout, match decision, decline, or expiry) are resolved by a server transaction using server time.
