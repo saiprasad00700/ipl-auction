@@ -1665,96 +1665,27 @@ export const AuctionProvider = ({ children }) => {
   }, [user, currentAuction]);
 
   const placeBid = useCallback(async (amount) => {
-    if (!currentAuction) throw new Error("Auction not found!");
-    if (!user) throw new Error("Please log in to bid!");
-    if (!team) throw new Error("You must select a team in the lobby to participate!");
-    if (currentAuction.bannedPlayers && currentAuction.bannedPlayers.includes(user.uid)) {
-      throw new Error("You have been removed from this auction and cannot bid.");
-    }
-    if (currentAuction.currentAuction?.status !== 'bidding') throw new Error("Auction is not accepting bids right now.");
-    if (currentAuction.currentAuction?.highBidderId === user.uid) throw new Error("You are already the highest bidder!");
-
-    // Squad limit check
-    const squadLimit = currentAuction.squadLimit || 25;
-    if (team.squad && team.squad.length >= squadLimit) {
-      throw new Error(`You have reached the squad limit of ${squadLimit} players!`);
-    }
-
-    // Overseas limit check
-    const player = IPL_PLAYERS.find(p => p.id === currentAuction.currentAuction?.playerId);
-    const isOverseas = player && player.country !== 'IND';
-    const overseasLimit = currentAuction.overseasLimit || MEGA_OVERSEAS_LIMIT;
-    if (isOverseas && team.squad) {
-      const currentOverseasCount = team.squad.reduce((count, s) => {
-        const pInfo = IPL_PLAYERS.find(p => p.id === (typeof s === 'string' ? s : s.id));
-        return pInfo && pInfo.country !== 'IND' ? count + 1 : count;
-      }, 0);
-      if (currentOverseasCount >= overseasLimit) {
-        throw new Error(`You have reached the overseas quota of ${overseasLimit} players for this mode!`);
-      }
-    }
-
-    // ── Bug Fix 1: Budget pre-flight check OUTSIDE the transaction ──
-    // The transaction update function is retried by Firebase on conflicts — using team.budgetRemaining
-    // inside it reads a stale React closure each retry, not the live DB value. We do the check here
-    // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
-    const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0, player?.set);
-    const myBudget = team.budgetRemaining || 0;
-    if (myBudget < nextBidSnapshot) {
-      throw new Error('Insufficient budget to place this bid.');
-    }
-
-    const liveRef = ref(getRoomDatabase(currentAuction.id), `auctions/${currentAuction.id}/live`);
-    let txResult;
-    try {
-      txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData) return currentData;
-        if (currentData.status !== 'bidding') return; // normal abort
-        if (currentData.highBidderId === user.uid) return; // normal abort
-
-        const now = getSyncedTime();
-        // Server-side guard: Reject late bids if timer has already expired
-        if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
-          return; // normal abort
-        }
-
-        const cBid = currentData.currentBid || 0;
-        const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
-
-        // Guard: Abort retried transaction if updated bid exceeds user's budget
-        if (nAmount > myBudget) return;
-
-        currentData.currentBid = nAmount;
-        currentData.highBidderId = user.uid;
-        currentData.highBidderName = user.displayName || 'Manager';
-        currentData.highBidderTeamId = team.teamId;
-        currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000;
-        currentData.lastActivityAt = now;
-
-        return currentData;
-      });
-    } catch (error) {
-      const errorCode = error?.code || 'unknown';
-      const errorMessage = error?.message || String(error);
-      reportGuardianError({
-        operation: 'bidding',
-        severity: 'critical',
-        message: `Firebase bid transaction failed [${errorCode}]: ${errorMessage}`,
+    if (!currentAuction?.id) throw new Error('Auction not found!');
+    if (!user) throw new Error('Please log in to bid!');
+    if (!team) throw new Error('You must select a team in the lobby to participate!');
+    const roomServerId = getRoomServerId(currentAuction.id);
+    if (roomServerId === '3') await ensureServer3Auth();
+    else if (roomServerId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/place-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
         roomId: currentAuction.id,
-        fingerprint: `bid-transaction-error:${errorCode}`
-      });
-      throw error;
-    }
-
-    if (!txResult.committed) {
-      // Firebase uses committed=false for intentional aborts as well as
-      // transactions that do not write. These are normal bid-race/validation
-      // outcomes and must not be reported as critical infrastructure errors.
-      throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
-    }
+        serverId: roomServerId,
+        name: user.displayName || 'Manager'
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Bid failed.');
     void trackAnalyticsEvent('bid', currentAuction.id);
-  }, [currentAuction, user, team, getSyncedTime]);
+    return result;
+  }, [currentAuction, user, team]);
 
   const decideRetention = useCallback(async (roomId, decision) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
