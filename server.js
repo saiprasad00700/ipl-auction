@@ -321,7 +321,10 @@ async function cleanupAbandonedRooms() {
         const status = liveStatus || roomStatus || 'waiting';
         const isWaiting = status === 'waiting';
         const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
-        if (!isWaiting && !isStarted) continue;
+        if (!isWaiting && !isStarted) {
+          console.log('[Room cleanup] Preserving room with unrecognized/non-live status:', roomId, status);
+          continue;
+        }
 
         // Presence heartbeats are intentionally excluded: players may remain
         // online without using the room, and must not prevent idle-room cleanup.
@@ -332,11 +335,13 @@ async function cleanupAbandonedRooms() {
         const lastActivityAt = Math.max(
           Number(room.lastActivityAt || 0),
           Number(room.createdAt || 0),
-          Number(roomNode?.live?.lastActivityAt || 0),
           messageActivity
         );
         // Do not guess when a legacy room has no trustworthy timestamp.
-        if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) continue;
+        if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) {
+          console.warn('[Room cleanup] Preserving room with missing/invalid activity timestamp:', roomId);
+          continue;
+        }
         if (now - lastActivityAt < ROOM_IDLE_TIMEOUT_MS) continue;
       }
 
@@ -1109,6 +1114,9 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
         tokenExpirationSeconds, privilegeExpirationSeconds
       );
+      // Only a successful voice-chat token issuance counts as activity.
+      // Mere online presence or failed token requests do not keep rooms alive.
+      await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
       return sendJson(res, 200, {
         appId, channelName, token, uid: rtcAccount,
         expiresIn: tokenExpirationSeconds,
