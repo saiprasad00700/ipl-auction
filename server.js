@@ -1578,18 +1578,21 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
     let decoded;
     let body;
+    let serverId;
+    let database;
     try {
-      const { auth } = await getFirebaseAdminServices();
-      decoded = await auth.verifyIdToken(authorization.slice(7));
       body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[123][A-Z0-9]{4,12}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room code' });
+      serverId = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      database = services.database;
     } catch (error) {
       return sendJson(res, error.message === 'Request body too large' ? 413 : 401, { error: 'Authentication or request validation failed' });
     }
     const roomId = String(body.roomId || '').trim();
-    if (!/^[123][A-Z0-9]{4,12}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room code' });
     try {
-      const serverId = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
-      const { database } = await getDatabaseForServer(serverId);
       const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
       const roomData = roomSnapshot.val() || {};
