@@ -5,6 +5,7 @@ import { validateSaleSettlement } from '../api/sale-settlement-auth.js';
 const room = { players: [{ id: 'u1', team: 'CSK', isBot: false }] };
 const live = { status: 'sold', playerId: 'p1', highBidderId: 'u1', highBidderTeamId: 'CSK', currentBid: 2 };
 const players = [{ id: 'p1' }];
+const team = { userId: 'u1' };
 
 test('validates a sold player and participant winner', () => {
   const result = validateSaleSettlement({ room, live, team: { userId: 'u1' }, players });
