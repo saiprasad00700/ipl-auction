@@ -149,23 +149,8 @@
           }
         },
 
-        // Team records are protected individually. Only the owner, room host,
-        // current winning bidder during a settled sale, or a waiting-room member
-        // replacing a bot may modify a team record.
         "teams": {
-          ".read": "auth != null",
-          "$teamKey": {
-            ".write": "auth != null && (auth.uid == data.child('userId').val() || auth.uid == newData.child('userId').val() || auth.uid == root.child('auctions').child($roomId).child('room/hostId').val() || (auth.uid == root.child('auctions').child($roomId).child('live/highBidderId').val() && (root.child('auctions').child($roomId).child('live/status').val() == 'sold' || root.child('auctions').child($roomId).child('live/status').val() == 'processing_sale')) || (data.child('userId').val().beginsWith('bot_') && root.child('auctions').child($roomId).child('room/status').val() == 'waiting' && root.child('auctions').child($roomId).child('room/players').hasChild(auth.uid)))",
-            ".validate": "!newData.exists() || (newData.hasChildren(['auctionId', 'userId', 'teamId', 'teamName', 'budgetRemaining', 'spent', 'squad']) && newData.child('auctionId').val() == $roomId && newData.child('userId').isString() && newData.child('teamId').isString() && newData.child('teamName').isString() && newData.child('budgetRemaining').isNumber() && newData.child('budgetRemaining').val() >= 0 && newData.child('spent').isNumber() && newData.child('spent').val() >= 0 && newData.child('squad').isList())",
-            "auctionId": { ".validate": "newData.val() == $roomId" },
-            "userId": { ".validate": "newData.isString() && newData.val().length <= 128" },
-            "teamId": { ".validate": "newData.isString() && newData.val().length <= 32" },
-            "teamName": { ".validate": "newData.isString() && newData.val().length <= 80" },
-            "budgetRemaining": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-            "spent": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-            "squad": { ".validate": "newData.isList() && newData.val().size() <= 30" },
-            "retentionCardsRemaining": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 2)" }
-          }
+          ".write": "auth != null"
         },
 
         // A user may only write their own presence entry.
