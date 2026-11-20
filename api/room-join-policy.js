@@ -10,7 +10,10 @@ export function validateRoomJoin({ room, uid, teamId, bannedPlayers = [] }) {
   if (!['waiting', 'lobby', ''].includes(String(room.status || 'waiting'))) return { allowed: false, status: 409, reason: 'join_closed' };
   const players = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
   const existing = players.find((player) => player && (player.id === uid || player.userId === uid));
-  if (teamId && !existing) {
+  if (existing && existing.team && teamId && existing.team !== teamId) {
+    return { allowed: false, status: 409, reason: 'team_change_requires_explicit_transfer' };
+  }
+  if (teamId) {
     const conflict = players.find((player) => player && player.id !== uid && player.userId !== uid && player.team === teamId);
     if (conflict) return { allowed: false, status: 409, reason: 'franchise_taken' };
   }
