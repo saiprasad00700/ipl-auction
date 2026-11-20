@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import analyzeWinner from './api/analyze-winner.js';
 import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
 import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
+import { authorizeWinnerAnalysis } from './api/winner-analysis-auth.js';
+import { validateRtcAccount } from './api/voice-token-auth.js';
+import { PLAYING_XI_DEADLINE_MS } from './src/lib/auctionWinnerRules.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -63,8 +66,27 @@ function allowAnalysis(ip) {
 }
 
 const guardianRequestsByIp = new Map();
+const roomActivityRequestsByUid = new Map();
 const analyticsRequestsByUid = new Map();
 const MAX_ANALYTICS_REQUESTS_PER_MINUTE = 120;
+const MAX_ROOM_ACTIVITY_REQUESTS_PER_MINUTE = 30;
+
+function allowRoomActivityRequest(uid) {
+  const now = Date.now();
+  const recent = (roomActivityRequestsByUid.get(uid) || []).filter((time) => now - time < WINDOW_MS);
+  if (recent.length >= MAX_ROOM_ACTIVITY_REQUESTS_PER_MINUTE) {
+    roomActivityRequestsByUid.set(uid, recent);
+    return false;
+  }
+  recent.push(now);
+  roomActivityRequestsByUid.set(uid, recent);
+  if (roomActivityRequestsByUid.size > 5000) {
+    for (const [key, values] of roomActivityRequestsByUid) {
+      if (!values.some((time) => now - time < WINDOW_MS)) roomActivityRequestsByUid.delete(key);
+    }
+  }
+  return true;
+}
 
 function allowAnalyticsRequest(uid) {
   const now = Date.now();
@@ -1039,18 +1061,954 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if(pathname==='/api/room-settings'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      if(!decoded.uid||/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid))return sendJson(res,403,{error:'Automated accounts cannot update settings'});
+      if(!allowRoomActivityRequest(decoded.uid))return sendJson(res,429,{error:'Settings request limit reached. Please wait before retrying.'});
+      const roomRef=services.database.ref(`auctions/${roomId}/room`);
+      const {validateRoomSettings}=await import('./api/room-settings-auth.js');
+      let reason=null,finalSettings=null;
+      const tx=await roomRef.transaction(room=>{
+        const result=validateRoomSettings({room,uid:decoded.uid,settings:body.settings});
+        if(!result.allowed){reason=result.reason;return;}
+        finalSettings=result.settings;
+        return {...room,settings:finalSettings,lastActivityAt:Date.now()};
+      });
+      if(!tx.committed)return sendJson(res,reason==='host_only'?403:400,{error:reason==='host_only'?'Only the host can update room settings.':'Room settings are invalid.',reason});
+      return sendJson(res,200,{ok:true,settings:finalSettings});
+    }catch(error){
+      console.warn('[Room settings] Update failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not update room settings securely'});
+    }
+  }
+  if (pathname === '/api/submit-playing-xi') {
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Bots cannot submit a Playing XI'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Playing XI submission limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room),teamRef=database.ref(`auctions/${roomId}/teams/${roomId}_${uid}`);
+      const [roomSnap,teamSnap]=await Promise.all([roomRef.get(),teamRef.get()]);
+      if(!roomSnap.exists())return sendJson(res,404,{error:'Room not found'});
+      if(!teamSnap.exists())return sendJson(res,404,{error:'Franchise squad not found'});
+      const room=roomSnap.val(),team=teamSnap.val();
+      const roster=Array.isArray(room.players)?room.players:Object.values(room.players||{});
+      if(!roster.some(p=>p&&p.id===uid&&!p.isBot))return sendJson(res,403,{error:'Room participant required'});
+      const banned=Array.isArray(room.bannedPlayers)?room.bannedPlayers:Object.keys(room.bannedPlayers||{}).filter(key=>room.bannedPlayers[key]===true);
+      if(banned.includes(uid))return sendJson(res,403,{error:'You are banned from this room'});
+      if(room.status!=='awaiting_xi')return sendJson(res,409,{error:'Playing XI submissions are closed'});
+      if(Date.now()>Number(room.xiSubmissionDeadline||0))return sendJson(res,409,{error:'Playing XI submission deadline has passed'});
+      if(team.disqualified)return sendJson(res,403,{error:team.disqualificationReason||'Franchise is disqualified'});
+      const {IPL_PLAYERS}=await import('./src/data/players.js');
+      const {validatePlayingXIOptions}=await import('./src/lib/auctionWinnerRules.js');
+      const startingXI=body.startingXI,impactPlayerChasing=body.impactPlayerChasing,impactPlayerDefending=body.impactPlayerDefending;
+      if(!validatePlayingXIOptions(startingXI,impactPlayerChasing,impactPlayerDefending,team.squad||[],IPL_PLAYERS))return sendJson(res,400,{error:'Invalid Playing XI or Impact Player selection'});
+      const submittedAt=Date.now();
+      const tx=await teamRef.transaction(current=>{
+        if(!current||current.userId!==uid||current.disqualified)return;
+        return {...current,playingXI:{startingXI,impactPlayerChasing,impactPlayerDefending,impactPlayer:impactPlayerChasing,submittedAt,autoSelected:false}};
+      });
+      if(!tx.committed)return sendJson(res,409,{error:'Playing XI submission could not be saved. Squad or status may have changed.'});
+      await database.ref(`auctions/${roomId}/messages`).push({userId:'system',userName:'System',text:`${team.teamName||team.teamId} submitted its Playing XI.`,type:'log',timestamp:Date.now()});
+      return sendJson(res,200,{ok:true,playingXI:tx.snapshot.val()?.playingXI});
+    }catch(error){
+      console.warn('[Playing XI] Submission failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not submit Playing XI securely'});
+    }
+  }
+  if (pathname === '/api/end-auction') {
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      if(!decoded.uid||/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid))return sendJson(res,403,{error:'Automated accounts cannot end auctions'});
+      if(!allowRoomActivityRequest(decoded.uid))return sendJson(res,429,{error:'Auction end request limit reached. Please wait before retrying.'});
+      const database=services.database,rootRef=database.ref(`auctions/${roomId}`);
+      const {resolveAuctionEnd}=await import('./api/auction-end-auth.js');
+      const {PLAYING_XI_DEADLINE_MS}=await import('./src/lib/auctionWinnerRules.js');
+      let reason=null;
+      const tx=await rootRef.transaction(current=>{
+        if(!current?.room){reason='room_not_found';return;}
+        const result=resolveAuctionEnd({room:current.room,teams:current.teams||{},uid:decoded.uid,now:Date.now(),xiDeadlineMs:PLAYING_XI_DEADLINE_MS});
+        if(!result.allowed){reason=result.reason;return;}
+        return {...current,room:result.room,teams:{...(current.teams||{}),...result.teams}};
+      });
+      if(!tx.committed)return sendJson(res,reason==='host_only'?403:409,{error:reason==='host_only'?'Only the host can end the auction.':'Auction is already ended or cannot be ended now.',reason});
+      return sendJson(res,200,{ok:true,room:tx.snapshot.val().room,disqualified: Object.values(tx.snapshot.val().teams||{}).filter(t=>t?.disqualified).map(t=>t.teamName||t.teamId)});
+    }catch(error){
+      console.warn('[Auction end] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not end auction securely'});
+    }
+  }
+  if (pathname === '/api/auction-pause') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),action=String(body.action||'');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId)||!['pause','resume'].includes(action))return sendJson(res,400,{error:'Invalid room/server/action'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      const uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot pause/resume auctions'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Pause/resume request limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room`),liveRef=database.ref(`auctions/${roomId}/live`);
+      const roomSnap=await roomRef.get();
+      if(!roomSnap.exists())return sendJson(res,404,{error:'Room not found'});
+      if(roomSnap.val().hostId!==uid)return sendJson(res,403,{error:'Only the host can pause or resume the auction'});
+      const {applyAuctionPauseResume}=await import('./api/auction-pause-auth.js');
+      let reason=null;
+      const tx=await liveRef.transaction(current=>{
+        const result=applyAuctionPauseResume({live:current,action,now:Date.now()});
+        if(!result.allowed){reason=result.reason;return;}
+        return result.live;
+      });
+      if(!tx.committed)return sendJson(res,409,{error:reason==='already_paused'?'Auction is already paused.':reason==='not_paused'?'Auction is not paused.':'Auction cannot be paused/resumed in its current state.',reason});
+      if(action==='resume')await database.ref(`auctions/${roomId}/pauseRequests`).remove();
+      await database.ref(`auctions/${roomId}/messages`).push({userId:'system',userName:'System',text:action==='pause'?'Auction PAUSED by Admin':'Auction RESUMED by Admin',type:'log',timestamp:Date.now()});
+      return sendJson(res,200,{ok:true,live:tx.snapshot.val()});
+    }catch(error){
+      console.warn('[Auction pause/resume] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not pause/resume auction securely'});
+    }
+  }
+  if (pathname === '/api/start-auction') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot start auctions' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Auction start request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const rootRef = database.ref(`auctions/${roomId}`);
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { buildAuctionStart } = await import('./api/auction-start-auth.js');
+      let reason = null;
+      const transaction = await rootRef.transaction((current) => {
+        const room = current?.room;
+        if (!room || room.hostId !== uid) { reason = 'host_only'; return; }
+        const result = buildAuctionStart({ room, players: IPL_PLAYERS, now: Date.now(), bidTimerSeconds: room.settings?.bidTimer || 15 });
+        if (!result.allowed) { reason = result.reason; return; }
+        return { ...current, room: result.room, playerOrder: result.order, live: result.live };
+      });
+      if (!transaction.committed) {
+        const status = reason === 'host_only' ? 403 : 409;
+        return sendJson(res, status, { error: reason === 'minimum_members' ? 'Invite at least one friend or add a bot to start.' : reason === 'room_not_waiting' ? 'Auction already started or room is not waiting.' : 'Auction could not be started.', reason });
+      }
+      const finalRoom = transaction.snapshot.val()?.room;
+      if (finalRoom?.isPublic) {
+        try { await database.ref(`publicRooms/${roomId}`).update({ status: 'active' }); } catch {}
+      }
+      return sendJson(res, 200, { ok: true, roomId, room: finalRoom, live: transaction.snapshot.val()?.live, playerOrder: transaction.snapshot.val()?.playerOrder });
+    } catch (error) {
+      console.warn('[Auction start] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not start auction securely' });
+    }
+  }
+  if (pathname === '/api/advance-auction') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot advance auction lots' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Auction advance request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const orderSnap = await database.ref(`auctions/${roomId}/playerOrder`).get();
+      const order = orderSnap.exists() ? orderSnap.val() : room.playerOrder;
+      const { resolveAuctionAdvance } = await import('./api/auction-advance-auth.js');
+      let reason = null;
+      const tx = await liveRef.transaction((current) => {
+        const result = resolveAuctionAdvance({ live: current, room, order, players: IPL_PLAYERS, now: Date.now(), bidTimerSeconds: room.settings?.bidTimer || 15 });
+        if (!result.allowed) { reason = result.reason; return; }
+        return result.live;
+      });
+      if (!tx.committed) return sendJson(res, 409, { error: reason === 'transition_waiting' ? 'Player transition timer is still active.' : 'Auction progression was not committed.', reason: reason || 'transaction_not_committed' });
+      const finalLive = tx.snapshot.val();
+      if (finalLive.status === 'awaiting_xi') {
+        const now = Date.now();
+        const usesSquadBalanceAnalysis = room.auctionType !== 'mega';
+        await roomRef.update({
+          status: 'awaiting_xi',
+          xiSubmissionStartedAt: now,
+          xiSubmissionDeadline: usesSquadBalanceAnalysis ? now : now + PLAYING_XI_DEADLINE_MS,
+          winnerAnalysisStatus: 'collecting'
+        });
+      }
+      return sendJson(res, 200, { ok: true, live: finalLive, finished: finalLive.status === 'awaiting_xi' });
+    } catch (error) {
+      console.warn('[Auction advance] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not advance auction securely' });
+    }
+  }
+  if (pathname === '/api/settle-sale') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot request settlement recovery' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Settlement request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      const liveSnap = await liveRef.get();
+      if (!roomSnap.exists() || !liveSnap.exists()) return sendJson(res, 404, { error: 'Room or live state not found' });
+      const room = roomSnap.val();
+      const live = liveSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { validateSaleSettlement } = await import('./api/sale-settlement-auth.js');
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
+      const teamSnap = await teamRef.get();
+      const existingTeam = teamSnap.exists() ? teamSnap.val() : null;
+      const validation = validateSaleSettlement({ room, live, team: existingTeam, players: IPL_PLAYERS });
+      if (!validation.allowed) return sendJson(res, validation.status, { error: 'Sale settlement is not valid for the current auction state', reason: validation.reason });
+      const player = IPL_PLAYERS.find((p) => p.id === validation.playerId);
+      const teamName = String(body.teamName || live.highBidderName || 'Unknown').slice(0, 80);
+      const defaultBudget = Number(room.settings?.budget ?? 120);
+      const retentionCardsDefault = 2;
+      const transaction = await teamRef.transaction((currentTeam) => {
+        const team = currentTeam || {};
+        const squad = Array.isArray(team.squad) ? team.squad : [];
+        if (squad.some((item) => (typeof item === 'string' ? item : item?.id) === validation.playerId)) return;
+        if (squad.length >= Number(room.squadLimit || 25)) return;
+        const overseasLimit = Number(room.overseasLimit || 8);
+        const overseasCount = squad.reduce((count, item) => {
+          const squadPlayerId = typeof item === 'string' ? item : item?.id;
+          const squadPlayer = IPL_PLAYERS.find((candidate) => candidate.id === squadPlayerId);
+          return count + (squadPlayer && squadPlayer.country !== 'IND' ? 1 : 0);
+        }, 0);
+        if (player.country !== 'IND' && overseasCount >= overseasLimit) return;
+        const remaining = Number(team.budgetRemaining ?? defaultBudget);
+        if (remaining < validation.bid) return;
+        if (validation.retained && Number(team.retentionCardsRemaining ?? retentionCardsDefault) < 1) return;
+        return {
+          ...team,
+          auctionId: roomId,
+          userId: validation.uid,
+          teamId: validation.teamId,
+          teamName,
+          budgetRemaining: Math.max(0, remaining - validation.bid),
+          spent: Number(team.spent || 0) + validation.bid,
+          retentionCardsRemaining: validation.retained
+            ? Math.max(0, Number(team.retentionCardsRemaining ?? retentionCardsDefault) - 1)
+            : Number(team.retentionCardsRemaining ?? retentionCardsDefault),
+          squad: [...squad, { id: validation.playerId, bid: validation.bid, rtmUsed: validation.retained }]
+        };
+      });
+      if (!transaction.committed) {
+        const latest = transaction.snapshot?.val();
+        if (latest?.squad?.some((item) => (typeof item === 'string' ? item : item?.id) === validation.playerId)) {
+          return sendJson(res, 200, { ok: true, applied: false, alreadySettled: true, team: latest });
+        }
+        return sendJson(res, 409, { error: 'Sale settlement could not be applied. Team limits or budget may have changed.' });
+      }
+      return sendJson(res, 200, { ok: true, applied: true, team: transaction.snapshot.val() });
+    } catch (error) {
+      console.warn('[Sale settlement] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not settle sale securely' });
+    }
+  }
+  if (pathname === '/api/finalize-bidding') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot finalize bidding' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Auction finalization request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const teamsRef = database.ref(`auctions/${roomId}/teams`);
+      const [roomSnap, teamsSnap] = await Promise.all([roomRef.get(), teamsRef.get()]);
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { getPlayerOriginalFranchise } = await import('./src/data/playerOriginalFranchises.js');
+      const { canUseRetentionCard, RETENTION_DECISION_MS, RETENTION_CARDS_PER_FRANCHISE } = await import('./src/lib/auctionWinnerRules.js');
+      const { MEGA_OVERSEAS_LIMIT } = await import('./src/lib/auctionRules.js');
+      const { resolveExpiredBidding } = await import('./api/expired-bidding-auth.js');
+      const teams = teamsSnap.exists() ? teamsSnap.val() : {};
+      let reason = null;
+      const tx = await liveRef.transaction((current) => {
+        const result = resolveExpiredBidding({
+          live: current, room, roomPlayers: roster, teams, players: IPL_PLAYERS, now: Date.now(),
+          originalFranchiseResolver: getPlayerOriginalFranchise, canUseRetentionCard,
+          retentionDecisionMs: RETENTION_DECISION_MS, retentionCardsDefault: RETENTION_CARDS_PER_FRANCHISE,
+          megaOverseasLimit: MEGA_OVERSEAS_LIMIT
+        });
+        if (!result.allowed) { reason = result.reason; return; }
+        return result.live;
+      });
+      if (!tx.committed) return sendJson(res, 409, { error: reason === 'bid_timer_open' ? 'The bid timer is still running.' : 'Bidding finalization was not committed.', reason: reason || 'transaction_not_committed' });
+      return sendJson(res, 200, { ok: true, live: tx.snapshot.val() });
+    } catch (error) {
+      console.warn('[Bidding finalize] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not finalize bidding securely' });
+    }
+  }
+  if (pathname === '/api/retention-finalize') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot finalize RTM offers' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'RTM finalize request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { resolveRetentionOffer } = await import('./api/retention-finalize-auth.js');
+      let reason = null;
+      const tx = await liveRef.transaction((current) => {
+        const result = resolveRetentionOffer({ live: current, now: Date.now() });
+        if (!result.allowed) { reason = result.reason; return; }
+        return result.live;
+      });
+      if (!tx.committed) {
+        return sendJson(res, 409, { error: reason === 'window_open' ? 'The RTM decision window is still open.' : 'RTM finalization was not committed.', reason: reason || 'transaction_not_committed' });
+      }
+      return sendJson(res, 200, { ok: true, live: tx.snapshot.val() });
+    } catch (error) {
+      console.warn('[RTM finalize] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not finalize RTM securely' });
+    }
+  }
+  if (pathname === '/api/bot-retention-decision') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const botUserId = String(body.botUserId || '').trim();
+      const decision = String(body.decision || '').trim();
+      const amount = Number(body.amount);
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId) || !/^bot_[A-Z0-9]{2,8}$/.test(botUserId)) return sendJson(res, 400, { error: 'Invalid room/server/bot identity' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const hostUid = decoded.uid;
+      if (!hostUid || /^(bot[_-]|auctionbot[_-])/i.test(hostUid)) return sendJson(res, 403, { error: 'Automated accounts cannot coordinate bot RTM decisions' });
+      if (!allowRoomActivityRequest(hostUid)) return sendJson(res, 429, { error: 'Bot RTM request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      if (room.hostId !== hostUid) return sendJson(res, 403, { error: 'Only the host can coordinate bot RTM decisions' });
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      const bot = roster.find((p) => p && p.id === botUserId && p.isBot === true);
+      if (!bot) return sendJson(res, 403, { error: 'Bot participant not found' });
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${botUserId}`);
+      const teamSnap = await teamRef.get();
+      const botTeam = teamSnap.exists() ? teamSnap.val() : null;
+      const liveSnap = await liveRef.get();
+      const live = liveSnap.val();
+      const { validateRetentionDecision } = await import('./api/retention-decision-auth.js');
+      const { validateRetentionCounterBid } = await import('./api/retention-counter-auth.js');
+      const now = Date.now();
+      let errorReason = null;
+      let transaction;
+      if (decision === 'accept' || decision === 'decline' || decision === 'match' || decision === 'decline_counter') {
+        const offer = live?.retentionOffer;
+        const validation = validateRetentionDecision({ offer, uid: botUserId, decision, now });
+        if (!validation.allowed) return sendJson(res, validation.status, { error: 'Bot RTM decision is not valid for this phase', reason: validation.reason });
+        transaction = await liveRef.transaction((current) => {
+          if (!current || current.status !== 'processing_sale') return;
+          const currentOffer = current.retentionOffer;
+          const check = validateRetentionDecision({ offer: currentOffer, uid: botUserId, decision, now: Date.now() });
+          if (!check.allowed) { errorReason = check.reason; return; }
+          currentOffer.decision = decision;
+          currentOffer.decidedBy = hostUid;
+          currentOffer.decidedAt = check.now;
+          if (currentOffer.phase === 'initial_decision' && decision === 'accept') {
+            currentOffer.rtmUsed = true;
+            currentOffer.phase = 'counter_bid';
+            currentOffer.expiresAt = check.now + 15000;
+          }
+          return current;
+        });
+      } else if (decision === 'counter_bid') {
+        const validation = validateRetentionCounterBid({ offer: live?.retentionOffer, uid: botUserId, amount, team: botTeam, now });
+        if (!validation.allowed) return sendJson(res, validation.status, { error: 'Bot counter-bid is not valid for the current RTM stage', reason: validation.reason });
+        transaction = await liveRef.transaction((current) => {
+          if (!current || current.status !== 'processing_sale') return;
+          const currentOffer = current.retentionOffer;
+          const check = validateRetentionCounterBid({ offer: currentOffer, uid: botUserId, amount, team: botTeam, now: Date.now() });
+          if (!check.allowed) { errorReason = check.reason; return; }
+          currentOffer.counterBid = check.counterBid;
+          currentOffer.phase = 'match_decision';
+          currentOffer.decision = null;
+          currentOffer.expiresAt = Date.now() + 10000;
+          current.currentBid = check.counterBid;
+          return current;
+        });
+      } else return sendJson(res, 400, { error: 'Unsupported bot RTM action' });
+      if (!transaction?.committed) return sendJson(res, 409, { error: 'Bot RTM action was not committed', reason: errorReason || 'transaction_not_committed' });
+      return sendJson(res, 200, { ok: true, action: decision, phase: transaction.snapshot.val()?.retentionOffer?.phase, currentBid: transaction.snapshot.val()?.currentBid });
+    } catch (error) {
+      console.warn('[Bot RTM decision] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not save bot RTM action securely' });
+    }
+  }
+  if (pathname === '/api/retention-counter-bid') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const amount = Number(body.amount);
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot submit counter-bids' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'RTM request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${uid}`);
+      const [roomSnap, teamSnap] = await Promise.all([roomRef.get(), teamRef.get()]);
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const team = teamSnap.exists() ? teamSnap.val() : null;
+      const { validateRetentionCounterBid } = await import('./api/retention-counter-auth.js');
+      const now = Date.now();
+      const validation = validateRetentionCounterBid({ offer: (await liveRef.get()).val()?.retentionOffer, uid, amount, team, now });
+      if (!validation.allowed) return sendJson(res, validation.status, { error: validation.reason === 'insufficient_budget' ? 'Counter-bid exceeds your remaining budget.' : validation.reason === 'offer_expired' ? 'The counter-bid window has expired.' : 'Counter-bid is not valid for the current RTM stage.', reason: validation.reason });
+      const transaction = await liveRef.transaction((current) => {
+        if (!current || current.status !== 'processing_sale') return;
+        const offer = current.retentionOffer;
+        const currentValidation = validateRetentionCounterBid({ offer, uid, amount, team, now: Date.now() });
+        if (!currentValidation.allowed || currentValidation.counterBid !== validation.counterBid) return;
+        offer.counterBid = currentValidation.counterBid;
+        offer.phase = 'match_decision';
+        offer.decision = null;
+        offer.expiresAt = Date.now() + 10000;
+        current.currentBid = currentValidation.counterBid;
+        return current;
+      });
+      if (!transaction.committed) return sendJson(res, 409, { error: 'Counter-bid was not saved. The RTM window may have changed or expired.' });
+      return sendJson(res, 200, { ok: true, roomId, counterBid: validation.counterBid, expiresAt: transaction.snapshot.val()?.retentionOffer?.expiresAt });
+    } catch (error) {
+      console.warn('[RTM counter-bid] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not submit counter-bid securely' });
+    }
+  }
+  if (pathname === '/api/retention-decision') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const decisionValue = String(body.decision || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot make RTM decisions' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'RTM request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { validateRetentionDecision } = await import('./api/retention-decision-auth.js');
+      const now = Date.now();
+      let decisionError = null;
+      const transaction = await liveRef.transaction((current) => {
+        if (!current || current.status !== 'processing_sale') return;
+        const offer = current.retentionOffer;
+        const validation = validateRetentionDecision({ offer, uid, decision: decisionValue, now });
+        if (!validation.allowed) { decisionError = validation.reason; return; }
+        if (offer.phase === 'initial_decision' && decisionValue === 'accept') {
+          offer.rtmUsed = true;
+          offer.phase = 'counter_bid';
+          offer.decision = 'accept';
+          offer.decidedBy = uid;
+          offer.decidedAt = validation.now;
+          offer.expiresAt = validation.now + 15000;
+        } else {
+          offer.decision = decisionValue;
+          offer.decidedBy = uid;
+          offer.decidedAt = validation.now;
+        }
+        return current;
+      });
+      if (!transaction.committed) return sendJson(res, 409, { error: decisionError === 'offer_expired' ? 'The RTM offer has expired.' : 'Your RTM decision was not saved. Please try again if the offer is still open.', reason: decisionError || 'transaction_not_committed' });
+      return sendJson(res, 200, { ok: true, roomId, decision: decisionValue, phase: transaction.snapshot.val()?.retentionOffer?.phase });
+    } catch (error) {
+      console.warn('[RTM decision] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not save RTM decision securely' });
+    }
+  }
+  if (pathname === '/api/place-bot-bid') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),botUserId=String(body.botUserId||'');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot coordinate bot bids'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Bot-bid request limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room`),liveRef=database.ref(`auctions/${roomId}/live`);
+      const [roomSnap,liveSnap]=await Promise.all([roomRef.get(),liveRef.get()]);
+      if(!roomSnap.exists()||!liveSnap.exists())return sendJson(res,404,{error:'Room or live state not found'});
+      const room=roomSnap.val(),live=liveSnap.val();
+      const teamRef=database.ref(`auctions/${roomId}/teams/${roomId}_${botUserId}`),teamSnap=await teamRef.get();
+      if(!teamSnap.exists())return sendJson(res,404,{error:'Bot team record not found'});
+      const team=teamSnap.val();
+      const {IPL_PLAYERS}=await import('./src/data/players.js');
+      const {evaluateBotBid}=await import('./src/lib/botEngine.js');
+      const player=IPL_PLAYERS.find(p=>p.id===live.playerId);
+      if(!player)return sendJson(res,409,{error:'Current player is invalid'});
+      const decision=evaluateBotBid({player,currentBid:Number(live.currentBid||0),highBidderId:live.highBidderId,botTeam:team,squadLimit:Number(room.squadLimit||25),overseasLimit:Number(room.overseasLimit||8),initialBudget:Number(room.settings?.budget||120)});
+      const {validateBotBidRequest}=await import('./api/bot-bid-auth.js');
+      const validation=validateBotBidRequest({room,live,team,uid,botUserId,now:Date.now(),decision});
+      if(!validation.allowed)return sendJson(res,validation.status,{error:'Bot bid is not eligible for this auction state.',reason:validation.reason});
+      const expected={playerId:live.playerId,currentBid:Number(live.currentBid||0),highBidderId:live.highBidderId||'',highBidderTeamId:live.highBidderTeamId||'',timerEndsAt:Number(live.timerEndsAt||0)};
+      let reason=null;
+      const tx=await liveRef.transaction(current=>{
+        if(!current||current.status!=='bidding'||current.isPaused){reason='auction_not_bidding';return;}
+        if(current.playerId!==expected.playerId||Number(current.currentBid||0)!==expected.currentBid||(current.highBidderId||'')!==expected.highBidderId||(current.highBidderTeamId||'')!==expected.highBidderTeamId||Number(current.timerEndsAt||0)!==expected.timerEndsAt){reason='live_state_changed';return;}
+        const fresh=validateBotBidRequest({room,live:current,team,uid,botUserId,now:Date.now(),decision});
+        if(!fresh.allowed){reason=fresh.reason;return;}
+        current.currentBid=fresh.amount;
+        current.highBidderId=botUserId;
+        current.highBidderName=String(body.botName||team.teamName||'Bot').slice(0,80);
+        current.highBidderTeamId=team.teamId;
+        current.timerEndsAt=Date.now()+Math.max(3,Math.min(15,Number(room.settings?.bidTimer||15)))*1000;
+        return current;
+      });
+      if(!tx.committed)return sendJson(res,409,{error:'Bot bid was not committed because the auction state changed.',reason:reason||'transaction_not_committed'});
+      return sendJson(res,200,{ok:true,botUserId,teamId:team.teamId,amount:validation.amount,live:tx.snapshot.val()});
+    }catch(error){
+      console.warn('[Bot bid] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not place bot bid securely'});
+    }
+  }
+  if (pathname === '/api/place-bid') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot place user bids' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bid request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${uid}`);
+      const [roomSnap, liveSnap, teamSnap] = await Promise.all([roomRef.get(), liveRef.get(), teamRef.get()]);
+      if (!roomSnap.exists() || !liveSnap.exists()) return sendJson(res, 404, { error: 'Room or live auction state not found' });
+      const room = roomSnap.val();
+      const live = liveSnap.val();
+      const team = teamSnap.exists() ? teamSnap.val() : null;
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { getNextBidAmount } = await import('./src/lib/auctionRules.js');
+      const { validateBidRequest } = await import('./api/bid-auth.js');
+      const decision = validateBidRequest({
+        room, live, team, uid, now: Date.now(), players: IPL_PLAYERS,
+        nextBidAmount: (currentBid, player) => getNextBidAmount(currentBid, player.basePrice || 0, player.set)
+      });
+      if (!decision.allowed) {
+        const messages = {
+          participant_required: 'You must be a participant to bid.',
+          banned: 'You have been removed from this auction and cannot bid.',
+          auction_not_bidding: 'Auction is not accepting bids right now.',
+          already_high_bidder: 'You are already the highest bidder.',
+          bid_timer_expired: 'The bid timer has expired.',
+          team_record_mismatch: 'Your franchise team record could not be verified.',
+          current_player_unknown: 'Current player could not be verified.',
+          squad_limit: 'You have reached your squad limit.',
+          overseas_limit: 'You have reached the overseas player limit.',
+          insufficient_budget: 'Insufficient budget to place this bid.'
+        };
+        return sendJson(res, decision.status, { error: messages[decision.reason] || 'Bid validation failed', reason: decision.reason });
+      }
+      const transaction = await liveRef.transaction((currentData) => {
+        if (!currentData || currentData.status !== 'bidding' || currentData.highBidderId === uid) return;
+        const now = Date.now();
+        if (currentData.timerEndsAt && now >= Number(currentData.timerEndsAt)) return;
+        const player = IPL_PLAYERS.find((p) => p.id === currentData.playerId);
+        if (!player || player.id !== live.playerId) return;
+        const amount = getNextBidAmount(currentData.currentBid || 0, player.basePrice || 0, player.set);
+        if (amount !== decision.amount || amount > Number(team.budgetRemaining || 0)) return;
+        currentData.currentBid = amount;
+        currentData.highBidderId = uid;
+        currentData.highBidderName = String(decoded.name || decoded.displayName || body.name || 'Manager').slice(0, 60);
+        currentData.highBidderTeamId = team.teamId;
+        currentData.timerEndsAt = now + Number(room.settings?.bidTimer || 15) * 1000;
+        currentData.lastActivityAt = now;
+        return currentData;
+      });
+      if (!transaction.committed) return sendJson(res, 409, { error: 'Bid failed: another manager bid, the timer expired, or the state changed.' });
+      return sendJson(res, 200, { ok: true, roomId, amount: transaction.snapshot.val()?.currentBid, highBidderId: uid, timerEndsAt: transaction.snapshot.val()?.timerEndsAt });
+    } catch (error) {
+      console.warn('[Place bid] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not place bid securely' });
+    }
+  }
+  if(pathname==='/api/create-room'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[123][A-Z0-9]{4,12}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot create rooms'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Room creation limit reached. Please wait before retrying.'});
+      const teamId=String(body.teamId||'').trim().toUpperCase();
+      const name=String(body.name||'Manager').trim().slice(0,40);
+      const auctionType=String(body.auctionType||'mega');
+      const isPublic=body.isPublic===true;
+      const teams={MI:'Mumbai Indians',CSK:'Chennai Super Kings',RCB:'Royal Challengers Bengaluru',KKR:'Kolkata Knight Riders',DC:'Delhi Capitals',PBKS:'Punjab Kings',RR:'Rajasthan Royals',SRH:'Sunrisers Hyderabad',GT:'Gujarat Titans',LSG:'Lucknow Super Giants'};
+      if(!teams[teamId])return sendJson(res,400,{error:'Invalid franchise'});
+      if(!['mega','sprint11','sprint5'].includes(auctionType))return sendJson(res,400,{error:'Invalid auction mode'});
+      const budget=auctionType==='sprint5'?60:auctionType==='sprint11'?90:120;
+      const squadLimit=auctionType==='sprint5'?5:auctionType==='sprint11'?11:25;
+      const overseasLimit=auctionType==='sprint5'?2:auctionType==='sprint11'?4:8;
+      const database=services.database,rootRef=database.ref(`auctions/${roomId}`);
+      const now=Date.now();
+      const host={id:uid,name,team:teamId,teamName:teams[teamId],isHost:true,isBot:false};
+      const rootValue={room:{hostId:uid,hostName:name,status:'waiting',auctionType,isPublic,lastActivityAt:now,squadLimit,overseasLimit,players:[host],bannedPlayers:[],settings:{bidTimer:15,budget}},live:{status:'waiting'},teams:{[`${roomId}_${uid}`]:{auctionId:roomId,userId:uid,teamId,teamName:teams[teamId],budgetRemaining:budget,spent:0,squad:[],retentionCardsRemaining:2}},presence:{[uid]:{online:true,lastSeen:now}}};
+      const tx=await rootRef.transaction(current=>current?undefined:rootValue);
+      if(!tx.committed)return sendJson(res,409,{error:'Room code already exists'});
+      if(isPublic){
+        await database.ref(`publicRooms/${roomId}`).set({roomId,hostId:uid,hostName:name,status:'waiting',auctionType,createdAt:now});
+      }
+      return sendJson(res,200,{ok:true,roomId,serverId,room:rootValue.room,team:rootValue.teams[`${roomId}_${uid}`]});
+    }catch(error){
+      console.warn('[Create room] Failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not create room securely'});
+    }
+  }
+  if(pathname==='/api/claim-franchise'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),teamId=String(body.teamId||'').trim().toUpperCase();
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot claim franchises'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Franchise claim limit reached. Please wait before retrying.'});
+      const teamNames={MI:'Mumbai Indians',CSK:'Chennai Super Kings',RCB:'Royal Challengers Bengaluru',KKR:'Kolkata Knight Riders',DC:'Delhi Capitals',PBKS:'Punjab Kings',RR:'Rajasthan Royals',SRH:'Sunrisers Hyderabad',LSG:'Lucknow Super Giants',GT:'Gujarat Titans'};
+      if(!teamNames[teamId])return sendJson(res,400,{error:'Invalid franchise'});
+      const rootRef=services.database.ref(`auctions/${roomId}`),{applyFranchiseClaim}=await import('./api/franchise-claim-auth.js');
+      let reason=null,claimed=null;
+      const tx=await rootRef.transaction(current=>{
+        if(!current){reason='room_not_found';return;}
+        const room=current.room||{},budget=Number(room.settings?.budget||120);
+        const result=applyFranchiseClaim({root:{...current,roomId},roomId,uid,teamId,teamNames,budget,now:Date.now()});
+        if(!result.allowed){reason=result.reason;return;}
+        claimed=result.player;
+        return result.root;
+      });
+      if(!tx.committed)return sendJson(res,reason==='room_member_required'||reason==='banned'?403:reason==='room_not_found'?404:409,{error:reason==='franchise_taken'?'Franchise is already claimed.':reason==='join_closed'?'Franchises can only be changed before auction start.':'Could not claim franchise.',reason});
+      return sendJson(res,200,{ok:true,player:claimed,teamId,roomId});
+    }catch(error){
+      console.warn('[Franchise claim] Failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not claim franchise securely'});
+    }
+  }
+  if (pathname === '/api/room-join') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const teamId = String(body.teamId || '').trim().toUpperCase();
+      const name = String(body.name || 'Manager').trim().slice(0, 40);
+      const teamNames = { MI: 'Mumbai Indians', CSK: 'Chennai Super Kings', RCB: 'Royal Challengers Bengaluru', KKR: 'Kolkata Knight Riders', DC: 'Delhi Capitals', PBKS: 'Punjab Kings', RR: 'Rajasthan Royals', SRH: 'Sunrisers Hyderabad', LSG: 'Lucknow Super Giants', GT: 'Gujarat Titans' };
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      if (!teamNames[teamId]) return sendJson(res, 400, { error: 'Invalid franchise selection' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot join as participants' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Room join request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const { validateRoomJoin, buildJoinedRoom } = await import('./api/room-join-policy.js');
+      const bannedSnapshot = await database.ref(`auctions/${roomId}/room/bannedPlayers`).get();
+      const bannedRaw = bannedSnapshot.exists() ? bannedSnapshot.val() : [];
+      const bannedPlayers = Array.isArray(bannedRaw) ? bannedRaw : Object.keys(bannedRaw || {}).filter((key) => bannedRaw[key] === true);
+      const transaction = await roomRef.transaction((currentRoom) => {
+        if (!currentRoom) return;
+        const currentBans = currentRoom?.bannedPlayers || bannedPlayers;
+        const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers: currentBans });
+        if (!decision.allowed) return;
+        const built = buildJoinedRoom({ room: currentRoom, uid, name, teamId, teamName: teamNames[teamId] });
+        return { ...currentRoom, players: built.roster, lastActivityAt: Date.now() };
+      });
+      if (!transaction.committed) {
+        const current = transaction.snapshot.val();
+        const currentBans = current?.bannedPlayers || bannedPlayers;
+        const decision = validateRoomJoin({ room: current, uid, teamId, bannedPlayers: currentBans });
+        return sendJson(res, decision.status, { error: decision.reason });
+      }
+      // Team creation is idempotent and separate from the roster transaction.
+      // Existing team purse/squad state is never overwritten on reconnect.
+      const teamKey = `${roomId}_${uid}`;
+      const teamRef = database.ref(`auctions/${roomId}/teams/${teamKey}`);
+      const teamTransaction = await teamRef.transaction((existingTeam) => {
+        if (existingTeam) return existingTeam.teamId === teamId ? existingTeam : undefined;
+        return {
+          auctionId: roomId, userId: uid, teamId, teamName: teamNames[teamId],
+          budgetRemaining: Number(transaction.snapshot.val()?.settings?.budget || 120),
+          spent: 0, squad: [], retentionCardsRemaining: 2
+        };
+      });
+      if (!teamTransaction.committed || teamTransaction.snapshot.val()?.teamId !== teamId) {
+        return sendJson(res, 409, { error: 'Existing team record does not match the selected franchise' });
+      }
+      return sendJson(res, 200, { ok: true, player: (transaction.snapshot.val()?.players || []).find((p) => p?.id === uid), serverId });
+    } catch (error) {
+      console.warn('[Room join] Transaction failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not join room securely' });
+    }
+  }
+  if (pathname === '/api/room-bots') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const action = String(body.action || '').trim();
+      const value = String(body.value || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot manage bot teams' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bot management request limit reached. Please wait before retrying.' });
+      if (!['add','remove','fill'].includes(action)) return sendJson(res, 400, { error: 'Invalid bot management action' });
+      const teamNames = { MI: 'Mumbai Indians', CSK: 'Chennai Super Kings', RCB: 'Royal Challengers Bengaluru', KKR: 'Kolkata Knight Riders', DC: 'Delhi Capitals', PBKS: 'Punjab Kings', RR: 'Rajasthan Royals', SRH: 'Sunrisers Hyderabad', GT: 'Gujarat Titans', LSG: 'Lucknow Super Giants' };
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      let selectedTeamId = '';
+      let removedBotId = '';
+      let createdBotTeamIds = [];
+      const transaction = await roomRef.transaction((room) => {
+        if (!room || room.hostId !== uid || room.status !== 'waiting') return;
+        const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+        if (action === 'add') {
+          const teamId = value.toUpperCase();
+          if (!teamNames[teamId]) return;
+          selectedTeamId = teamId;
+          const botId = `bot_${teamId}`;
+          if (roster.some((p) => p?.id === botId || p?.team === teamId)) return;
+          return { ...room, players: [...roster, { id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true }], lastActivityAt: Date.now() };
+        }
+        if (action === 'fill') {
+          createdBotTeamIds = [];
+          const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
+          const newPlayers = [...roster];
+          for (const teamId of Object.keys(teamNames)) {
+            if (taken.has(teamId)) continue;
+            const botId = `bot_${teamId}`;
+            newPlayers.push({ id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true });
+            createdBotTeamIds.push(teamId);
+            taken.add(teamId);
+          }
+          return { ...room, players: newPlayers, lastActivityAt: Date.now() };
+        }
+        if (action === 'remove') {
+          if (!/^bot_[A-Z]{2,4}$/.test(value)) return;
+          const target = roster.find((p) => p?.id === value && p?.isBot === true);
+          if (!target) return;
+          removedBotId = value;
+          return { ...room, players: roster.filter((p) => p?.id !== value), lastActivityAt: Date.now() };
+        }
+      });
+      if (!transaction.committed) {
+        const room = transaction.snapshot.val();
+        if (!room) return sendJson(res, 404, { error: 'Auction room not found' });
+        if (room.hostId !== uid) return sendJson(res, 403, { error: 'Only the host can manage bot teams' });
+        if (room.status !== 'waiting') return sendJson(res, 409, { error: 'Bot teams can only be managed before the auction starts' });
+        return sendJson(res, 409, { error: action === 'add' ? 'Franchise is already claimed' : action === 'remove' ? 'Bot not found' : 'Could not fill empty franchises' });
+      }
+      const finalRoom = transaction.snapshot.val() || {};
+      const roster = Array.isArray(finalRoom.players) ? finalRoom.players : Object.values(finalRoom.players || {});
+      const teamsRef = database.ref(`auctions/${roomId}/teams`);
+      const teamUpdates = {};
+      const teamsToInitialize = action === 'add' && selectedTeamId ? [selectedTeamId] : action === 'fill' ? roster.filter((player) => player?.isBot === true && /^bot_[A-Z]{2,4}$/.test(String(player.id || ''))).map((player) => String(player.team || '').toUpperCase()).filter((teamId) => teamNames[teamId]) : [];
+      for (const teamId of teamsToInitialize) {
+        const botId = `bot_${teamId}`;
+        const botTeamRef = teamsRef.child(`${roomId}_${botId}`);
+        await botTeamRef.transaction((existingTeam) => existingTeam || ({
+          auctionId: roomId, userId: botId, teamId, teamName: teamNames[teamId],
+          budgetRemaining: Number(finalRoom.settings?.budget || 120), spent: 0, squad: [], retentionCardsRemaining: 2
+        }));
+      }
+      if (action === 'remove' && removedBotId) await teamsRef.child(`${roomId}_${removedBotId}`).remove();
+      return sendJson(res, 200, { ok: true, action, roomId });
+    } catch (error) {
+      console.warn('[Room bots] Mutation failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not manage bot teams securely' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth } = await getFirebaseAdminServices();
-      const decoded = await auth.verifyIdToken(authorization.slice(7));
-      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
-      const { database } = await getDatabaseForServer(body.serverId || '1');
-      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot record activity' });
+      if (!allowRoomActivityRequest(decoded.uid)) return sendJson(res, 429, { error: 'Room activity update limit reached. Please wait before retrying.' });
+      const database = services.database;
       const roomRef = database.ref(`auctions/${roomId}/room`);
       const roomSnapshot = await roomRef.get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
@@ -1079,6 +2037,8 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const serverId = String(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       if (!/^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount)) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
+      const rtcIdentityCheck = validateRtcAccount({ uid: decoded.uid, rtcAccount });
+      if (!rtcIdentityCheck.allowed) return sendJson(res, 403, { error: 'Voice identity must match your authenticated account' });
       if (!['1', '2', '3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
 
@@ -1146,21 +2106,43 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
     if (!allowAnalysis(ip)) return sendJson(res, 429, { error: 'Too many AI analysis requests. Please wait a minute and try again.' });
+    const authorization = String(req.headers.authorization || '');
+    if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+    let decoded;
+    let body;
+    let serverId;
+    let database;
     try {
-      req.body = await readBody(req);
+      body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      if (!/^[123][A-Z0-9]{4,12}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room code' });
+      serverId = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      database = services.database;
     } catch (error) {
-      return sendJson(res, error.message === 'Request body too large' ? 413 : 400, { error: error.message });
+      return sendJson(res, error.message === 'Request body too large' ? 413 : 401, { error: 'Authentication or request validation failed' });
     }
-    const responseShim = {
-      statusCode: 200,
-      status(code) { this.statusCode = code; return this; },
-      json(body) { sendJson(res, this.statusCode, body); return res; }
-    };
+    const roomId = String(body.roomId || '').trim();
     try {
-      const result = await analyzeWinner(req, responseShim);
-      if (result && !res.writableEnded) {
-        sendJson(res, result.statusCode || 500, JSON.parse(result.body || '{}'));
+      const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
+      if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
+      const roomData = roomSnapshot.val() || {};
+      const authorizationResult = authorizeWinnerAnalysis({ uid: decoded.uid, room: roomData, roomStatus: roomData.status });
+      if (!authorizationResult.allowed) {
+        const message = authorizationResult.reason === 'host_only'
+          ? 'Only the room host can run winner analysis'
+          : 'Winner analysis is not currently allowed for this room';
+        return sendJson(res, authorizationResult.status, { error: message });
       }
+      const responseShim = {
+        statusCode: 200,
+        status(code) { this.statusCode = code; return this; },
+        json(body) { sendJson(res, this.statusCode, body); return res; }
+      };
+      req.body = body;
+      const result = await analyzeWinner(req, responseShim);
+      if (result && !res.writableEnded) sendJson(res, result.statusCode || 500, JSON.parse(result.body || '{}'));
     } catch (error) {
       if (!res.writableEnded) sendJson(res, 500, { error: 'Internal server error' });
       console.error('API request failed:', error?.message || error);

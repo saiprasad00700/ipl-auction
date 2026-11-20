@@ -356,7 +356,8 @@ const AuctionSummary = () => {
                           {teamInfo?.logo && <img src={teamInfo.logo} alt="" className="w-11 h-11 object-contain shrink-0" />}
                           <div className="min-w-0">
                             <h3 className="font-black uppercase truncate">{teamDoc.teamId || teamInfo?.id}</h3>
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{teamDoc.disqualified ? 'Disqualified' : 'View Playing XI'}</p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{teamDoc.disqualified ? 'Disqualified · Squad retained for review' : startingPlayers.length === 11 && Boolean(chasingImpactPlayer) && Boolean(defendingImpactPlayer) ? (savedXI.autoSelected ? 'Automatically selected XI · View details' : 'Playing XI submitted · View details') : 'Playing XI unavailable · Squad still viewable'}</p>
+                            <p className="text-[9px] text-emerald-300/70 uppercase tracking-wider mt-1">{Array.isArray(teamDoc.squad) ? teamDoc.squad.length : 0} squad players · all auction results visible</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">

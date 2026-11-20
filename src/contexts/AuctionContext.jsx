@@ -158,41 +158,16 @@ export const AuctionProvider = ({ children }) => {
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
     const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : MEGA_OVERSEAS_LIMIT;
 
-    const liveRef = ref(roomDatabase, `auctions/${roomId}/live`);
-    await set(liveRef, { status: 'waiting' });
-
-    // Instantly set host online presence in RTDB
-    const hostPresenceRef = ref(roomDatabase, `auctions/${roomId}/presence/${userId}`);
-    await set(hostPresenceRef, {
-      online: true,
-      lastSeen: serverTimestampRtdb()
+    if (!user || user.uid !== userId) throw new Error('Authenticated user does not match room host.');
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/create-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId: roomServerId, teamId: playerDetails.team, name: playerDetails.name, auctionType, isPublic: !!isPublic })
     });
-
-    // Sync to RTDB for real-time reads
-    const rtdbRoomRef = ref(roomDatabase, `auctions/${roomId}/room`);
-    await set(rtdbRoomRef, {
-      hostId: userId,
-      hostName: playerDetails.name,
-      status: 'waiting',
-      auctionType,
-      isPublic: !!isPublic,
-      lastActivityAt: Date.now(),
-      squadLimit,
-      overseasLimit,
-      players: [{
-        id: userId,
-        name: playerDetails.name,
-        team: playerDetails.team,
-        teamName: teamDetails?.name || 'Unknown',
-        isHost: true
-      }],
-      bannedPlayers: [],
-      settings: {
-        bidTimer: DEFAULT_BID_TIMER_SECONDS,
-        budget
-      }
-    });
-    if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.room) throw new Error(result.error || 'Could not create room securely.');
+        if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
 
 
     // Publish only minimal metadata for public rooms; never expose auction state.
@@ -336,124 +311,31 @@ export const AuctionProvider = ({ children }) => {
   }, []);
 
   const startAuction = useCallback(async (roomId) => {
-    // Record the host's start request immediately, even before auction setup runs.
-    const rtdbRoomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
-    await updateRtdb(rtdbRoomRef, { lastActivityAt: Date.now() });
-    // Fetch room data to determine auction type
-    const roomSnap = await get(rtdbRoomRef);
-    const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const roster = Array.isArray(roomData.players)
-      ? roomData.players
-      : Object.values(roomData.players || {});
-    const uniqueParticipants = new Map();
-    roster.forEach((player) => {
-      const participantId = String(player?.id || player?.userId || '').trim();
-      if (participantId) uniqueParticipants.set(participantId, player);
+    if (!user) throw new Error('Sign in to start the auction.');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/start-auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId })
     });
-    if (uniqueParticipants.size < 2) {
-      const error = new Error('Invite at least 1 friend or add a bot to start the auction.');
-      error.code = 'MINIMUM_MEMBERS_REQUIRED';
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result.error || 'Could not start auction.');
+      if (result.reason === 'minimum_members') error.code = 'MINIMUM_MEMBERS_REQUIRED';
       throw error;
     }
-    const auctionType = roomData.auctionType || 'mega';
-
-    // Calculate target players
-    let targetPlayers = IPL_PLAYERS.length;
-    if (auctionType === 'sprint11') targetPlayers = 150;
-    else if (auctionType === 'sprint5') targetPlayers = 75;
-
-    // 1. Identify Marquee vs Non-Marquee players
-    const marqueeIndices = [];
-    const nonMarqueeIndicesByRole = {};
-    
-    IPL_PLAYERS.forEach((p, i) => {
-      if (p.set.includes('Marquee')) {
-        marqueeIndices.push(i);
-      } else {
-        if (!nonMarqueeIndicesByRole[p.role]) nonMarqueeIndicesByRole[p.role] = [];
-        nonMarqueeIndicesByRole[p.role].push(i);
-      }
-    });
-
-    // Always keep all Marquee players
-    const selectedPlayersByRole = new Set(marqueeIndices);
-
-    // Calculate fraction based on target players for NON-MARQUEE only
-    const nonMarqueeTarget = Math.max(0, targetPlayers - marqueeIndices.length);
-    const nonMarqueeTotal = IPL_PLAYERS.length - marqueeIndices.length;
-    const fraction = nonMarqueeTotal > 0 ? (nonMarqueeTarget / nonMarqueeTotal) : 1;
-
-    // 2. Select NON-MARQUEE players proportionally by ROLE
-    Object.keys(nonMarqueeIndicesByRole).forEach(roleName => {
-      const roleIndices = nonMarqueeIndicesByRole[roleName];
-      const shuffledRole = shuffleArray(roleIndices);
-      
-      const limit = auctionType === 'mega' 
-        ? shuffledRole.length 
-        : Math.max(1, Math.ceil(shuffledRole.length * fraction));
-        
-      shuffledRole.slice(0, limit).forEach(idx => selectedPlayersByRole.add(idx));
-    });
-
-    // 2. Build the final auction order maintaining the realistic SET order (Marquee -> Set 1 -> etc.)
-    const sets = [...new Set(IPL_PLAYERS.map(p => p.set))];
-    let randomizedIndices = [];
-    sets.forEach(setName => {
-      // Only include players from this set who were selected in the role balancing phase
-      const setIndices = IPL_PLAYERS
-        .map((p, i) => (p.set === setName && selectedPlayersByRole.has(i)) ? i : -1)
-        .filter(i => i !== -1);
-        
-      randomizedIndices = [...randomizedIndices, ...shuffleArray(setIndices)];
-    });
-
-    const playerOrderRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`);
-    
-    // Store playerOrder in room node (matching RTDB rules) and attempt subnode update
-    await updateRtdb(rtdbRoomRef, {
-      status: 'active',
-      playerOrder: randomizedIndices,
-      lastActivityAt: Date.now()
-    });
-    try {
-      const publicRoomSnap = await get(ref(getRoomDatabase(roomId), `publicRooms/${roomId}`));
-      if (publicRoomSnap.exists()) await updateRtdb(ref(getRoomDatabase(roomId), `publicRooms/${roomId}`), { status: 'active' });
-    } catch (directoryError) { console.warn('Public room status sync failed:', directoryError); }
-
     if (supabase) {
-      try {
-        await supabase.from('auctions').update({ status: 'active' }).eq('id', roomId);
-      } catch (sErr) {}
+      try { await supabase.from('auctions').update({ status: 'active' }).eq('id', roomId); } catch {}
     }
-
-    try {
-      await set(playerOrderRef, randomizedIndices);
-    } catch (e) {
-      // Graceful fallback if RTDB sub-path rule is pending deploy
-    }
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    await set(liveRef, {
-      playerId: IPL_PLAYERS[randomizedIndices[0]].id,
-      currentBid: 0,
-      highBidderId: '',
-      highBidderName: 'No Bids',
-      timerEndsAt: getSyncedTime() + DEFAULT_BID_TIMER_SECONDS * 1000,
-      status: 'bidding'
-    });
-    
-    // Add to messages collection for chronological sorting
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction has started!`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
+    await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System', text: 'Auction has started!', type: 'log', timestamp: serverTimestampRtdb()
     });
     void trackAnalyticsEvent('auction_start', roomId);
-
-  }, [getSyncedTime]);
+    return result;
+  }, [user]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
     // A single missed sync check must not permanently stall the lot at 0 seconds.
@@ -496,155 +378,27 @@ export const AuctionProvider = ({ children }) => {
         }
       }
 
-      // Read the room and franchise roster before claiming the expired lot.
-      const preRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-      const preRoomData = preRoomSnap.exists() ? preRoomSnap.val() : {};
-      const preTeamsSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams`));
-      const preTeamsData = preTeamsSnap.exists() ? preTeamsSnap.val() : {};
-      const { getPlayerOriginalFranchise } = await import('../data/playerOriginalFranchises');
-      const { RETENTION_DECISION_MS, RETENTION_CARDS_PER_FRANCHISE, canUseRetentionCard } = await import('../lib/auctionWinnerRules');
-
-      // Claim the lot atomically. If an eligible original franchise manager is present,
-      // pause settlement for the five-second retention decision before charging anyone.
-      const txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData || currentData.isPaused || currentData.status === 'paused') return;
-        const now = getSyncedTime();
-
-        // Recovery path: if the client that opened a retention offer disconnected,
-        // any connected client can settle it after its deadline.
-        if (currentData.status === 'processing_sale') {
-          const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending') return;
-          // Another client may still be inside the current RTM decision window.
-          // Do not abort the transaction just because this timer tick arrived early.
-          if (now < Number(offer.expiresAt) + 1500) return;
-          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
-            // Original franchise exercised RTM but the winning bidder did not raise in time.
-            currentData.highBidderId = offer.eligibleUserId;
-            currentData.highBidderName = offer.eligibleTeamName;
-            currentData.highBidderTeamId = offer.originalFranchiseId;
-            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
-            offer.status = 'accepted';
-          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
-            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
-              currentData.highBidderId = offer.eligibleUserId;
-              currentData.highBidderName = offer.eligibleTeamName;
-              currentData.highBidderTeamId = offer.originalFranchiseId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'accepted';
-            } else {
-              currentData.highBidderId = offer.buyerId;
-              currentData.highBidderName = offer.buyerName;
-              currentData.highBidderTeamId = offer.buyerTeamId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'declined';
-            }
-          } else {
-            // No RTM, or the initial decision expired: the original winning bid stands.
-            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
-          }
-          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
-          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
-          return currentData;
-        }
-
-        if (currentData.status !== 'bidding') return;
-        if (currentData.timerEndsAt && now < currentData.timerEndsAt) return;
-
-        const isSold = !!currentData.highBidderId;
-        let retentionOffer = null;
-        if (isSold) {
-          const originalFranchiseId = getPlayerOriginalFranchise(currentData.playerId);
-          const buyerFranchiseId = currentData.highBidderTeamId;
-          const eligiblePlayer = (preRoomData.players || []).find((p) =>
-            p.team === originalFranchiseId && p.id !== currentData.highBidderId
-          );
-          const eligibleTeamEntry = Object.entries(preTeamsData).find(([, t]) =>
-            t.userId === eligiblePlayer?.id && t.teamId === originalFranchiseId
-          );
-          const eligibleTeamData = eligibleTeamEntry?.[1] || {};
-          const cardsRemaining = Number.isFinite(Number(eligibleTeamData.retentionCardsRemaining))
-            ? Number(eligibleTeamData.retentionCardsRemaining)
-            : RETENTION_CARDS_PER_FRANCHISE;
-          const purseRemaining = Number(eligibleTeamData.budgetRemaining ?? preRoomData.settings?.budget ?? 120);
-          const auctionPlayer = IPL_PLAYERS.find((player) => player.id === currentData.playerId);
-          const isOverseasPlayer = Boolean(auctionPlayer && auctionPlayer.country !== 'IND');
-          const overseasLimit = preRoomData.auctionType === 'sprint5' ? 2
-            : preRoomData.auctionType === 'sprint11' ? 4 : MEGA_OVERSEAS_LIMIT;
-          const existingOverseasCount = (Array.isArray(eligibleTeamData.squad) ? eligibleTeamData.squad : [])
-            .reduce((count, squadItem) => {
-              const squadPlayerId = typeof squadItem === 'string' ? squadItem : squadItem?.id;
-              const squadPlayer = IPL_PLAYERS.find((player) => player.id === squadPlayerId);
-              return count + (squadPlayer && squadPlayer.country !== 'IND' ? 1 : 0);
-            }, 0);
-          // RTM must never bypass the franchise overseas-player limit. If the
-          // original franchise is already at its cap, skip the RTM offer entirely
-          // and let the current highest bidder win the player.
-          const eligibleForOverseasRtm = !isOverseasPlayer || existingOverseasCount < overseasLimit;
-          if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer
-            && eligibleForOverseasRtm
-            && canUseRetentionCard({
-              originalFranchiseId,
-              eligibleFranchiseId: eligibleTeamData.teamId,
-              cardsRemaining,
-              purseRemaining,
-              winningBid: Number(currentData.currentBid || 0)
-            })) {
-            retentionOffer = {
-              playerId: currentData.playerId,
-              originalFranchiseId,
-              eligibleUserId: eligiblePlayer.id,
-              eligibleTeamName: eligiblePlayer.teamName || originalFranchiseId,
-              buyerId: currentData.highBidderId,
-              buyerTeamId: buyerFranchiseId,
-              buyerName: currentData.highBidderName,
-              bid: Number(currentData.currentBid || 0),
-              counterBid: null,
-              phase: 'initial_decision',
-              rtmUsed: false,
-              expiresAt: now + RETENTION_DECISION_MS,
-              status: 'pending',
-              decision: null
-            };
-          }
-        }
-        currentData.status = retentionOffer ? 'processing_sale' : (isSold ? 'sold' : 'unsold');
-        // Shared deadline lets another connected client recover if the coordinator tab closes.
-        if (!retentionOffer) currentData.transitionDeadline = now + (isSold ? 5000 : 2000) + 2500;
-        else delete currentData.transitionDeadline;
-        if (retentionOffer) currentData.retentionOffer = retentionOffer;
-        return currentData;
+            if (!user) throw new Error('Sign in required to finalize bidding.');
+      const serverId = getRoomServerId(roomId);
+      if (serverId === '3') await ensureServer3Auth();
+      else if (serverId === '2') await ensureServer2Auth();
+      const idToken = await user.getIdToken();
+      const endpoint = initialLive.status === 'processing_sale' ? '/api/retention-finalize' : '/api/finalize-bidding';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId })
       });
-
-      if (!txResult.committed) {
-        const latestState = txResult.snapshot?.val();
-        const latestOffer = latestState?.retentionOffer;
-        const genuinelyExpired = latestState?.status === 'bidding'
-          ? (!latestState.timerEndsAt || getSyncedTime() >= Number(latestState.timerEndsAt))
-          : latestState?.status === 'processing_sale'
-            && latestOffer?.status === 'pending'
-            && getSyncedTime() >= Number(latestOffer.expiresAt) + 1500;
-        if (!genuinelyExpired) {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.live) {
+        if (result.reason === 'bid_timer_open' || result.reason === 'window_open') {
           endingPlayerRef.current = false;
+          setTimeout(() => { void endPlayerAuction(roomId); }, 500);
           return;
         }
-        console.error('[Auction] Settlement transaction was not committed.', {
-          roomId,
-          liveState: txResult.snapshot?.val() || null,
-          serverTimeSynced: isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb),
-          serverTime: getSyncedTime()
-        });
-        endingPlayerRef.current = false;
-        // A competing client or a clock boundary can make an otherwise valid
-        // settlement transaction return uncommitted. Retry from fresh RTDB state
-        // instead of leaving the lot stuck at 0 seconds.
-        if (txResult.snapshot?.val()?.status === 'bidding'
-          || txResult.snapshot?.val()?.status === 'processing_sale') {
-          setTimeout(() => { void endPlayerAuction(roomId); }, 500);
-        }
-        return;
+        throw new Error(result.error || 'Auction finalization failed.');
       }
-
+      const txResult = { committed: true, snapshot: { val: () => result.live } };
       let auctionState = txResult.snapshot.val();
       if (auctionState.status === 'processing_sale' && auctionState.retentionOffer?.status === 'pending') {
         // Follow all three RTM stages. Each stage has its own expiry, so refresh
@@ -688,72 +442,30 @@ export const AuctionProvider = ({ children }) => {
           });
         });
 
-        // A decision is accepted only if it was made by the eligible manager before expiry.
-        const settleTx = await runTransactionRtdb(liveRef, (currentData) => {
-          if (!currentData || currentData.status !== 'processing_sale' || currentData.isPaused) return;
-          const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending') return;
-          const now = getSyncedTime();
-          const initialDeclined = offer.phase === 'initial_decision'
-            && offer.decision === 'decline'
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          const matchDecisionMade = offer.phase === 'match_decision'
-            && ['match', 'decline_counter'].includes(offer.decision)
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
-          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
-            currentData.highBidderId = offer.eligibleUserId;
-            currentData.highBidderName = offer.eligibleTeamName;
-            currentData.highBidderTeamId = offer.originalFranchiseId;
-            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
-            offer.status = 'accepted';
-          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
-            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
-              currentData.highBidderId = offer.eligibleUserId;
-              currentData.highBidderName = offer.eligibleTeamName;
-              currentData.highBidderTeamId = offer.originalFranchiseId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'accepted';
-            } else {
-              currentData.highBidderId = offer.buyerId;
-              currentData.highBidderName = offer.buyerName;
-              currentData.highBidderTeamId = offer.buyerTeamId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'declined';
-            }
-          } else {
-            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
-          }
-          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
-          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
-          return currentData;
+        // Final RTM outcome is resolved by the trusted server transaction.
+        if (!user) throw new Error('Sign in required to finalize RTM.');
+        const serverId = getRoomServerId(roomId);
+        if (serverId === '3') await ensureServer3Auth();
+        else if (serverId === '2') await ensureServer2Auth();
+        const idToken = await user.getIdToken();
+        const finalizeResponse = await fetch('/api/retention-finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ roomId, serverId })
         });
-        if (!settleTx.committed) {
-          const failedState = settleTx.snapshot?.val() || null;
+        const finalizeResult = await finalizeResponse.json().catch(() => ({}));
+        if (!finalizeResponse.ok || !finalizeResult.live) {
+          const latestSnap = await get(liveRef);
+          const failedState = latestSnap.val() || null;
           const failedOffer = failedState?.retentionOffer || null;
-          console.error('[Auction] RTM settlement transaction was not committed.', {
-            roomId,
-            liveStatus: failedState?.status ?? null,
-            offerPhase: failedOffer?.phase ?? null,
-            offerStatus: failedOffer?.status ?? null,
-            offerDecision: failedOffer?.decision ?? null,
-            offerExpiresAt: failedOffer?.expiresAt ?? null,
-            offerDecidedAt: failedOffer?.decidedAt ?? null,
-            hasCounterBid: failedOffer?.counterBid != null,
-            serverTimeSynced: isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb),
-            serverTime: getSyncedTime(),
-            liveState: failedState
-          });
-          endingPlayerRef.current = false;
-          // Keep recovering if the lot is still awaiting RTM settlement. Another
-          // connected client may have raced this transaction or its clock may
-          // have reached the expiry boundary slightly later.
-          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending' && !failedState?.isPaused) {
+          if (finalizeResult.reason === 'window_open' || (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending')) {
+            endingPlayerRef.current = false;
             setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+            return;
           }
-          return;
+          throw new Error(finalizeResult.error || 'RTM finalization failed.');
         }
-        auctionState = settleTx.snapshot.val();
+        auctionState = finalizeResult.live;
         if (auctionState.retentionOffer?.status === 'accepted') {
           await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
@@ -798,54 +510,31 @@ export const AuctionProvider = ({ children }) => {
 
       if (isSold) {
         teamDocId = `${roomId}_${auctionState.highBidderId}`;
-        const teamRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${teamDocId}`);
-        const defaultBudget = roomData.settings?.budget || 120.0;
-
-        // A transaction makes the squad append and budget deduction atomic. If
-        // multiple browsers settle the same lot, only the first can apply it.
-        const teamTx = await runTransactionRtdb(teamRef, (current) => {
-          const tData = current || {};
-          const squad = Array.isArray(tData.squad) ? tData.squad : [];
-          if (squad.some((p) => p?.id === auctionState.playerId)) return;
-          return {
-            ...tData,
-            auctionId: roomId,
-            userId: auctionState.highBidderId,
-            teamId: auctionState.highBidderTeamId || tData.teamId || '',
-            teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
-            budgetRemaining: Math.max(0, Number(tData.budgetRemaining ?? defaultBudget) - Number(auctionState.currentBid)),
-            spent: Number(tData.spent || 0) + Number(auctionState.currentBid),
-            retentionCardsRemaining: successfullyRetainedPlayer
-              ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-              : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid, rtmUsed: successfullyRetainedPlayer }]
-          };
+        if (!user) throw new Error('Sign in required to settle sale.');
+        const serverId = getRoomServerId(roomId);
+        if (serverId === '3') await ensureServer3Auth();
+        else if (serverId === '2') await ensureServer2Auth();
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/settle-sale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ roomId, serverId, teamName: teamDetails?.name || auctionState.highBidderName || 'Unknown' })
         });
-
-        const finalTeamData = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
-        teamSaleApplied = Boolean(teamTx.committed);
+        const settlement = await response.json().catch(() => ({}));
+        if (!response.ok || !settlement.team) throw new Error(settlement.error || 'Sale settlement failed.');
+        const finalTeamData = settlement.team;
+        teamSaleApplied = settlement.applied === true;
         newTeamData = finalTeamData;
 
-        // Reconcile room-level counters from the committed team record, not by
-        // incrementing a stale room snapshot. This also repairs the counters if a
-        // previous client committed the squad transaction but disconnected before
-        // updating room.players.
-        if (finalTeamData) {
-          const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
-          const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
-            if (!Array.isArray(currentPlayers)) return;
-            return currentPlayers.map((p) => p.id === auctionState.highBidderId
-              ? {
-                  ...p,
-                  spent: Number(finalTeamData.spent || 0),
-                  squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0
-                }
-              : p);
-          });
-          if (!playersTx.committed) {
-            throw new Error('Could not synchronize team totals to the room roster.');
-          }
-        }
+        // Reconcile room-level counters from the trusted team settlement.
+        const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
+        const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
+          if (!Array.isArray(currentPlayers)) return;
+          return currentPlayers.map((p) => p.id === auctionState.highBidderId
+            ? { ...p, spent: Number(finalTeamData.spent || 0), squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0 }
+            : p);
+        });
+        if (!playersTx.committed) throw new Error('Could not synchronize team totals to the room roster.');
       }
 
       // Do not advance the lot until required state writes have completed. A failed
@@ -872,53 +561,32 @@ export const AuctionProvider = ({ children }) => {
       const waitTime = isSold ? 5000 : 2000;
 
       // Player order from the single room snapshot already fetched above
-      let playerOrder = roomData.playerOrder;
-      if (!playerOrder) {
-        const orderSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`));
-        if (orderSnap.exists()) playerOrder = orderSnap.val();
-      }
-
-      // ── Bug Fix 2: Always release endingPlayerRef via finally inside the timeout callback ──
-      // Previously, component unmount before timeout fired left the ref stuck at true forever.
-      const advanceToNextPlayer = async () => {
+        const advanceToNextPlayer = async () => {
         try {
-          if (roomData.status !== 'active') return;
-
-          const settings = roomData.settings;
-          const currentPlayerId = auctionState.playerId;
-          const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
-          const currentPlayerIndexInOrder = order.findIndex(idx => IPL_PLAYERS[idx] && IPL_PLAYERS[idx].id === currentPlayerId);
-          const nextIndexInOrder = currentPlayerIndexInOrder !== -1 ? order[currentPlayerIndexInOrder + 1] : order[0];
-
-          if (nextIndexInOrder !== undefined && IPL_PLAYERS[nextIndexInOrder]) {
-            const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-            // Guard the local timeout with the same settled-lot identity as the
-            // recovery path. If another client already advanced it, do not reset
-            // the next player's timer or overwrite newer live state.
-            await runTransactionRtdb(liveRef, (current) => {
-              if (!current || current.playerId !== currentPlayerId
-                || !['sold', 'unsold'].includes(current.status)) return;
-              return {
-                playerId: nextPlayer.id,
-                currentBid: 0,
-                highBidderId: '',
-                highBidderName: 'No Bids',
-                timerEndsAt: getSyncedTime() + (settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
-                status: 'bidding'
-              };
-            });
-          } else {
-            // Natural end of bidding must enter the same shared XI phase as host-triggered end.
-            const endedAt = getSyncedTime();
+          if (roomData.status !== 'active' || !user) return;
+          const serverId = getRoomServerId(roomId);
+          if (serverId === '3') await ensureServer3Auth();
+          else if (serverId === '2') await ensureServer2Auth();
+          const idToken = await user.getIdToken();
+          const response = await fetch('/api/advance-auction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ roomId, serverId })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.live) {
+            if (result.reason === 'transition_waiting') {
+              endingPlayerRef.current = false;
+              setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+              return;
+            }
+            throw new Error(result.error || 'Auction progression failed.');
+          }
+          if (result.finished) {
+            const now = getSyncedTime();
             const roomSnapshot = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
             const auctionType = roomSnapshot.val()?.auctionType || 'mega';
             const usesSquadBalanceAnalysis = auctionType !== 'mega';
-            await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), {
-              status: 'awaiting_xi',
-              xiSubmissionStartedAt: endedAt,
-              xiSubmissionDeadline: usesSquadBalanceAnalysis ? endedAt : endedAt + PLAYING_XI_DEADLINE_MS,
-              winnerAnalysisStatus: 'collecting'
-            });
             await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
               userId: 'system', userName: 'System',
               text: usesSquadBalanceAnalysis
@@ -928,18 +596,17 @@ export const AuctionProvider = ({ children }) => {
             });
           }
         } finally {
-          // Always release the lock — even if any async step above throws or component unmounts
           endingPlayerRef.current = false;
         }
       };
-
       setTimeout(advanceToNextPlayer, waitTime);
+
     } catch (err) {
       // Log the real failure instead of silently swallowing the auction settlement error.
       console.error('[Auction] endPlayerAuction failed:', err);
       endingPlayerRef.current = false;
     }
-  }, [getSyncedTime, flushAuctionToFirestore]);
+  }, [getSyncedTime, flushAuctionToFirestore, user, currentAuction]);
 
   // Recover an overdue sold/unsold transition from shared RTDB state. The
   // transaction checks the player, status and deadline again, so only one client
@@ -961,87 +628,48 @@ export const AuctionProvider = ({ children }) => {
     // This covers a coordinator disconnect after live.status became "sold" but
     // before the team squad/budget or room roster counters finished syncing.
     if (live.status === 'sold' && live.highBidderId && live.playerId) {
-      const [retentionRules, playerFranchises] = await Promise.all([
-        import('../lib/auctionWinnerRules'),
-        import('../data/playerOriginalFranchises')
-      ]);
-      const { RETENTION_CARDS_PER_FRANCHISE } = retentionRules;
-      const { getPlayerOriginalFranchise } = playerFranchises;
+      if (!user) throw new Error('Sign in required to recover sale settlement.');
+      const serverId = getRoomServerId(roomId);
+      if (serverId === '3') await ensureServer3Auth();
+      else if (serverId === '2') await ensureServer2Auth();
+      const idToken = await user.getIdToken();
       const teamDetails = TEAMS.find((t) => t.id === live.highBidderTeamId);
-      const teamRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
-      const defaultBudget = Number(roomData.settings?.budget ?? 120);
-      const offer = live.retentionOffer;
-      const successfullyRetainedPlayer = offer?.status === 'accepted'
-        && live.highBidderTeamId === offer.originalFranchiseId
-        && (offer.decision === 'match'
-          || (offer.phase === 'counter_bid' && offer.decision === 'accept'));
-
-      const teamTx = await runTransactionRtdb(teamRef, (current) => {
-        const team = current || {};
-        const squad = Array.isArray(team.squad) ? team.squad : [];
-        // A player in the squad means another client already applied the charge.
-        if (squad.some((p) => p?.id === live.playerId)) return;
-        return {
-          ...team,
-          auctionId: roomId,
-          userId: live.highBidderId,
-          teamId: live.highBidderTeamId || team.teamId || getPlayerOriginalFranchise(live.playerId) || '',
-          teamName: teamDetails?.name || live.highBidderName || team.teamName || 'Unknown',
-          budgetRemaining: Math.max(0, Number(team.budgetRemaining ?? defaultBudget) - Number(live.currentBid || 0)),
-          spent: Number(team.spent || 0) + Number(live.currentBid || 0),
-          retentionCardsRemaining: successfullyRetainedPlayer
-            ? Math.max(0, Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-            : Number(team.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-          squad: [...squad, { id: live.playerId, bid: Number(live.currentBid || 0), rtmUsed: successfullyRetainedPlayer }]
-        };
+      const response = await fetch('/api/settle-sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId, teamName: teamDetails?.name || live.highBidderName || 'Unknown' })
       });
-      const finalTeam = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
-      if (!finalTeam) throw new Error('Sale recovery could not find or create the winning team record.');
-
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.team) throw new Error(result.error || 'Sale settlement recovery failed.');
+      const finalTeam = result.team;
       const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
       const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
         if (!Array.isArray(currentPlayers)) return;
         return currentPlayers.map((p) => p.id === live.highBidderId
-          ? {
-              ...p,
-              spent: Number(finalTeam.spent || 0),
-              squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0
-            }
+          ? { ...p, spent: Number(finalTeam.spent || 0), squadCount: Array.isArray(finalTeam.squad) ? finalTeam.squad.length : 0 }
           : p);
       });
-      if (!playersTx.committed) {
-        throw new Error('Sale recovery could not synchronize the room roster totals.');
-      }
+      if (!playersTx.committed) throw new Error('Sale recovery could not synchronize the room roster totals.');
     }
 
-    let playerOrder = roomData.playerOrder;
-    if (!playerOrder) {
-      const orderSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`));
-      if (orderSnap.exists()) playerOrder = orderSnap.val();
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/advance-auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.live) {
+      if (result.reason === 'transition_waiting') return;
+      throw new Error(result.error || 'Auction transition recovery failed.');
     }
-    const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
-    const currentIndex = order.findIndex((idx) => IPL_PLAYERS[idx]?.id === live.playerId);
-    const nextIndex = currentIndex >= 0 ? order[currentIndex + 1] : order[0];
-
-    if (nextIndex === undefined || !IPL_PLAYERS[nextIndex]) {
-      const claim = await runTransactionRtdb(liveRef, (current) => {
-        if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-        if (Number(current.transitionDeadline) > getSyncedTime()) return;
-        current.status = 'awaiting_xi';
-        current.transitionDeadline = null;
-        return current;
-      });
-      if (!claim.committed) return;
+    if (result.finished) {
       const now = getSyncedTime();
-      const roomSnapshot = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-      const auctionType = roomSnapshot.val()?.auctionType || 'mega';
+      const auctionType = roomData.auctionType || 'mega';
       const usesSquadBalanceAnalysis = auctionType !== 'mega';
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), {
-        status: 'awaiting_xi',
-        xiSubmissionStartedAt: now,
-        xiSubmissionDeadline: usesSquadBalanceAnalysis ? now : now + PLAYING_XI_DEADLINE_MS,
-        winnerAnalysisStatus: 'collecting'
-      });
       await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: usesSquadBalanceAnalysis
@@ -1049,22 +677,9 @@ export const AuctionProvider = ({ children }) => {
           : 'Bidding has ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 5 minutes.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
-      return;
     }
 
-    await runTransactionRtdb(liveRef, (current) => {
-      if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-      if (Number(current.transitionDeadline) > getSyncedTime()) return;
-      return {
-        playerId: IPL_PLAYERS[nextIndex].id,
-        currentBid: 0,
-        highBidderId: '',
-        highBidderName: 'No Bids',
-        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
-        status: 'bidding'
-      };
-    });
-  }, [getSyncedTime]);
+  }, [getSyncedTime, user, currentAuction]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     // Room codes are allocated with their first digit identifying the Firebase server.
@@ -1139,8 +754,23 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Update the roster first, preserving its array shape.
-    await set(ref(roomDatabase, `auctions/${roomId}/room/players`), updatedPlayers);
+    // RTDB rooms use the server-authoritative transactional join endpoint.
+    // Legacy Supabase/Firestore rooms retain their existing compatibility path.
+    let serverAuthoritativeJoin = false;
+    if (rtdbRoomSnap.exists() && user && user.uid === userId) {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/room-join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId: getRoomServerId(roomId), teamId: playerDetails.team, name: updatedPlayer.name })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not join room securely');
+      serverAuthoritativeJoin = true;
+    } else {
+      // Compatibility path for legacy rooms not hosted in RTDB.
+      await set(ref(roomDatabase, `auctions/${roomId}/room/players`), updatedPlayers);
+    }
 
     // Save history independently of the activity heartbeat. A heartbeat/rules
     // failure must never prevent a successfully joined room from being recorded.
@@ -1183,8 +813,9 @@ export const AuctionProvider = ({ children }) => {
     }
     */
 
-    // Create/Update team in RTDB if team is provided
-    if (playerDetails.team) {
+    // The secure endpoint initializes the team transactionally/idempotently.
+    // Legacy room paths continue to use the compatibility team initialization.
+    if (playerDetails.team && !serverAuthoritativeJoin) {
       const rtdbTeamSnap = await get(ref(roomDatabase, `auctions/${roomId}/teams/${roomId}_${userId}`));
       if (!rtdbTeamSnap.exists()) {
         const teamDataToSet = {
@@ -1649,197 +1280,61 @@ export const AuctionProvider = ({ children }) => {
   }, [user, currentAuction]);
 
   const placeBid = useCallback(async (amount) => {
-    if (!currentAuction) throw new Error("Auction not found!");
-    if (!user) throw new Error("Please log in to bid!");
-    if (!team) throw new Error("You must select a team in the lobby to participate!");
-    if (currentAuction.bannedPlayers && currentAuction.bannedPlayers.includes(user.uid)) {
-      throw new Error("You have been removed from this auction and cannot bid.");
-    }
-    if (currentAuction.currentAuction?.status !== 'bidding') throw new Error("Auction is not accepting bids right now.");
-    if (currentAuction.currentAuction?.highBidderId === user.uid) throw new Error("You are already the highest bidder!");
-
-    // Squad limit check
-    const squadLimit = currentAuction.squadLimit || 25;
-    if (team.squad && team.squad.length >= squadLimit) {
-      throw new Error(`You have reached the squad limit of ${squadLimit} players!`);
-    }
-
-    // Overseas limit check
-    const player = IPL_PLAYERS.find(p => p.id === currentAuction.currentAuction?.playerId);
-    const isOverseas = player && player.country !== 'IND';
-    const overseasLimit = currentAuction.overseasLimit || MEGA_OVERSEAS_LIMIT;
-    if (isOverseas && team.squad) {
-      const currentOverseasCount = team.squad.reduce((count, s) => {
-        const pInfo = IPL_PLAYERS.find(p => p.id === (typeof s === 'string' ? s : s.id));
-        return pInfo && pInfo.country !== 'IND' ? count + 1 : count;
-      }, 0);
-      if (currentOverseasCount >= overseasLimit) {
-        throw new Error(`You have reached the overseas quota of ${overseasLimit} players for this mode!`);
-      }
-    }
-
-    // ── Bug Fix 1: Budget pre-flight check OUTSIDE the transaction ──
-    // The transaction update function is retried by Firebase on conflicts — using team.budgetRemaining
-    // inside it reads a stale React closure each retry, not the live DB value. We do the check here
-    // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
-    const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0, player?.set);
-    const myBudget = team.budgetRemaining || 0;
-    if (myBudget < nextBidSnapshot) {
-      throw new Error('Insufficient budget to place this bid.');
-    }
-
-    const liveRef = ref(getRoomDatabase(currentAuction.id), `auctions/${currentAuction.id}/live`);
-    let txResult;
-    try {
-      txResult = await runTransactionRtdb(liveRef, (currentData) => {
-        if (!currentData) return currentData;
-        if (currentData.status !== 'bidding') return; // normal abort
-        if (currentData.highBidderId === user.uid) return; // normal abort
-
-        const now = getSyncedTime();
-        // Server-side guard: Reject late bids if timer has already expired
-        if (currentData.timerEndsAt && now >= currentData.timerEndsAt) {
-          return; // normal abort
-        }
-
-        const cBid = currentData.currentBid || 0;
-        const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
-
-        // Guard: Abort retried transaction if updated bid exceeds user's budget
-        if (nAmount > myBudget) return;
-
-        currentData.currentBid = nAmount;
-        currentData.highBidderId = user.uid;
-        currentData.highBidderName = user.displayName || 'Manager';
-        currentData.highBidderTeamId = team.teamId;
-        currentData.timerEndsAt = now + (currentAuction.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000;
-        currentData.lastActivityAt = now;
-
-        return currentData;
-      });
-    } catch (error) {
-      const errorCode = error?.code || 'unknown';
-      const errorMessage = error?.message || String(error);
-      reportGuardianError({
-        operation: 'bidding',
-        severity: 'critical',
-        message: `Firebase bid transaction failed [${errorCode}]: ${errorMessage}`,
+    if (!currentAuction?.id) throw new Error('Auction not found!');
+    if (!user) throw new Error('Please log in to bid!');
+    if (!team) throw new Error('You must select a team in the lobby to participate!');
+    const roomServerId = getRoomServerId(currentAuction.id);
+    if (roomServerId === '3') await ensureServer3Auth();
+    else if (roomServerId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/place-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
         roomId: currentAuction.id,
-        fingerprint: `bid-transaction-error:${errorCode}`
-      });
-      throw error;
-    }
-
-    if (!txResult.committed) {
-      // Firebase uses committed=false for intentional aborts as well as
-      // transactions that do not write. These are normal bid-race/validation
-      // outcomes and must not be reported as critical infrastructure errors.
-      throw new Error("Bid failed: Another manager placed a higher bid or timer expired.");
-    }
+        serverId: roomServerId,
+        name: user.displayName || 'Manager'
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Bid failed.');
     void trackAnalyticsEvent('bid', currentAuction.id);
-  }, [currentAuction, user, team, getSyncedTime]);
+    return result;
+  }, [currentAuction, user, team]);
 
   const decideRetention = useCallback(async (roomId, decision) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
-
-    // Do not wait for the sync-readiness flag after the RTM countdown has begun.
-    // That wait can consume the entire short initial decision window. The RTDB
-    // transaction is the authority; use the cached server-adjusted clock and
-    // record the phase transition atomically.
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    // Capture when the manager actually clicked. A slow network must not turn an on-time
-    // choice into a rejection merely because the transaction reaches Firebase near expiry.
-    const decisionStartedAt = getSyncedTime();
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending') return;
-      const expiresAt = Number(offer.expiresAt);
-      // Allow a small network/UI scheduling grace for a click made at the countdown
-      // boundary. Store the decision at the deadline so settlement treats it as on-time.
-      if (decisionStartedAt > expiresAt + 1500) return;
-      const now = Math.min(decisionStartedAt, expiresAt);
-      const isInitialDecision = offer.phase === 'initial_decision';
-      const isMatchDecision = offer.phase === 'match_decision';
-      if (isInitialDecision) {
-        if (offer.eligibleUserId !== user.uid || !['accept', 'decline'].includes(decision)) return;
-        if (decision === 'accept') {
-          // Persist the affirmative choice as well as advancing the phase, so
-          // every client can distinguish an exercised RTM from an unanswered offer.
-          offer.rtmUsed = true;
-          offer.phase = 'counter_bid';
-          offer.decision = 'accept';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-          offer.expiresAt = now + 15000;
-        } else {
-          offer.decision = 'decline';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-        }
-      } else if (isMatchDecision) {
-        if (offer.eligibleUserId !== user.uid || !['match', 'decline_counter'].includes(decision)) return;
-        offer.decision = decision;
-        offer.decidedBy = user.uid;
-        offer.decidedAt = now;
-      } else {
-        return;
-      }
-      return currentData;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/retention-decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, decision })
     });
-
-    if (!result.committed) {
-      const latest = result.snapshot?.val();
-      const offer = latest?.retentionOffer;
-      reportGuardianError({ operation: 'rtm', severity: 'critical', message: 'RTM decision transaction was not committed', roomId, fingerprint: 'rtm-decision-not-committed' });
-      console.error('[RTM] Decision transaction not committed', {
-        roomId, decision, uid: user.uid, status: latest?.status,
-        phase: offer?.phase, offerStatus: offer?.status,
-        eligibleUserId: offer?.eligibleUserId, expiresAt: offer?.expiresAt,
-        serverTime: getSyncedTime()
-      });
-      throw new Error('Your RTM decision was not saved. Please try again immediately if the offer is still open.');
-    }
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Your RTM decision was not saved.');
+    return result;
+  }, [user]);
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
-    // Do not spend the short RTM counter-bid window waiting for the server-time
-    // readiness flag. As with decideRetention, the RTDB transaction remains
-    // authoritative; use the cached server-adjusted clock for the expiry check.
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    // These reads are independent. Run them together so a short RTM window is
-    // not consumed by two sequential network round trips before the transaction.
-    const [roomSnap, teamSnap] = await Promise.all([
-      get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`)),
-      get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`))
-    ]);
-    const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const teamData = teamSnap.exists() ? teamSnap.val() : {};
-    const counterBid = Number(Number(amount).toFixed(2));
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending' || offer.phase !== 'counter_bid' || offer.buyerId !== user.uid) return;
-      if (getSyncedTime() > Number(offer.expiresAt)) return;
-      if (counterBid <= Number(offer.bid)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120) + Number(teamData.spent || 0)) return;
-      offer.counterBid = counterBid;
-      offer.phase = 'match_decision';
-      offer.decision = null;
-      // The original franchise gets 10 seconds to match or decline the counter-bid.
-      offer.expiresAt = getSyncedTime() + 10000;
-      currentData.currentBid = counterBid;
-      return currentData;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/retention-counter-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, amount: Number(amount) })
     });
-    if (!result.committed) {
-      throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
-    }
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Counter-bid was not saved.');
+    return result;
+  }, [user]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
@@ -1912,116 +1407,67 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
   
   const updateRoomSettings = useCallback(async (roomId, settings) => {
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { settings, lastActivityAt: Date.now() });
-  }, []);
+    if (!user) throw new Error('Sign in to update room settings.');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/room-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, settings })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not update room settings.');
+    return result;
+  }, [user]);
 
   const pauseAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    const now = getSyncedTime();
-
-    // Keep processing_sale intact during RTM. Changing its status to "paused"
-    // is rejected by the RTDB lifecycle validation while an RTM offer is pending.
-    // A separate pause flag freezes the RTM timers without losing the decision.
-    await runTransactionRtdb(liveRef, (live) => {
-      if (!live || live.isPaused || ['sold', 'unsold'].includes(live.status)) return;
-      live.isPaused = true;
-      live.pausedAt = now;
-      live.pausedFromStatus = live.status;
-      if (live.status === 'bidding') {
-        live.pausedTimerRemainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
-        live.status = 'paused';
-      }
-      return live;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/auction-pause', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, action: 'pause' })
     });
-
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction PAUSED by Admin`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
-    });
-  }, [user, currentAuction, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not pause auction.');
+    return result;
+  }, [user, currentAuction]);
 
   const resumeAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    const now = getSyncedTime();
-
-    await runTransactionRtdb(liveRef, (live) => {
-      if (!live || !live.isPaused) return;
-      const pausedDuration = Math.max(0, now - Number(live.pausedAt || now));
-
-      if (live.status === 'paused') {
-        live.status = live.pausedFromStatus || 'bidding';
-        live.timerEndsAt = now + Math.max(0, Number(live.pausedTimerRemainingMs || 0));
-      } else if (live.status === 'processing_sale' && live.retentionOffer?.status === 'pending') {
-        // Freeze the current RTM phase countdown for the entire pause duration.
-        live.retentionOffer.expiresAt = Number(live.retentionOffer.expiresAt || now) + pausedDuration;
-      }
-
-      delete live.isPaused;
-      delete live.pausedAt;
-      delete live.pausedFromStatus;
-      delete live.pausedTimerRemainingMs;
-      return live;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/auction-pause', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, action: 'resume' })
     });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not resume auction.');
+    return result;
+  }, [user, currentAuction]);
 
-    await remove(ref(getRoomDatabase(roomId), `auctions/${roomId}/pauseRequests`));
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction RESUMED by Admin`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
-    });
-  }, [getSyncedTime, user, currentAuction]);
-
-  // End the bidding phase and open the shared three-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-    const roomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
-    const roomSnap = await get(roomRef);
-    if (!roomSnap.exists()) throw new Error('Auction room not found');
-    const roomData = roomSnap.val();
-    if (roomData.hostId !== user.uid) throw new Error('Only the host can end the auction');
-    if (roomData.status === 'awaiting_xi' || roomData.status === 'analyzing' || roomData.status === 'completed') return;
-    // Only MEGA requires a submitted Playing XI and keeps its 18-player minimum.
-    // Classic and every Sprint variant are ranked from the complete squad.
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/end-auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.room) throw new Error(result.error || 'Could not end auction.');
+    const roomData = result.room;
     const isMegaAuction = (roomData.auctionType || 'mega') === 'mega';
     const usesSquadBalanceAnalysis = !isMegaAuction;
-    const disqualifiedNames = [];
-    const teamsRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/teams`);
-    const teamsSnap = await get(teamsRef);
-    const teamsData = teamsSnap.val() || {};
-    const teamUpdates = {};
-    Object.entries(teamsData).forEach(([teamKey, teamData]) => {
-      if (!teamData?.teamId || teamData.teamId === 'NONE') return;
-      const squadCount = Array.isArray(teamData.squad) ? teamData.squad.length : 0;
-      const disqualified = isMegaAuction && squadCount < 18;
-      teamUpdates[`${teamKey}/disqualified`] = disqualified;
-      teamUpdates[`${teamKey}/disqualificationReason`] = disqualified
-        ? `Only ${squadCount} players bought; at least 18 are required.`
-        : null;
-      teamUpdates[`${teamKey}/squadCountAtEnd`] = squadCount;
-      if (disqualified) disqualifiedNames.push(`${teamData.teamName || teamData.teamId} (${squadCount}/18)`);
-    });
-    if (Object.keys(teamUpdates).length) await updateRtdb(teamsRef, teamUpdates);
-
-    const endedAt = getSyncedTime();
-    const deadline = usesSquadBalanceAnalysis ? endedAt : endedAt + PLAYING_XI_DEADLINE_MS;
-    await updateRtdb(roomRef, {
-      status: 'awaiting_xi',
-      xiSubmissionStartedAt: endedAt,
-      xiSubmissionDeadline: deadline,
-      winnerAnalysisStatus: 'collecting',
-      minimumSquadSize: isMegaAuction ? 18 : null
-    });
+    const disqualifiedNames = Array.isArray(result.disqualified) ? result.disqualified : [];
     const ruleMessage = isMegaAuction
       ? ` Minimum squad size is 18; franchises below 18 are disqualified. ${disqualifiedNames.length ? `Disqualified: ${disqualifiedNames.join(', ')}.` : 'All franchises met the minimum squad size.'}`
       : '';
@@ -2032,58 +1478,25 @@ export const AuctionProvider = ({ children }) => {
         : `Auction ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 5 minutes.${ruleMessage}`,
       type: 'log', timestamp: serverTimestampRtdb()
     });
-  }, [user, currentAuction, getSyncedTime]);
+    return result;
+  }, [user, currentAuction]);
 
   const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayerChasing, impactPlayerDefending = impactPlayerChasing) => {
     if (!user) throw new Error('Sign in to submit your Playing XI');
-    const roomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!roomSnap.exists()) throw new Error('Auction room not found');
-    const roomData = roomSnap.val();
-    if (roomData.status !== 'awaiting_xi') throw new Error('Playing XI submissions are closed');
-    if (getSyncedTime() > Number(roomData.xiSubmissionDeadline || 0)) throw new Error('Submission deadline has passed');
-    const teamSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`));
-    if (!teamSnap.exists()) throw new Error('Your franchise squad was not found');
-    const teamData = teamSnap.val();
-    if (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || (roomData.players || []).some((player) => player?.id === user.uid && player.isBot)) {
-      throw new Error('Bots cannot submit a Playing XI. The site selects their best eligible XI automatically.');
-    }
-    if (teamData.disqualified) {
-      throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
-    }
-    if (!validatePlayingXIOptions(startingXI, impactPlayerChasing, impactPlayerDefending, teamData.squad || [], IPL_PLAYERS)) {
-      const uniqueSelected = [...new Map([...(startingXI || []), impactPlayerChasing, impactPlayerDefending].filter(Boolean).map((item) => {
-        const id = typeof item === 'string' ? item : item?.id;
-        return [id, item];
-      })).values()];
-      const overseasCount = uniqueSelected.filter((item) => {
-        const playerId = typeof item === 'string' ? item : item?.id;
-        const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
-        return player && player.country !== 'IND';
-      }).length;
-      if (overseasCount > 4) {
-        throw new Error('Your 11 starters and both Impact Player choices can include a maximum of 4 unique overseas players combined.');
-      }
-      throw new Error('Choose 11 different starters in order and select an Impact Player for both chasing and defending from your squad. The two Impact slots may use the same player.');
-    }
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
-      playingXI: {
-        startingXI,
-        impactPlayerChasing,
-        impactPlayerDefending,
-        impactPlayer: impactPlayerChasing,
-        submittedAt: getSyncedTime(),
-        autoSelected: false
-      }
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/submit-playing-xi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, startingXI, impactPlayerChasing, impactPlayerDefending })
     });
-    await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System',
-      text: `${teamData.teamName || teamData.teamId} submitted its Playing XI.`,
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not submit Playing XI.');
+    return result;
+  }, [user]);
 
-  // One client claims the analysis phase transactionally after the deadline.
-  // All other clients observe the same persisted result through the room listener.
   const finalizeWinnerAnalysis = useCallback(async (roomId) => {
     const roomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
     const roomSnap = await get(roomRef);
@@ -2256,10 +1669,20 @@ export const AuctionProvider = ({ children }) => {
       let eligibleRankings = [];
       let analysisModel = 'Eligibility Rules';
       if (payload.length >= 2 || (usesSquadBalanceAnalysis && payload.length === 1)) {
+        if (!user?.getIdToken) throw new Error('Sign in again to complete winner analysis.');
+        const analysisToken = await user.getIdToken();
         const response = await fetch('/api/analyze-winner', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId, auctionType: roomData.auctionType || 'mega', franchises: payload })
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + analysisToken
+          },
+          body: JSON.stringify({
+            roomId,
+            serverId: getRoomServerId(roomId),
+            auctionType: roomData.auctionType || 'mega',
+            franchises: payload
+          })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'AI analysis failed');
@@ -2365,148 +1788,54 @@ export const AuctionProvider = ({ children }) => {
 
   // ─── Bot Management & Bidding Engine ───
 
-  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName, timerSeconds = DEFAULT_BID_TIMER_SECONDS, maxValuation = Infinity, botBudget = Infinity) => {
-    if (!roomId) return;
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-
-    await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === botUserId) return; // abort
-
-      const now = getSyncedTime();
-      // Reject if timer has already expired server-side
-      if (currentData.timerEndsAt && now >= currentData.timerEndsAt) return;
-      
-      const cBid = currentData.currentBid || 0;
-      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
-
-      // Guard: Abort retried transaction if updated bid exceeds bot's max valuation or remaining budget
-      if (nAmount > maxValuation || nAmount > botBudget) return;
-
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = botUserId;
-      currentData.highBidderName = botName;
-      currentData.highBidderTeamId = botTeamId;
-      // Use the room's configured timer, NOT a hardcoded 10 seconds
-      currentData.timerEndsAt = now + (timerSeconds * 1000);
-      
-      return currentData;
+  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName) => {
+    if (!roomId || !user) return;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/place-bot-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, botUserId, botTeamId, botName })
     });
-  }, [getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (result.reason !== 'live_state_changed' && result.reason !== 'bid_timer_expired' && result.reason !== 'already_high_bidder') {
+        throw new Error(result.error || 'Bot bid failed.');
+      }
+      return result;
+    }
+    return result;
+  }, [user]);
+
+  const botTeamMutation = useCallback(async (roomId, action, teamIdOrBotId) => {
+    if (!user) throw new Error('Sign in required');
+    const roomServerId = getRoomServerId(roomId);
+    if (roomServerId === '3') await ensureServer3Auth();
+    else if (roomServerId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/room-bots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId: roomServerId, action, value: teamIdOrBotId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Bot team update failed');
+    return result;
+  }, [user]);
 
   const addBotTeam = useCallback(async (roomId, teamId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-    const teamDetails = TEAMS.find(t => t.id === teamId);
-    if (!teamDetails) return;
-
-    const botUserId = `bot_${teamId}`;
-    const botName = `${teamDetails.name} Bot`;
-
-    const existingPlayers = data.players || [];
-    if (existingPlayers.some(p => p.id === botUserId || p.team === teamId)) return;
-
-    const updatedPlayers = [...existingPlayers, {
-      id: botUserId,
-      name: botName,
-      team: teamId,
-      teamName: teamDetails.name,
-      isHost: false,
-      isBot: true
-    }];
-
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    const teamDataToSet = {
-      auctionId: roomId,
-      userId: botUserId,
-      teamId,
-      teamName: teamDetails.name,
-      budgetRemaining: data.settings?.budget || 120.0,
-      spent: 0,
-      squad: []
-    };
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), teamDataToSet);
-  }, []);
+    return botTeamMutation(roomId, 'add', teamId);
+  }, [botTeamMutation]);
 
   const removeBotTeam = useCallback(async (roomId, botUserId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const updatedPlayers = (data.players || []).filter(p => p.id !== botUserId);
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
-  }, []);
+    return botTeamMutation(roomId, 'remove', botUserId);
+  }, [botTeamMutation]);
 
   const fillEmptyTeamsWithBots = useCallback(async (roomId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const existingPlayers = data.players || [];
-    const takenTeamIds = new Set(existingPlayers.map(p => p.team).filter(Boolean));
-
-    const updatedPlayers = [...existingPlayers];
-    const teamsToSet = {};
-
-    TEAMS.forEach(t => {
-      if (!takenTeamIds.has(t.id)) {
-        const botUserId = `bot_${t.id}`;
-        const botName = `${t.name} Bot`;
-        updatedPlayers.push({
-          id: botUserId,
-          name: botName,
-          team: t.id,
-          teamName: t.name,
-          isHost: false,
-          isBot: true
-        });
-        teamsToSet[`${roomId}_${botUserId}`] = {
-          auctionId: roomId,
-          userId: botUserId,
-          teamId: t.id,
-          teamName: t.name,
-          budgetRemaining: data.settings?.budget || 120.0,
-          spent: 0,
-          squad: []
-        };
-      }
-    });
-
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    if (Object.keys(teamsToSet).length > 0) {
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams`), teamsToSet);
-    }
-  }, []);
+    return botTeamMutation(roomId, 'fill', null);
+  }, [botTeamMutation]);
 
   // Guard ref: track the last timer cycle (timerEndsAt) that a bot bid was queued for.
   // Prevents multiple bot bids from being scheduled when currentAuction re-renders

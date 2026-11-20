@@ -149,7 +149,6 @@
           }
         },
 
-        // Whole-tree team sync happens from every client on each sale.
         "teams": {
           ".write": "auth != null"
         },
