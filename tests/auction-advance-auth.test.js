@@ -4,7 +4,7 @@ import { resolveAuctionAdvance } from '../api/auction-advance-auth.js';
 
 const players=[{id:'p1'},{id:'p2'}];
 const live={playerId:'p1',status:'sold',transitionDeadline:1000};
-const room={settings:{bidTimer:15}};
+const room={status:'active',settings:{bidTimer:15}};
 
 test('rejects lot progression before transition deadline',()=>{
   assert.equal(resolveAuctionAdvance({live,room,order:[0,1],players,now:999}).reason,'transition_waiting');
