@@ -51,3 +51,10 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Room activity endpoint now has a per-user in-memory rate limit of 30 requests per minute; bot identities are rejected.
 - CI workflow explicitly runs on pushes to `security-rules-hardening`. The production health-check job remains restricted to `main`.
 - These changes are isolated in the security branch and have not been merged or deployed.
+
+## Transactional join implementation status
+- Added `POST /api/room-join`, which verifies the primary Firebase ID token, routes rooms by code prefix, checks waiting-room status/ban/franchise occupancy/reconnect identity, and commits roster changes using an RTDB transaction.
+- Team records are initialized through an idempotent transaction that preserves existing team state on reconnect.
+- The RTDB client join flow now calls the endpoint; legacy non-RTDB rooms retain a compatibility path.
+- Remaining caveat: roster transaction and team-record transaction are separate RTDB paths, so a failure between them can leave a roster member without a team record. The endpoint is designed to be safely retried, but full atomic coordination across room and team paths remains a follow-up.
+- Bot add/remove/fill operations are not yet server-authoritative and remain pending.
