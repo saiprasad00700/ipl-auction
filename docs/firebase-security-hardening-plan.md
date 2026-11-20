@@ -48,6 +48,12 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Pure helper tests cover timer rejection, eligible offer creation, and RTM skip conditions.
 - Cross-path consistency caveat remains: eligibility reads room/team snapshots before the live transaction; trusted settlement still validates purse/card/squad limits. Restrictive Firebase rules are not yet safe to deploy.
 
+## Server-authoritative Playing XI submission
+- `POST /api/submit-playing-xi` verifies the assigned Firebase project token, room membership, ban status, XI phase/deadline, and disqualification state.
+- The server validates the ordered 11 starters and both Impact Player choices against the franchise squad and player catalogue, then commits the XI in a team transaction.
+- The client no longer writes the submitted XI directly.
+- Emulator tests for ownership/deadline/quota edge cases are still required before restrictive rules are introduced.
+
 ## Server-authoritative pause/resume and host end
 - Host pause/resume is now authenticated by the assigned Firebase project and host identity; timer and RTM expiry freezing are applied inside the server transaction.
 - Host end-auction/disqualification is now performed in an atomic auction-root transaction. Mega auction minimum-squad disqualification and XI-phase metadata are calculated server-side.
