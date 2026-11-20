@@ -1061,6 +1061,37 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/end-auction') {
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      if(!decoded.uid||/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid))return sendJson(res,403,{error:'Automated accounts cannot end auctions'});
+      if(!allowRoomActivityRequest(decoded.uid))return sendJson(res,429,{error:'Auction end request limit reached. Please wait before retrying.'});
+      const database=services.database,rootRef=database.ref(`auctions/${roomId}`);
+      const {resolveAuctionEnd}=await import('./api/auction-end-auth.js');
+      const {PLAYING_XI_DEADLINE_MS}=await import('./src/lib/auctionWinnerRules.js');
+      let reason=null;
+      const tx=await rootRef.transaction(current=>{
+        if(!current?.room){reason='room_not_found';return;}
+        const result=resolveAuctionEnd({room:current.room,teams:current.teams||{},uid:decoded.uid,now:Date.now(),xiDeadlineMs:PLAYING_XI_DEADLINE_MS});
+        if(!result.allowed){reason=result.reason;return;}
+        return {...current,room:result.room,teams:{...(current.teams||{}),...result.teams}};
+      });
+      if(!tx.committed)return sendJson(res,reason==='host_only'?403:409,{error:reason==='host_only'?'Only the host can end the auction.':'Auction is already ended or cannot be ended now.',reason});
+      return sendJson(res,200,{ok:true,room:tx.snapshot.val().room,disqualified: Object.values(tx.snapshot.val().teams||{}).filter(t=>t?.disqualified).map(t=>t.teamName||t.teamId)});
+    }catch(error){
+      console.warn('[Auction end] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not end auction securely'});
+    }
+  }
   if (pathname === '/api/auction-pause') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
