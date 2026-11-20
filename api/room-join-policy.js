@@ -35,3 +35,15 @@ export function buildJoinedRoom({ room, uid, name, teamId, teamName }) {
   roster.push(player);
   return { player, roster };
 }
+
+// Pure transaction callback helper: Firebase may rerun this callback, so it must
+// remain deterministic and side-effect free.
+export function applyRoomJoinTransaction(currentRoom, { uid, name, teamId, teamName, bannedPlayers = [] }) {
+  const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers });
+  if (!decision.allowed) return { room: undefined, decision };
+  const built = buildJoinedRoom({ room: currentRoom, uid, name, teamId, teamName });
+  return {
+    room: { ...currentRoom, players: built.roster, lastActivityAt: Date.now() },
+    decision: { ...decision, player: built.player }
+  };
+}
