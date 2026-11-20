@@ -319,13 +319,9 @@ async function cleanupAbandonedRooms() {
         if (now - completionStamp < COMPLETED_ROOM_RETENTION_MS) continue;
       } else {
         const status = liveStatus || roomStatus || 'waiting';
-        const isWaiting = status === 'waiting';
-        const isStarted = status === 'active' || status === 'started' || status === 'in_progress';
-        if (!isWaiting && !isStarted) {
-          console.log('[Room cleanup] Preserving room with unrecognized/non-live status:', roomId, status);
-          continue;
-        }
-
+        // Any non-completed room state is eligible for inactivity cleanup.
+        // Auction states such as bidding, paused, sold, unsold, and
+        // processing_sale are valid states—not reasons to skip cleanup.
         // Presence heartbeats are intentionally excluded: players may remain
         // online without using the room, and must not prevent idle-room cleanup.
         const messageActivity = Object.values(roomNode?.messages || {}).reduce((latest, message) => {
