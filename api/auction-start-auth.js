@@ -33,12 +33,14 @@ export function buildAuctionStart({ room, players, random = Math.random, now, bi
     order.push(...shuffle(setIndices));
   }
   if (!order.length) return { allowed: false, status: 409, reason: 'empty_player_order' };
+  const configuredTimer = Number(bidTimerSeconds || 15);
+  const timerSeconds = [3, 5, 10, 15].includes(configuredTimer) ? configuredTimer : 15;
   const live = {
     playerId: players[order[0]].id,
     currentBid: 0,
     highBidderId: '',
     highBidderName: 'No Bids',
-    timerEndsAt: Number(now) + Number(bidTimerSeconds || 15) * 1000,
+    timerEndsAt: Number(now) + timerSeconds * 1000,
     status: 'bidding'
   };
   return { allowed: true, status: 200, order, live, room: { ...room, status: 'active', playerOrder: order, lastActivityAt: Number(now) } };
