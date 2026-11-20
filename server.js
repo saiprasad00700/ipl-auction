@@ -395,44 +395,43 @@ async function cleanupAbandonedRooms() {
           const createdAt = Number(publicRoom.createdAt || publicRoom.lastActivityAt || 0);
           if (!Number.isFinite(createdAt) || createdAt <= 0 || now - createdAt < ROOM_IDLE_TIMEOUT_MS) continue;
 
-          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-          if (!supabaseUrl || !supabaseServiceKey) {
-            console.warn('[Room cleanup] Skipped orphan directory cleanup: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured.');
-            continue;
-          }
-          const supabaseHeaders = {
-            apikey: supabaseServiceKey,
-            Authorization: 'Bearer ' + supabaseServiceKey,
-            Prefer: 'return=minimal'
-          };
-
-          const teamsQuery = new URL('/rest/v1/teams', supabaseUrl);
-          teamsQuery.searchParams.set('auction_id', 'eq.' + roomId);
-          const teamsResponse = await fetch(teamsQuery, { method: 'DELETE', headers: supabaseHeaders });
-          if (!teamsResponse.ok && teamsResponse.status !== 404) {
-            const detail = (await teamsResponse.text()).slice(0, 300);
-            console.warn('[Room cleanup] Orphan Supabase team cleanup failed for room', roomId, teamsResponse.status, detail);
-            continue;
-          }
-
-          const auctionQuery = new URL('/rest/v1/auctions', supabaseUrl);
-          auctionQuery.searchParams.set('id', 'eq.' + roomId);
-          const auctionResponse = await fetch(auctionQuery, { method: 'DELETE', headers: supabaseHeaders });
-          if (!auctionResponse.ok) {
-            const detail = (await auctionResponse.text()).slice(0, 500);
-            let errorBody = {};
-            try { errorBody = JSON.parse(detail); } catch {}
-            const tableMissing = auctionResponse.status === 404 && errorBody.code === 'PGRST205';
-            if (!tableMissing) {
-              console.warn('[Room cleanup] Orphan Supabase auction cleanup failed for room', roomId, auctionResponse.status, detail);
-              continue;
-            }
-          }
-
+          // Firebase is the source of truth for orphan directory entries.
+          // Remove the stale public room and capacity reservation first so
+          // optional Supabase failures cannot leave the room visible forever.
           await database.ref('publicRooms/' + roomId).remove();
           await database.ref(ALLOCATOR_PATH + '/' + roomId).remove().catch(() => {});
           console.log('[Room cleanup] Removed orphan public room directory entry from Firebase:', roomId);
+
+          // Supabase cleanup is best-effort only.
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseServiceKey) {
+            const supabaseHeaders = {
+              apikey: supabaseServiceKey,
+              Authorization: 'Bearer ' + supabaseServiceKey,
+              Prefer: 'return=minimal'
+            };
+            try {
+              const teamsQuery = new URL('/rest/v1/teams', supabaseUrl);
+              teamsQuery.searchParams.set('auction_id', 'eq.' + roomId);
+              const teamsResponse = await fetch(teamsQuery, { method: 'DELETE', headers: supabaseHeaders });
+              if (!teamsResponse.ok && teamsResponse.status !== 404) {
+                console.warn('[Room cleanup] Orphan Supabase teams cleanup failed (Firebase entry already removed):', roomId, teamsResponse.status, (await teamsResponse.text()).slice(0, 300));
+              }
+              const auctionQuery = new URL('/rest/v1/auctions', supabaseUrl);
+              auctionQuery.searchParams.set('id', 'eq.' + roomId);
+              const auctionResponse = await fetch(auctionQuery, { method: 'DELETE', headers: supabaseHeaders });
+              if (!auctionResponse.ok) {
+                const detail = (await auctionResponse.text()).slice(0, 500);
+                let errorBody = {};
+                try { errorBody = JSON.parse(detail); } catch {}
+                const tableMissing = auctionResponse.status === 404 && errorBody.code === 'PGRST205';
+                if (!tableMissing) console.warn('[Room cleanup] Orphan Supabase auction cleanup failed (Firebase entry already removed):', roomId, auctionResponse.status, detail);
+              }
+            } catch (supabaseError) {
+              console.warn('[Room cleanup] Orphan Supabase cleanup exception (Firebase entry already removed):', roomId, supabaseError?.message || supabaseError);
+            }
+          }
         }
       }
     }
