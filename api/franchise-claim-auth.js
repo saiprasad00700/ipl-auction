@@ -1,4 +1,4 @@
-export function applyFranchiseClaim({root,uid,teamId,teamNames,budget,now}){
+export function applyFranchiseClaim({root,roomId,uid,teamId,teamNames,budget,now}){
  const room=root?.room;if(!room)return {allowed:false,status:404,reason:'room_not_found'};
  if(room.status!=='waiting')return {allowed:false,status:409,reason:'join_closed'};
  if(!uid||!teamNames[teamId])return {allowed:false,status:400,reason:'invalid_identity_or_team'};
@@ -12,9 +12,9 @@ export function applyFranchiseClaim({root,uid,teamId,teamNames,budget,now}){
  const teamName=teamNames[teamId];
  const updatedPlayer={...players.find(p=>p&&(p.id===uid||p.userId===uid)),id:uid,team:teamId,teamName,isBot:false};
  const roster=players.filter(p=>p&&p.id!==uid&&p.userId!==uid&&!(p.isBot&&p.id===botId));roster.push(updatedPlayer);
- const teams={...(root.teams||{})};if(bot)delete teams[room.auctionId?room.auctionId+'_bot':undefined];delete teams[(root.roomId||'')+'_bot'];
- const humanKey=(root.roomId||'')+'_'+uid;
- const existing=teams[humanKey]||{};teams[humanKey]={...existing,auctionId:root.roomId||existing.auctionId,userId:uid,teamId,teamName,budgetRemaining:existing.budgetRemaining??budget,spent:Number(existing.spent||0),squad:Array.isArray(existing.squad)?existing.squad:[],retentionCardsRemaining:Number(existing.retentionCardsRemaining??2)};
+ const teams={...(root.teams||{})};if(bot)delete teams[roomId+'_bot_'+teamId];
+ const humanKey=roomId+'_'+uid;
+ const existing=teams[humanKey]||{};teams[humanKey]={...existing,auctionId:roomId,userId:uid,teamId,teamName,budgetRemaining:existing.budgetRemaining??budget,spent:Number(existing.spent||0),squad:Array.isArray(existing.squad)?existing.squad:[],retentionCardsRemaining:Number(existing.retentionCardsRemaining??2)};
  const roomNext={...room,players:roster,lastActivityAt:Number(now)};
  return {allowed:true,status:200,root:{...root,room:roomNext,teams},player:updatedPlayer,botId:bot?botId:null};
 }
