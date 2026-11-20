@@ -1139,8 +1139,23 @@ export const AuctionProvider = ({ children }) => {
     const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
     updatedPlayers.push(updatedPlayer);
 
-    // Update the roster first, preserving its array shape.
-    await set(ref(roomDatabase, `auctions/${roomId}/room/players`), updatedPlayers);
+    // RTDB rooms use the server-authoritative transactional join endpoint.
+    // Legacy Supabase/Firestore rooms retain their existing compatibility path.
+    let serverAuthoritativeJoin = false;
+    if (rtdbRoomSnap.exists() && user && user.uid === userId) {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/room-join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ roomId, serverId: getRoomServerId(roomId), teamId: playerDetails.team, name: updatedPlayer.name })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not join room securely');
+      serverAuthoritativeJoin = true;
+    } else {
+      // Compatibility path for legacy rooms not hosted in RTDB.
+      await set(ref(roomDatabase, `auctions/${roomId}/room/players`), updatedPlayers);
+    }
 
     // Save history independently of the activity heartbeat. A heartbeat/rules
     // failure must never prevent a successfully joined room from being recorded.
@@ -1183,8 +1198,9 @@ export const AuctionProvider = ({ children }) => {
     }
     */
 
-    // Create/Update team in RTDB if team is provided
-    if (playerDetails.team) {
+    // The secure endpoint initializes the team transactionally/idempotently.
+    // Legacy room paths continue to use the compatibility team initialization.
+    if (playerDetails.team && !serverAuthoritativeJoin) {
       const rtdbTeamSnap = await get(ref(roomDatabase, `auctions/${roomId}/teams/${roomId}_${userId}`));
       if (!rtdbTeamSnap.exists()) {
         const teamDataToSet = {
