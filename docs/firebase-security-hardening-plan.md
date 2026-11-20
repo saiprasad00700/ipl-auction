@@ -37,6 +37,15 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative bot team management
+- Bot add/remove/fill requests now call `POST /api/room-bots` with a Firebase ID token.
+- The server verifies the authenticated host, room-code server routing, and waiting-room status; clients cannot manage bots after the auction starts.
+- Room roster changes use an RTDB room transaction to avoid concurrent roster overwrites.
+- Bot team records are initialized idempotently through per-team transactions and existing team purse/squad state is preserved.
+- Bot removal is restricted to bot identities and removes the corresponding team record after the room transaction.
+- Cross-path atomicity remains a caveat: room roster and team records are separate RTDB paths. A failure after roster commit can leave a bot roster entry without a team record; retry/fill can repair missing team initialization, but removal can similarly require a retry.
+- This is branch-only and awaits CI/emulator verification; no production deployment.
+
 ## Completed-auction visibility requirement
 - Completed-auction summaries must allow every authenticated room viewer to inspect every franchise's squad and saved Playing XI, including the ordered starting XI, both Impact Player selections, and auto-selected XI status.
 - `AuctionSummary.jsx` reads the completed room's team records directly from the room's Server 1/2/3 RTDB, while also merging context and legacy fallbacks. This avoids depending on the live-auction listeners remaining active after completion.
