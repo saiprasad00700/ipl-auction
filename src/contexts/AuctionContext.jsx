@@ -1710,22 +1710,19 @@ export const AuctionProvider = ({ children }) => {
   // room document and Firebase rules intentionally reserve that write for host.
   const retryWinnerAnalysis = useCallback(async (roomId) => {
     if (!user) return;
-    const roomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
-    const roomSnap = await get(roomRef);
-    if (!roomSnap.exists() || roomSnap.val()?.hostId !== user.uid) return;
-    const retryClaim = await runTransactionRtdb(roomRef, (current) => {
-      if (!current || current.status !== 'analysis_failed') return;
-      return {
-        ...current,
-        status: 'awaiting_xi',
-        winnerAnalysisStatus: 'collecting',
-        winnerAnalysisError: null
-      };
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/winner-analysis-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, action: 'retry' })
     });
-    if (!retryClaim.committed) return;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not retry winner analysis securely.');
     await finalizeWinnerAnalysis(roomId);
   }, [user, finalizeWinnerAnalysis]);
-
 
 
   // ─── Bot Management & Bidding Engine ───
