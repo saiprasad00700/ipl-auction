@@ -1147,6 +1147,11 @@ export const AuctionProvider = ({ children }) => {
         ? currentRoster.filter(Boolean)
         : Object.values(currentRoster || {}).filter(Boolean);
       const existingIndex = roster.findIndex(p => p && (p.id === userId || p.userId === userId));
+      if (updatedPlayer.team) {
+        const conflictingOwner = roster.find(p => p && p.team === updatedPlayer.team
+          && p.id !== userId && p.userId !== userId && !p.isBot);
+        if (conflictingOwner) return;
+      }
       if (existingIndex >= 0) {
         roster[existingIndex] = {
           ...roster[existingIndex],
