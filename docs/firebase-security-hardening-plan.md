@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative RTM finalization
+- The `POST /api/retention-finalize` endpoint authenticates the caller against the room's assigned Firebase project and checks room membership and ban state.
+- Final RTM outcomes (original manager retain after counter-bid timeout, match decision, decline, or expiry) are resolved by a server transaction using server time.
+- The client now requests finalization from this endpoint instead of directly mutating the RTM outcome.
+- Pure helper tests cover RTM phase/window resolution.
+- RTM offer creation still originates from the client timer path and remains a security gap. Full bidding-expiry/offer creation and auction progression should be migrated before restrictive rules.
+
 ## Trusted sale-side effects
 - Durable sold-player team updates (squad append, purse deduction, spent total, and RTM card decrement) now call `POST /api/settle-sale`.
 - The endpoint verifies a room participant caller against the assigned Firebase project, validates that the live state is sold, verifies the winner/franchise roster entry and player catalog record, and commits the team record idempotently.
