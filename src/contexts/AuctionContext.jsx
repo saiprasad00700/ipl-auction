@@ -539,6 +539,9 @@ export const AuctionProvider = ({ children }) => {
             ? Number(eligibleTeamData.retentionCardsRemaining)
             : RETENTION_CARDS_PER_FRANCHISE;
           const purseRemaining = Number(eligibleTeamData.budgetRemaining ?? preRoomData.settings?.budget ?? 120);
+          const squadLimit = Number(preRoomData.squadLimit || 25);
+          const eligibleSquadCount = Array.isArray(eligibleTeamData.squad) ? eligibleTeamData.squad.length : 0;
+          const hasSquadSpaceForRtm = eligibleSquadCount < squadLimit;
           const auctionPlayer = IPL_PLAYERS.find((player) => player.id === currentData.playerId);
           const isOverseasPlayer = Boolean(auctionPlayer && auctionPlayer.country !== 'IND');
           const overseasLimit = preRoomData.auctionType === 'sprint5' ? 2
@@ -554,6 +557,7 @@ export const AuctionProvider = ({ children }) => {
           // and let the current highest bidder win the player.
           const eligibleForOverseasRtm = !isOverseasPlayer || existingOverseasCount < overseasLimit;
           if (originalFranchiseId && originalFranchiseId !== buyerFranchiseId && eligiblePlayer
+            && hasSquadSpaceForRtm
             && eligibleForOverseasRtm
             && canUseRetentionCard({
               originalFranchiseId,
