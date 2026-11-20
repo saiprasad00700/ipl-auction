@@ -1060,6 +1060,63 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/room-join') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot join as participants' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Room join request limit reached. Please wait before retrying.' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const teamId = String(body.teamId || '').trim().toUpperCase();
+      const name = String(body.name || 'Manager').trim().slice(0, 40);
+      const teamNames = { MI: 'Mumbai Indians', CSK: 'Chennai Super Kings', RCB: 'Royal Challengers Bengaluru', KKR: 'Kolkata Knight Riders', DC: 'Delhi Capitals', PBKS: 'Punjab Kings', RR: 'Rajasthan Royals', SRH: 'Sunrisers Hyderabad', LSG: 'Lucknow Super Giants', GT: 'Gujarat Titans' };
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      if (!teamNames[teamId]) return sendJson(res, 400, { error: 'Invalid franchise selection' });
+      const database = await getDatabaseForServer(serverId);
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const { validateRoomJoin, buildJoinedRoom } = await import('./api/room-join-policy.js');
+      const bannedSnapshot = await database.ref(`auctions/${roomId}/room/bannedPlayers`).get();
+      const bannedPlayers = bannedSnapshot.exists() ? bannedSnapshot.val() : [];
+      const transaction = await roomRef.transaction((currentRoom) => {
+        if (!currentRoom) return;
+        const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers });
+        if (!decision.allowed) return;
+        const built = buildJoinedRoom({ room: currentRoom, uid, name, teamId, teamName: teamNames[teamId] });
+        return { ...currentRoom, players: built.roster, lastActivityAt: Date.now() };
+      });
+      if (!transaction.committed) {
+        const current = transaction.snapshot.val();
+        const decision = validateRoomJoin({ room: current, uid, teamId, bannedPlayers });
+        return sendJson(res, decision.status, { error: decision.reason });
+      }
+      // Team creation is idempotent and separate from the roster transaction.
+      // Existing team purse/squad state is never overwritten on reconnect.
+      const teamKey = `${roomId}_${uid}`;
+      const teamRef = database.ref(`auctions/${roomId}/teams/${teamKey}`);
+      const teamSnapshot = await teamRef.get();
+      if (!teamSnapshot.exists()) {
+        await teamRef.set({
+          auctionId: roomId, userId: uid, teamId, teamName: teamNames[teamId],
+          budgetRemaining: Number(transaction.snapshot.val()?.settings?.budget || 120),
+          spent: 0, squad: [], retentionCardsRemaining: 2
+        });
+      } else if (teamSnapshot.val()?.teamId !== teamId) {
+        return sendJson(res, 409, { error: 'Existing team record does not match the selected franchise' });
+      }
+      return sendJson(res, 200, { ok: true, player: (transaction.snapshot.val()?.players || []).find((p) => p?.id === uid), serverId });
+    } catch (error) {
+      console.warn('[Room join] Transaction failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not join room securely' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
