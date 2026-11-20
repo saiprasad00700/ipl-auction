@@ -1432,8 +1432,19 @@ export const AuctionProvider = ({ children }) => {
   }, [user]);
   
   const updateRoomSettings = useCallback(async (roomId, settings) => {
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { settings, lastActivityAt: Date.now() });
-  }, []);
+    if (!user) throw new Error('Sign in to update room settings.');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/room-settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, settings })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not update room settings.');
+    return result;
+  }, [user]);
 
   const pauseAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
