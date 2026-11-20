@@ -1121,6 +1121,98 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not join room securely' });
     }
   }
+  if (pathname === '/api/room-bots') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot manage bot teams' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bot management request limit reached. Please wait before retrying.' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const action = String(body.action || '').trim();
+      const value = String(body.value || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      if (!['add','remove','fill'].includes(action)) return sendJson(res, 400, { error: 'Invalid bot management action' });
+      const teamNames = { MI: 'Mumbai Indians', CSK: 'Chennai Super Kings', RCB: 'Royal Challengers Bengaluru', KKR: 'Kolkata Knight Riders', DC: 'Delhi Capitals', PBKS: 'Punjab Kings', RR: 'Rajasthan Royals', SRH: 'Sunrisers Hyderabad', GT: 'Gujarat Titans', LSG: 'Lucknow Super Giants' };
+      const database = await getDatabaseForServer(serverId);
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      let selectedTeamId = '';
+      let removedBotId = '';
+      const transaction = await roomRef.transaction((room) => {
+        if (!room || room.hostId !== uid || room.status !== 'waiting') return;
+        const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+        if (action === 'add') {
+          const teamId = value.toUpperCase();
+          if (!teamNames[teamId]) return;
+          selectedTeamId = teamId;
+          const botId = `bot_${teamId}`;
+          if (roster.some((p) => p?.id === botId || p?.team === teamId)) return;
+          return { ...room, players: [...roster, { id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true }], lastActivityAt: Date.now() };
+        }
+        if (action === 'fill') {
+          const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
+          const newPlayers = [...roster];
+          for (const teamId of Object.keys(teamNames)) {
+            if (taken.has(teamId)) continue;
+            const botId = `bot_${teamId}`;
+            newPlayers.push({ id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true });
+            taken.add(teamId);
+          }
+          return { ...room, players: newPlayers, lastActivityAt: Date.now() };
+        }
+        if (action === 'remove') {
+          if (!/^bot_[A-Z]{2,4}$/.test(value)) return;
+          const target = roster.find((p) => p?.id === value && p?.isBot === true);
+          if (!target) return;
+          removedBotId = value;
+          return { ...room, players: roster.filter((p) => p?.id !== value), lastActivityAt: Date.now() };
+        }
+      });
+      if (!transaction.committed) {
+        const room = transaction.snapshot.val();
+        if (!room) return sendJson(res, 404, { error: 'Auction room not found' });
+        if (room.hostId !== uid) return sendJson(res, 403, { error: 'Only the host can manage bot teams' });
+        if (room.status !== 'waiting') return sendJson(res, 409, { error: 'Bot teams can only be managed before the auction starts' });
+        return sendJson(res, 409, { error: action === 'add' ? 'Franchise is already claimed' : action === 'remove' ? 'Bot not found' : 'Could not fill empty franchises' });
+      }
+      const finalRoom = transaction.snapshot.val() || {};
+      const roster = Array.isArray(finalRoom.players) ? finalRoom.players : Object.values(finalRoom.players || {});
+      const teamsRef = database.ref(`auctions/${roomId}/teams`);
+      const teamUpdates = {};
+      if (action === 'add' && selectedTeamId) {
+        const botId = `bot_${selectedTeamId}`;
+        teamUpdates[`${roomId}_${botId}`] = {
+          auctionId: roomId, userId: botId, teamId: selectedTeamId, teamName: teamNames[selectedTeamId],
+          budgetRemaining: Number(finalRoom.settings?.budget || 120), spent: 0, squad: [], retentionCardsRemaining: 2
+        };
+      } else if (action === 'fill') {
+        const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
+        for (const teamId of Object.keys(teamNames)) {
+          if (!taken.has(teamId)) continue;
+          const botId = `bot_${teamId}`;
+          if (roster.some((p) => p?.id === botId)) {
+            teamUpdates[`${roomId}_${botId}`] = {
+              auctionId: roomId, userId: botId, teamId, teamName: teamNames[teamId],
+              budgetRemaining: Number(finalRoom.settings?.budget || 120), spent: 0, squad: [], retentionCardsRemaining: 2
+            };
+          }
+        }
+      }
+      if (Object.keys(teamUpdates).length) await teamsRef.update(teamUpdates);
+      if (action === 'remove' && removedBotId) await teamsRef.child(`${roomId}_${removedBotId}`).remove();
+      return sendJson(res, 200, { ok: true, action, roomId });
+    } catch (error) {
+      console.warn('[Room bots] Mutation failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not manage bot teams securely' });
+    }
+  }
   if (pathname === '/api/room-activity') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
