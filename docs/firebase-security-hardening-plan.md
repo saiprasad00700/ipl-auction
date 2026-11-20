@@ -37,6 +37,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Completed-auction visibility requirement
+- Completed-auction summaries must allow every authenticated room viewer to inspect every franchise's squad and saved Playing XI, including the ordered starting XI, both Impact Player selections, and auto-selected XI status.
+- `AuctionSummary.jsx` reads the completed room's team records directly from the room's Server 1/2/3 RTDB, while also merging context and legacy fallbacks. This avoids depending on the live-auction listeners remaining active after completion.
+- The Franchise XI cards now explicitly indicate submitted XI, automatically selected XI, unavailable XI, and disqualified status, and show each franchise's squad count. The Squad tab remains the detailed roster view.
+- RTDB room/team reads are currently authenticated-user-readable in the existing rules; no client-only privacy restriction should hide other franchises' results from auction participants/viewers. This visibility is a required regression test before deployment.
+- Verified by source inspection only so far; no production deployment and no emulator/CI validation claimed.
+
 ## Rollout
 - Keep this branch isolated.
 - Implement trusted server mutation endpoints and client integration first.
