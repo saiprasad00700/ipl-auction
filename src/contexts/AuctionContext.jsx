@@ -852,7 +852,7 @@ export const AuctionProvider = ({ children }) => {
       console.error('[Auction] endPlayerAuction failed:', err);
       endingPlayerRef.current = false;
     }
-  }, [getSyncedTime, flushAuctionToFirestore, user]);
+  }, [getSyncedTime, flushAuctionToFirestore, user, currentAuction]);
 
   // Recover an overdue sold/unsold transition from shared RTDB state. The
   // transaction checks the player, status and deadline again, so only one client
@@ -925,7 +925,7 @@ export const AuctionProvider = ({ children }) => {
       });
     }
 
-  }, [getSyncedTime, user]);
+  }, [getSyncedTime, user, currentAuction]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     // Room codes are allocated with their first digit identifying the Firebase server.
