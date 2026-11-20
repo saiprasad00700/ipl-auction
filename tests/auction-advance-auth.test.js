@@ -10,6 +10,11 @@ test('rejects lot progression before transition deadline',()=>{
   assert.equal(resolveAuctionAdvance({live,room,order:[0,1],players,now:999}).reason,'transition_waiting');
 });
 
+test('rejects progression while paused or room inactive',()=>{
+  assert.equal(resolveAuctionAdvance({live:{...live,isPaused:true},room,order:[0,1],players,now:1000}).reason,'paused_or_inactive');
+  assert.equal(resolveAuctionAdvance({live,room:{...room,status:'paused'},order:[0,1],players,now:1000}).reason,'paused_or_inactive');
+});
+
 test('advances to next player with reset auction state',()=>{
   const result=resolveAuctionAdvance({live,room,order:[0,1],players,now:1000});
   assert.equal(result.action,'advance');
