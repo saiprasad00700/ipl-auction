@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateRoomJoin, buildJoinedRoom } from '../api/room-join-policy.js';
+import { validateRoomJoin, buildJoinedRoom, applyRoomJoinTransaction } from '../api/room-join-policy.js';
 
 test('rejects missing room, identity, and banned users', () => {
   assert.equal(validateRoomJoin({ room: null, uid: 'u', teamId: 'CSK' }).status, 404);
@@ -28,4 +28,24 @@ test('allows a same-user reconnect and builds a deduplicated roster entry', () =
   assert.equal(result.roster[0].id, 'u2');
   assert.equal(result.roster[1].id, 'u1');
   assert.equal(result.roster[1].isHost, true);
+});
+
+
+test('transaction helper rejects competing franchise claims without changing room', () => {
+  const room = { status: 'waiting', players: [{ id: 'host', team: 'CSK' }] };
+  const result = applyRoomJoinTransaction(room, { uid: 'guest', name: 'Guest', teamId: 'CSK', teamName: 'Chennai', activityTimestamp: 123 });
+  assert.equal(result.room, undefined);
+  assert.equal(result.decision.reason, 'franchise_taken');
+  assert.deepEqual(room.players, [{ id: 'host', team: 'CSK' }]);
+});
+
+test('transaction helper returns roster with activity timestamp and preserves host/reconnect team', () => {
+  const room = { status: 'waiting', players: [{ id: 'u1', team: 'MI', isHost: true, name: 'Old' }] };
+  const result = applyRoomJoinTransaction(room, { uid: 'u1', name: 'Updated', teamId: 'MI', teamName: 'Mumbai', activityTimestamp: 456 });
+  assert.ok(result.room);
+  assert.equal(result.room.lastActivityAt, 456);
+  assert.equal(result.room.players.length, 1);
+  assert.equal(result.room.players[0].isHost, true);
+  assert.equal(result.room.players[0].team, 'MI');
+  assert.equal(result.room.players[0].name, 'Updated');
 });
