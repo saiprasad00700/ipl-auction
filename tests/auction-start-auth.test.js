@@ -23,7 +23,7 @@ test('starts a waiting auction with two participants and timer initialized',()=>
  assert.equal(result.room.status,'active');
  assert.equal(result.live.status,'bidding');
  assert.equal(result.live.playerId,players[result.order[0]].id);
- assert.equal(result.live.timerEndsAt,11000);
+ assert.equal(result.live.timerEndsAt,16000);
  assert.ok(result.order.includes(0));
 });
 
