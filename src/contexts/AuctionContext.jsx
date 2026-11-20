@@ -1825,6 +1825,22 @@ export const AuctionProvider = ({ children }) => {
     return result;
   }, [user]);
 
+  const submitBotRetentionAction = useCallback(async (roomId, botUserId, decision, amount = null) => {
+    if (!user) throw new Error('Sign in required');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/bot-retention-decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, botUserId, decision, amount })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Bot RTM action failed');
+    return result;
+  }, [user]);
+
   const addBotTeam = useCallback(async (roomId, teamId) => {
     return botTeamMutation(roomId, 'add', teamId);
   }, [botTeamMutation]);
@@ -1902,22 +1918,7 @@ export const AuctionProvider = ({ children }) => {
         if (phase === 'initial_decision' && offer.eligibleUserId === botId) {
           const shouldUseRtm = isRtmPrioritySet && cardsRemaining > 0 && canAddPlayer
             && budget >= Number(offer.bid || 0);
-          await runTransactionRtdb(liveRef, (current) => {
-            const currentOffer = current?.retentionOffer;
-            if (!current || current.status !== 'processing_sale' || !currentOffer
-              || currentOffer.status !== 'pending' || currentOffer.phase !== 'initial_decision'
-              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
-              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
-            currentOffer.decision = shouldUseRtm ? 'accept' : 'decline';
-            currentOffer.decidedBy = user.uid;
-            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
-            if (shouldUseRtm) {
-              currentOffer.rtmUsed = true;
-              currentOffer.phase = 'counter_bid';
-              currentOffer.expiresAt = getSyncedTime() + 15000;
-            }
-            return current;
-          });
+          await submitBotRetentionAction(roomId, botId, shouldUseRtm ? 'accept' : 'decline');
         } else if (phase === 'counter_bid' && offer.buyerId === botId) {
           // Keep bot RTM counter-prices strictly below ₹25 Cr while
           // still requiring the counter to exceed the current bid.
@@ -1926,22 +1927,7 @@ export const AuctionProvider = ({ children }) => {
           if (canAddPlayer && maxCounter >= minCounter) {
             const steps = Math.floor((maxCounter - minCounter) * 4 + 0.0001);
             const counterBid = Number((minCounter + Math.floor(Math.random() * (steps + 1)) / 4).toFixed(2));
-            await runTransactionRtdb(liveRef, (current) => {
-              const currentOffer = current?.retentionOffer;
-              if (!current || current.status !== 'processing_sale' || !currentOffer
-                || currentOffer.status !== 'pending' || currentOffer.phase !== 'counter_bid'
-                || currentOffer.buyerId !== botId || currentOffer.decision !== 'accept'
-                || getSyncedTime() > Number(currentOffer.expiresAt)
-                || counterBid <= Number(currentOffer.bid)
-                || counterBid >= 25
-                || counterBid > Number(botTeam.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
-              currentOffer.counterBid = counterBid;
-              currentOffer.phase = 'match_decision';
-              currentOffer.decision = null;
-              currentOffer.expiresAt = getSyncedTime() + 10000;
-              current.currentBid = counterBid;
-              return current;
-            });
+            await submitBotRetentionAction(roomId, botId, 'counter_bid', counterBid);
           }
         } else if (phase === 'match_decision' && offer.eligibleUserId === botId
           && offer.counterBid != null) {
@@ -1950,25 +1936,14 @@ export const AuctionProvider = ({ children }) => {
           const leavesEnoughPurse = slotsLeft <= 1 || (budget - counterBid) / slotsAfter >= 0.30;
           const shouldMatch = isRtmPrioritySet && cardsRemaining > 0 && canAddPlayer
             && budget >= counterBid && leavesEnoughPurse;
-          await runTransactionRtdb(liveRef, (current) => {
-            const currentOffer = current?.retentionOffer;
-            if (!current || current.status !== 'processing_sale' || !currentOffer
-              || currentOffer.status !== 'pending' || currentOffer.phase !== 'match_decision'
-              || currentOffer.eligibleUserId !== botId || currentOffer.decision != null
-              || Number(currentOffer.counterBid) !== counterBid
-              || getSyncedTime() > Number(currentOffer.expiresAt)) return;
-            currentOffer.decision = shouldMatch ? 'match' : 'decline_counter';
-            currentOffer.decidedBy = user.uid;
-            currentOffer.decidedAt = Math.min(getSyncedTime(), Number(currentOffer.expiresAt));
-            return current;
-          });
+          await submitBotRetentionAction(roomId, botId, shouldMatch ? 'match' : 'decline_counter');
         }
       } catch (error) {
         console.warn('[Bot RTM] Automated decision failed:', error);
         lastBotRtmActionRef.current = null;
       }
     }, 350 + Math.random() * 650);
-  }, [currentAuction, user, roomTeams, getSyncedTime]);
+  }, [currentAuction, user, roomTeams, getSyncedTime, submitBotRetentionAction]);
 
   // Host Bidding Bot Loop Effect
   useEffect(() => {
