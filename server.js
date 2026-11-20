@@ -1196,11 +1196,6 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth: primaryAuth } = await getFirebaseAdminServices();
-      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
-      const uid = decoded.uid;
-      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot manage bot teams' });
-      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bot management request limit reached. Please wait before retrying.' });
       const body = await readBody(req);
       const roomId = String(body.roomId || '').trim();
       const serverId = String(body.serverId || '1');
@@ -1209,9 +1204,14 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
       const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
       if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot manage bot teams' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bot management request limit reached. Please wait before retrying.' });
       if (!['add','remove','fill'].includes(action)) return sendJson(res, 400, { error: 'Invalid bot management action' });
       const teamNames = { MI: 'Mumbai Indians', CSK: 'Chennai Super Kings', RCB: 'Royal Challengers Bengaluru', KKR: 'Kolkata Knight Riders', DC: 'Delhi Capitals', PBKS: 'Punjab Kings', RR: 'Rajasthan Royals', SRH: 'Sunrisers Hyderabad', GT: 'Gujarat Titans', LSG: 'Lucknow Super Giants' };
-      const database = await getDatabaseForServer(serverId);
+      const database = services.database;
       const roomRef = database.ref(`auctions/${roomId}/room`);
       let selectedTeamId = '';
       let removedBotId = '';
