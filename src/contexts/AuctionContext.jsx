@@ -2546,9 +2546,10 @@ export const AuctionProvider = ({ children }) => {
       if (!roster.some(p => p && p.id === botUserId && p.isBot)) return;
       return roster.filter(p => !(p && p.id === botUserId && p.isBot));
     });
+    // Delete the bot's keyed team node even if it was already absent from the roster.
+    await set(ref(database, `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
     if (!removeTx.committed) return;
     await set(ref(database, `auctions/${roomId}/room/lastActivityAt`), Date.now());
-    await set(ref(database, `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
   }, []);
 
   const fillEmptyTeamsWithBots = useCallback(async (roomId) => {
