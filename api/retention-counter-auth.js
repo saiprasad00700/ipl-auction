@@ -6,6 +6,6 @@ export function validateRetentionCounterBid({ offer, uid, amount, team, now }) {
   if (!Number.isFinite(counterBid) || counterBid <= Number(offer.bid || 0)) return { allowed: false, status: 400, reason: 'counter_not_higher' };
   if (!team || team.userId !== uid) return { allowed: false, status: 403, reason: 'team_record_mismatch' };
   const budget = Number(team.budgetRemaining ?? 0);
-  if (counterBid > budget return { allowed: false, status: 409, reason: 'insufficient_budget' };
+  if (counterBid > budget) return { allowed: false, status: 409, reason: 'insufficient_budget' };
   return { allowed: true, status: 200, counterBid };
 }
