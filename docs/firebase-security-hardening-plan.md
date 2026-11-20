@@ -16,10 +16,12 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 7. Use Firebase Emulator Suite tests before deploy. Test allow and deny cases, race conditions, reconnects, Server 1/2/3 routing, and cleanup.
 
 ## Current audit findings
-- Existing client `joinRoomDb` reads and rewrites the entire `room.players` roster with `set()`, so simultaneous joins can overwrite one another.
-- Existing `addBotTeam` and `fillEmptyTeamsWithBots` similarly read and rewrite roster state, then separately create team records; concurrent operations can create inconsistent roster/team state.
-- Existing reconnect logic allows a participant to update their franchise assignment and team record. The new pure join policy now rejects franchise reassignment during reconnect and checks occupancy for all join attempts, but it is not yet wired into the live client/backend flow.
-- A server-authoritative join/bot endpoint must atomically coordinate room roster and franchise claim state, preserve rejoin behavior, and route by room-code prefix (Server 1/2/3). Client integration remains intentionally deferred until the transaction design and tests are ready.
+- The RTDB `auctions/{roomId}/teams` path still has broad authenticated client write access. A signed-in client can potentially manipulate purse, squad, retention, or team fields directly; this is the highest-priority remaining integrity risk.
+- The room root and room metadata reads are available to any authenticated user who knows the room code. This is needed by the current invite/join flow but does not enforce membership-based privacy.
+- The `live` auction state remains client-writable under complex rules. These rules are not a complete trusted settlement system and may permit tampering with auction state.
+- The transactional `POST /api/room-join` endpoint now replaces the RTDB roster read-modify-write client flow for RTDB rooms, checking room phase, bans, franchise occupancy, and reconnect identity.
+- Bot add/remove/fill now use `POST /api/room-bots`; the server verifies the Firebase identity and host role and commits roster changes in a room transaction. Team-record initialization is separate and idempotent; this leaves a recoverable cross-path failure window.
+- Server-authoritative auction settlement, purse/squad/retention integrity, membership-scoped room reads, and comprehensive Firebase Emulator tests remain unfinished.
 
 ## Test matrix required before deployment
 - Unauthenticated read/write: denied.
