@@ -1060,6 +1060,76 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/place-bid') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot place user bids' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Bid request limit reached. Please wait before retrying.' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const database = await getDatabaseForServer(serverId);
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${uid}`);
+      const [roomSnap, liveSnap, teamSnap] = await Promise.all([roomRef.get(), liveRef.get(), teamRef.get()]);
+      if (!roomSnap.exists() || !liveSnap.exists()) return sendJson(res, 404, { error: 'Room or live auction state not found' });
+      const room = roomSnap.val();
+      const live = liveSnap.val();
+      const team = teamSnap.exists() ? teamSnap.val() : null;
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { getNextBidAmount } = await import('./src/lib/auctionRules.js');
+      const { validateBidRequest } = await import('./api/bid-auth.js');
+      const decision = validateBidRequest({
+        room, live, team, uid, now: Date.now(), players: IPL_PLAYERS,
+        nextBidAmount: (currentBid, player) => getNextBidAmount(currentBid, player.basePrice || 0, player.set)
+      });
+      if (!decision.allowed) {
+        const messages = {
+          participant_required: 'You must be a participant to bid.',
+          banned: 'You have been removed from this auction and cannot bid.',
+          auction_not_bidding: 'Auction is not accepting bids right now.',
+          already_high_bidder: 'You are already the highest bidder.',
+          bid_timer_expired: 'The bid timer has expired.',
+          team_record_mismatch: 'Your franchise team record could not be verified.',
+          current_player_unknown: 'Current player could not be verified.',
+          squad_limit: 'You have reached your squad limit.',
+          overseas_limit: 'You have reached the overseas player limit.',
+          insufficient_budget: 'Insufficient budget to place this bid.'
+        };
+        return sendJson(res, decision.status, { error: messages[decision.reason] || 'Bid validation failed', reason: decision.reason });
+      }
+      const transaction = await liveRef.transaction((currentData) => {
+        if (!currentData || currentData.status !== 'bidding' || currentData.highBidderId === uid) return;
+        const now = Date.now();
+        if (currentData.timerEndsAt && now >= Number(currentData.timerEndsAt)) return;
+        const player = IPL_PLAYERS.find((p) => p.id === currentData.playerId);
+        if (!player || player.id !== live.playerId) return;
+        const amount = getNextBidAmount(currentData.currentBid || 0, player.basePrice || 0, player.set);
+        if (amount !== decision.amount || amount > Number(team.budgetRemaining || 0)) return;
+        currentData.currentBid = amount;
+        currentData.highBidderId = uid;
+        currentData.highBidderName = String(decoded.name || decoded.displayName || body.name || 'Manager').slice(0, 60);
+        currentData.highBidderTeamId = team.teamId;
+        currentData.timerEndsAt = now + Number(room.settings?.bidTimer || 15) * 1000;
+        currentData.lastActivityAt = now;
+        return currentData;
+      });
+      if (!transaction.committed) return sendJson(res, 409, { error: 'Bid failed: another manager bid, the timer expired, or the state changed.' });
+      return sendJson(res, 200, { ok: true, roomId, amount: transaction.snapshot.val()?.currentBid, highBidderId: uid, timerEndsAt: transaction.snapshot.val()?.timerEndsAt });
+    } catch (error) {
+      console.warn('[Place bid] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not place bid securely' });
+    }
+  }
   if (pathname === '/api/room-join') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
