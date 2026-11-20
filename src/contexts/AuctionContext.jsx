@@ -852,7 +852,7 @@ export const AuctionProvider = ({ children }) => {
       console.error('[Auction] endPlayerAuction failed:', err);
       endingPlayerRef.current = false;
     }
-  }, [getSyncedTime, flushAuctionToFirestore]);
+  }, [getSyncedTime, flushAuctionToFirestore, user]);
 
   // Recover an overdue sold/unsold transition from shared RTDB state. The
   // transaction checks the player, status and deadline again, so only one client
