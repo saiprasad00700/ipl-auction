@@ -8,4 +8,4 @@ test('host can finalize valid analysis results',()=>{const r=validateWinnerAnaly
 test('non-host cannot finalize',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'guest',rankings,model:'AI',completedAt:100}).reason,'host_only'));
 test('finalization only works during analyzing',()=>assert.equal(validateWinnerAnalysisResult({room:{...room,status:'awaiting_xi'},teams,uid:'host',rankings,model:'AI',completedAt:100}).reason,'analysis_not_running'));
 test('rejects duplicate franchise ranks',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'host',rankings:[rankings[0],rankings[0]],model:'AI',completedAt:100}).reason,'invalid_rankings'));
-test('rejects unknown franchise',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'host',rankings:[{franchiseId:'XYZ',rank:1}],model:'AI',completedAt:100}).reason,'unknown_franchise'));
+test('rejects unknown franchise',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'host',rankings:[{franchiseId:'XYZ',rank:1},{franchiseId:'MI',rank:2},{franchiseId:'CSK',rank:3}],model:'AI',completedAt:100}).reason,'unknown_franchise'));
