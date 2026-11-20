@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {validateRoomSettings} from '../api/room-settings-auth.js';
+const room={hostId:'host',auctionType:'sprint5',settings:{bidTimer:15,budget:60}};
+test('validates host and allowed room settings',()=>{assert.equal(validateRoomSettings({room,uid:'guest',settings:{bidTimer:5}}).reason,'host_only');const r=validateRoomSettings({room,uid:'host',settings:{bidTimer:5,budget:50}});assert.equal(r.allowed,true);assert.equal(r.settings.bidTimer,5);assert.equal(r.settings.budget,50);});
+test('rejects unsupported settings, timers, and budgets',()=>{assert.equal(validateRoomSettings({room,uid:'host',settings:{auto:true}}).reason,'unsupported_setting');assert.equal(validateRoomSettings({room,uid:'host',settings:{bidTimer:7}}).reason,'invalid_bid_timer');assert.equal(validateRoomSettings({room,uid:'host',settings:{budget:61}}).reason,'invalid_budget');});
