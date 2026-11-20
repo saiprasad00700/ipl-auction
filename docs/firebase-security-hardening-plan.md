@@ -53,8 +53,14 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - `POST /api/settle-sale`: trusted idempotent squad/purse/card settlement checks sold state, winning participant/franchise, catalog player, squad limit, overseas quota, purse, and RTM card availability; client recovery uses this endpoint.
 - Client auction lifecycle handlers have been wired to these endpoints; direct client bid, expiry, RTM decision/finalization, lot progression, pause/resume, end-auction, and sold-player purse/squad/card mutations are removed from the corresponding flow.
 - Added pure-helper unit tests for start, bid, expired bidding/RTM eligibility, retention decision/counter/finalization, advance, pause, end-auction, and settlement authorization. Two additional regression checks were added: ending only from active phase, and rejecting progression when current player is absent from player order.
-- **Important remaining trust boundary:** RTDB rules still permit authenticated client writes to `live` and broad `teams` writes. These endpoints alone cannot prevent direct client bypass until bot bidding/RTM bot decisions, post-auction Playing XI/team updates, room roster/metadata, and any remaining direct mutations are migrated or explicitly rule-scoped. Do not deploy restrictive rules until those paths and Emulator tests are complete.
+- **Important remaining trust boundary:** RTDB rules still permit authenticated client writes to `live` and broad `teams` writes. Trusted bidding/expiry/RTM/settlement/progression/pause/end-auction and bot-bid/bot-RTM actions are migrated, but post-auction Playing XI/team updates, room roster/metadata, cleanup, and any remaining direct mutations must still be audited/migrated or explicitly rule-scoped. Do not deploy restrictive rules until those paths and Emulator tests are complete.
 - The endpoint migration is branch-only; no production deployment.
+
+## Bot RTM decision migration
+- Host-coordinated bot RTM accept/decline, counter-bid, and match/decline-counter decisions now route through `POST /api/bot-retention-decision`.
+- The endpoint requires the host's assigned-project Firebase token, verifies the host identity and bot roster entry, validates the RTM stage and bot team/purse for counter-bids, and commits the live-state transaction.
+- The host client no longer directly writes RTM decisions for bot identities.
+- Existing RTM helper tests cover decision/counter-bid validation; integration/emulator concurrency testing remains required.
 
 ## Server-authoritative bot team management
 - Bot add/remove/fill requests now call `POST /api/room-bots` with a Firebase ID token.
