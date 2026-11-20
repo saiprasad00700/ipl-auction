@@ -27,6 +27,11 @@ test('starts a waiting auction with two participants and timer initialized',()=>
  assert.ok(result.order.includes(0));
 });
 
+test('falls back to supported default when timer setting is invalid',()=>{
+ const result=buildAuctionStart({room:{status:'waiting',auctionType:'mega',players:[{id:'a'},{id:'b'}],settings:{bidTimer:99}},players,random,now:1000});
+ assert.equal(result.live.timerEndsAt,16000);
+});
+
 test('sprint auction uses target-size selection while retaining marquee',()=>{
  const result=buildAuctionStart({room:{status:'waiting',auctionType:'sprint5',players:[{id:'a'},{id:'b'}]},players,random,now:0});
  assert.equal(result.allowed,true);
