@@ -898,34 +898,24 @@ export const AuctionProvider = ({ children }) => {
       if (!playersTx.committed) throw new Error('Sale recovery could not synchronize the room roster totals.');
     }
 
-    let playerOrder = roomData.playerOrder;
-    if (!playerOrder) {
-      const orderSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`));
-      if (orderSnap.exists()) playerOrder = orderSnap.val();
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/advance-auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.live) {
+      if (result.reason === 'transition_waiting') return;
+      throw new Error(result.error || 'Auction transition recovery failed.');
     }
-    const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
-    const currentIndex = order.findIndex((idx) => IPL_PLAYERS[idx]?.id === live.playerId);
-    const nextIndex = currentIndex >= 0 ? order[currentIndex + 1] : order[0];
-
-    if (nextIndex === undefined || !IPL_PLAYERS[nextIndex]) {
-      const claim = await runTransactionRtdb(liveRef, (current) => {
-        if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-        if (Number(current.transitionDeadline) > getSyncedTime()) return;
-        current.status = 'awaiting_xi';
-        current.transitionDeadline = null;
-        return current;
-      });
-      if (!claim.committed) return;
+    if (result.finished) {
       const now = getSyncedTime();
-      const roomSnapshot = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-      const auctionType = roomSnapshot.val()?.auctionType || 'mega';
+      const auctionType = roomData.auctionType || 'mega';
       const usesSquadBalanceAnalysis = auctionType !== 'mega';
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), {
-        status: 'awaiting_xi',
-        xiSubmissionStartedAt: now,
-        xiSubmissionDeadline: usesSquadBalanceAnalysis ? now : now + PLAYING_XI_DEADLINE_MS,
-        winnerAnalysisStatus: 'collecting'
-      });
       await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
         userId: 'system', userName: 'System',
         text: usesSquadBalanceAnalysis
@@ -933,21 +923,8 @@ export const AuctionProvider = ({ children }) => {
           : 'Bidding has ended. Submit your ordered Playing XI and choose Impact Players for chasing and defending within 5 minutes.',
         type: 'log', timestamp: serverTimestampRtdb()
       });
-      return;
     }
 
-    await runTransactionRtdb(liveRef, (current) => {
-      if (!current || current.playerId !== live.playerId || !['sold', 'unsold'].includes(current.status)) return;
-      if (Number(current.transitionDeadline) > getSyncedTime()) return;
-      return {
-        playerId: IPL_PLAYERS[nextIndex].id,
-        currentBid: 0,
-        highBidderId: '',
-        highBidderName: 'No Bids',
-        timerEndsAt: getSyncedTime() + (roomData.settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
-        status: 'bidding'
-      };
-    });
   }, [getSyncedTime, user]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
