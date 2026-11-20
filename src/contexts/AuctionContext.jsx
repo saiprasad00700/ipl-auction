@@ -1707,39 +1707,19 @@ export const AuctionProvider = ({ children }) => {
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
-    // Do not spend the short RTM counter-bid window waiting for the server-time
-    // readiness flag. As with decideRetention, the RTDB transaction remains
-    // authoritative; use the cached server-adjusted clock for the expiry check.
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    // These reads are independent. Run them together so a short RTM window is
-    // not consumed by two sequential network round trips before the transaction.
-    const [roomSnap, teamSnap] = await Promise.all([
-      get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`)),
-      get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`))
-    ]);
-    const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const teamData = teamSnap.exists() ? teamSnap.val() : {};
-    const counterBid = Number(Number(amount).toFixed(2));
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending' || offer.phase !== 'counter_bid' || offer.buyerId !== user.uid) return;
-      if (getSyncedTime() > Number(offer.expiresAt)) return;
-      if (counterBid <= Number(offer.bid)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120)) return;
-      if (counterBid > Number(teamData.budgetRemaining ?? roomData.settings?.budget ?? 120) + Number(teamData.spent || 0)) return;
-      offer.counterBid = counterBid;
-      offer.phase = 'match_decision';
-      offer.decision = null;
-      // The original franchise gets 10 seconds to match or decline the counter-bid.
-      offer.expiresAt = getSyncedTime() + 10000;
-      currentData.currentBid = counterBid;
-      return currentData;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/retention-counter-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, amount: Number(amount) })
     });
-    if (!result.committed) {
-      throw new Error('Counter-bid must be higher than the current price and within your remaining budget.');
-    }
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Counter-bid was not saved.');
+    return result;
+  }, [user]);
 
   const updatePlayerTeam = useCallback(async (roomId, userId, newTeamId) => {
     const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
