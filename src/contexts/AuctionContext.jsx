@@ -1497,54 +1497,20 @@ export const AuctionProvider = ({ children }) => {
 
   const submitPlayingXI = useCallback(async (roomId, startingXI, impactPlayerChasing, impactPlayerDefending = impactPlayerChasing) => {
     if (!user) throw new Error('Sign in to submit your Playing XI');
-    const roomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!roomSnap.exists()) throw new Error('Auction room not found');
-    const roomData = roomSnap.val();
-    if (roomData.status !== 'awaiting_xi') throw new Error('Playing XI submissions are closed');
-    if (getSyncedTime() > Number(roomData.xiSubmissionDeadline || 0)) throw new Error('Submission deadline has passed');
-    const teamSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`));
-    if (!teamSnap.exists()) throw new Error('Your franchise squad was not found');
-    const teamData = teamSnap.val();
-    if (/^(bot[_-]|auctionbot[_-])/i.test(user.uid) || (roomData.players || []).some((player) => player?.id === user.uid && player.isBot)) {
-      throw new Error('Bots cannot submit a Playing XI. The site selects their best eligible XI automatically.');
-    }
-    if (teamData.disqualified) {
-      throw new Error(teamData.disqualificationReason || 'Your franchise is disqualified because it bought fewer than 18 players');
-    }
-    if (!validatePlayingXIOptions(startingXI, impactPlayerChasing, impactPlayerDefending, teamData.squad || [], IPL_PLAYERS)) {
-      const uniqueSelected = [...new Map([...(startingXI || []), impactPlayerChasing, impactPlayerDefending].filter(Boolean).map((item) => {
-        const id = typeof item === 'string' ? item : item?.id;
-        return [id, item];
-      })).values()];
-      const overseasCount = uniqueSelected.filter((item) => {
-        const playerId = typeof item === 'string' ? item : item?.id;
-        const player = IPL_PLAYERS.find((candidate) => candidate.id === playerId);
-        return player && player.country !== 'IND';
-      }).length;
-      if (overseasCount > 4) {
-        throw new Error('Your 11 starters and both Impact Player choices can include a maximum of 4 unique overseas players combined.');
-      }
-      throw new Error('Choose 11 different starters in order and select an Impact Player for both chasing and defending from your squad. The two Impact slots may use the same player.');
-    }
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${user.uid}`), {
-      playingXI: {
-        startingXI,
-        impactPlayerChasing,
-        impactPlayerDefending,
-        impactPlayer: impactPlayerChasing,
-        submittedAt: getSyncedTime(),
-        autoSelected: false
-      }
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/submit-playing-xi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, startingXI, impactPlayerChasing, impactPlayerDefending })
     });
-    await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
-      userId: 'system', userName: 'System',
-      text: `${teamData.teamName || teamData.teamId} submitted its Playing XI.`,
-      type: 'log', timestamp: serverTimestampRtdb()
-    });
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not submit Playing XI.');
+    return result;
+  }, [user]);
 
-  // One client claims the analysis phase transactionally after the deadline.
-  // All other clients observe the same persisted result through the room listener.
   const finalizeWinnerAnalysis = useCallback(async (roomId) => {
     const roomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
     const roomSnap = await get(roomRef);
