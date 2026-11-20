@@ -1084,7 +1084,8 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roomRef = database.ref(`auctions/${roomId}/room`);
       const { validateRoomJoin, buildJoinedRoom } = await import('./api/room-join-policy.js');
       const bannedSnapshot = await database.ref(`auctions/${roomId}/room/bannedPlayers`).get();
-      const bannedPlayers = bannedSnapshot.exists() ? bannedSnapshot.val() : [];
+      const bannedRaw = bannedSnapshot.exists() ? bannedSnapshot.val() : [];
+      const bannedPlayers = Array.isArray(bannedRaw) ? bannedRaw : Object.keys(bannedRaw || {}).filter((key) => bannedRaw[key] === true);
       const transaction = await roomRef.transaction((currentRoom) => {
         if (!currentRoom) return;
         const decision = validateRoomJoin({ room: currentRoom, uid, teamId, bannedPlayers });
@@ -1101,14 +1102,15 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       // Existing team purse/squad state is never overwritten on reconnect.
       const teamKey = `${roomId}_${uid}`;
       const teamRef = database.ref(`auctions/${roomId}/teams/${teamKey}`);
-      const teamSnapshot = await teamRef.get();
-      if (!teamSnapshot.exists()) {
-        await teamRef.set({
+      const teamTransaction = await teamRef.transaction((existingTeam) => {
+        if (existingTeam) return existingTeam.teamId === teamId ? existingTeam : undefined;
+        return {
           auctionId: roomId, userId: uid, teamId, teamName: teamNames[teamId],
           budgetRemaining: Number(transaction.snapshot.val()?.settings?.budget || 120),
           spent: 0, squad: [], retentionCardsRemaining: 2
-        });
-      } else if (teamSnapshot.val()?.teamId !== teamId) {
+        };
+      });
+      if (!teamTransaction.committed || teamTransaction.snapshot.val()?.teamId !== teamId) {
         return sendJson(res, 409, { error: 'Existing team record does not match the selected franchise' });
       }
       return sendJson(res, 200, { ok: true, player: (transaction.snapshot.val()?.players || []).find((p) => p?.id === uid), serverId });
