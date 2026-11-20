@@ -1647,6 +1647,44 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not place bid securely' });
     }
   }
+  if(pathname==='/api/create-room'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[123][A-Z0-9]{4,12}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code');
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot create rooms'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Room creation limit reached. Please wait before retrying.'});
+      const teamId=String(body.teamId||'').trim().toUpperCase();
+      const name=String(body.name||'Manager').trim().slice(0,40);
+      const auctionType=String(body.auctionType||'mega');
+      const isPublic=body.isPublic===true;
+      const teams={MI:'Mumbai Indians',CSK:'Chennai Super Kings',RCB:'Royal Challengers Bengaluru',KKR:'Kolkata Knight Riders',DC:'Delhi Capitals',PBKS:'Punjab Kings',RR:'Rajasthan Royals',SRH:'Sunrisers Hyderabad',GT:'Gujarat Titans',LSG:'Lucknow Super Giants'};
+      if(!teams[teamId])return sendJson(res,400,{error:'Invalid franchise'});
+      if(!['mega','sprint11','sprint5'].includes(auctionType))return sendJson(res,400,{error:'Invalid auction mode'});
+      const budget=auctionType==='sprint5'?60:auctionType==='sprint11'?90:120;
+      const squadLimit=auctionType==='sprint5'?5:auctionType==='sprint11'?11:25;
+      const overseasLimit=auctionType==='sprint5'?2:auctionType==='sprint11'?4:8;
+      const database=services.database,rootRef=database.ref(`auctions/${roomId}`);
+      const now=Date.now();
+      const host={id:uid,name,team:teamId,teamName:teams[teamId],isHost:true,isBot:false};
+      const rootValue={room:{hostId:uid,hostName:name,status:'waiting',auctionType,isPublic,lastActivityAt:now,squadLimit,overseasLimit,players:[host],bannedPlayers:[],settings:{bidTimer:15,budget}},live:{status:'waiting'},teams:{[`${roomId}_${uid}`]:{auctionId:roomId,userId:uid,teamId,teamName:teams[teamId],budgetRemaining:budget,spent:0,squad:[],retentionCardsRemaining:2}},presence:{[uid]:{online:true,lastSeen:now}}};
+      const tx=await rootRef.transaction(current=>current?undefined:rootValue);
+      if(!tx.committed)return sendJson(res,409,{error:'Room code already exists'});
+      if(isPublic){
+        await database.ref(`publicRooms/${roomId}`).set({roomId,hostId:uid,hostName:name,status:'waiting',auctionType,createdAt:now});
+      }
+      return sendJson(res,200,{ok:true,roomId,serverId,room:rootValue.room,team:rootValue.teams[`${roomId}_${uid}`]});
+    }catch(error){
+      console.warn('[Create room] Failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not create room securely'});
+    }
+  }
   if (pathname === '/api/room-join') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
