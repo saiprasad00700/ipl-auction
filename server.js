@@ -1061,6 +1061,49 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/submit-playing-xi') {
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Bots cannot submit a Playing XI'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Playing XI submission limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room),teamRef=database.ref(`auctions/${roomId}/teams/${roomId}_${uid}`);
+      const [roomSnap,teamSnap]=await Promise.all([roomRef.get(),teamRef.get()]);
+      if(!roomSnap.exists())return sendJson(res,404,{error:'Room not found'});
+      if(!teamSnap.exists())return sendJson(res,404,{error:'Franchise squad not found'});
+      const room=roomSnap.val(),team=teamSnap.val();
+      const roster=Array.isArray(room.players)?room.players:Object.values(room.players||{});
+      if(!roster.some(p=>p&&p.id===uid&&!p.isBot))return sendJson(res,403,{error:'Room participant required'});
+      const banned=Array.isArray(room.bannedPlayers)?room.bannedPlayers:Object.keys(room.bannedPlayers||{}).filter(key=>room.bannedPlayers[key]===true);
+      if(banned.includes(uid))return sendJson(res,403,{error:'You are banned from this room'});
+      if(room.status!=='awaiting_xi')return sendJson(res,409,{error:'Playing XI submissions are closed'});
+      if(Date.now()>Number(room.xiSubmissionDeadline||0))return sendJson(res,409,{error:'Playing XI submission deadline has passed'});
+      if(team.disqualified)return sendJson(res,403,{error:team.disqualificationReason||'Franchise is disqualified'});
+      const {IPL_PLAYERS}=await import('./src/data/players.js');
+      const {validatePlayingXIOptions}=await import('./src/lib/auctionWinnerRules.js');
+      const startingXI=body.startingXI,impactPlayerChasing=body.impactPlayerChasing,impactPlayerDefending=body.impactPlayerDefending;
+      if(!validatePlayingXIOptions(startingXI,impactPlayerChasing,impactPlayerDefending,team.squad||[],IPL_PLAYERS))return sendJson(res,400,{error:'Invalid Playing XI or Impact Player selection'});
+      const submittedAt=Date.now();
+      const tx=await teamRef.transaction(current=>{
+        if(!current||current.userId!==uid||current.disqualified)return;
+        return {...current,playingXI:{startingXI,impactPlayerChasing,impactPlayerDefending,impactPlayer:impactPlayerChasing,submittedAt,autoSelected:false}};
+      });
+      if(!tx.committed)return sendJson(res,409,{error:'Playing XI submission could not be saved. Squad or status may have changed.'});
+      await database.ref(`auctions/${roomId}/messages`).push({userId:'system',userName:'System',text:`${team.teamName||team.teamId} submitted its Playing XI.`,type:'log',timestamp:Date.now()});
+      return sendJson(res,200,{ok:true,playingXI:tx.snapshot.val()?.playingXI});
+    }catch(error){
+      console.warn('[Playing XI] Submission failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not submit Playing XI securely'});
+    }
+  }
   if (pathname === '/api/end-auction') {
     if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
     try{
