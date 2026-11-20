@@ -1060,6 +1060,86 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/settle-sale') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot request settlement recovery' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Settlement request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      const liveSnap = await liveRef.get();
+      if (!roomSnap.exists() || !liveSnap.exists()) return sendJson(res, 404, { error: 'Room or live state not found' });
+      const room = roomSnap.val();
+      const live = liveSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { validateSaleSettlement } = await import('./api/sale-settlement-auth.js');
+      const teamRef = database.ref(`auctions/${roomId}/teams/${roomId}_${live.highBidderId}`);
+      const teamSnap = await teamRef.get();
+      const existingTeam = teamSnap.exists() ? teamSnap.val() : null;
+      const validation = validateSaleSettlement({ room, live, team: existingTeam, players: IPL_PLAYERS });
+      if (!validation.allowed) return sendJson(res, validation.status, { error: 'Sale settlement is not valid for the current auction state', reason: validation.reason });
+      const player = IPL_PLAYERS.find((p) => p.id === validation.playerId);
+      const teamName = String(body.teamName || live.highBidderName || 'Unknown').slice(0, 80);
+      const defaultBudget = Number(room.settings?.budget ?? 120);
+      const retentionCardsDefault = 2;
+      const transaction = await teamRef.transaction((currentTeam) => {
+        const team = currentTeam || {};
+        const squad = Array.isArray(team.squad) ? team.squad : [];
+        if (squad.some((item) => (typeof item === 'string' ? item : item?.id) === validation.playerId)) return;
+        if (squad.length >= Number(room.squadLimit || 25)) return;
+        const overseasLimit = Number(room.overseasLimit || 8);
+        const overseasCount = squad.reduce((count, item) => {
+          const squadPlayerId = typeof item === 'string' ? item : item?.id;
+          const squadPlayer = IPL_PLAYERS.find((candidate) => candidate.id === squadPlayerId);
+          return count + (squadPlayer && squadPlayer.country !== 'IND' ? 1 : 0);
+        }, 0);
+        if (player.country !== 'IND' && overseasCount >= overseasLimit) return;
+        const remaining = Number(team.budgetRemaining ?? defaultBudget);
+        if (remaining < validation.bid) return;
+        return {
+          ...team,
+          auctionId: roomId,
+          userId: validation.uid,
+          teamId: validation.teamId,
+          teamName,
+          budgetRemaining: Math.max(0, remaining - validation.bid),
+          spent: Number(team.spent || 0) + validation.bid,
+          retentionCardsRemaining: validation.retained
+            ? Math.max(0, Number(team.retentionCardsRemaining ?? retentionCardsDefault) - 1)
+            : Number(team.retentionCardsRemaining ?? retentionCardsDefault),
+          squad: [...squad, { id: validation.playerId, bid: validation.bid, rtmUsed: validation.retained }]
+        };
+      });
+      if (!transaction.committed) {
+        const latest = transaction.snapshot?.val();
+        if (latest?.squad?.some((item) => (typeof item === 'string' ? item : item?.id) === validation.playerId)) {
+          return sendJson(res, 200, { ok: true, applied: false, alreadySettled: true, team: latest });
+        }
+        return sendJson(res, 409, { error: 'Sale settlement could not be applied. Team limits or budget may have changed.' });
+      }
+      return sendJson(res, 200, { ok: true, applied: true, team: transaction.snapshot.val() });
+    } catch (error) {
+      console.warn('[Sale settlement] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not settle sale securely' });
+    }
+  }
   if (pathname === '/api/retention-counter-bid') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
