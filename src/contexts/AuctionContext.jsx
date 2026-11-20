@@ -158,8 +158,38 @@ export const AuctionProvider = ({ children }) => {
     const squadLimit = isSprint5 ? 5 : isSprint11 ? 11 : 25;
     const overseasLimit = isSprint5 ? 2 : isSprint11 ? 4 : MEGA_OVERSEAS_LIMIT;
 
+    // Claim the room atomically first. A duplicate code must never overwrite an existing auction.
+    const rtdbRoomRef = ref(roomDatabase, `auctions/${roomId}/room`);
+    const initialRoomData = {
+      hostId: userId, hostName: playerDetails.name, status: 'waiting', auctionType,
+      isPublic: !!isPublic, lastActivityAt: Date.now(), squadLimit, overseasLimit,
+      players: [{ id: userId, name: playerDetails.name, team: playerDetails.team,
+        teamName: teamDetails?.name || 'Unknown', isHost: true }],
+      bannedPlayers: [], settings: { bidTimer: DEFAULT_BID_TIMER_SECONDS, budget }
+    };
+    const roomClaim = await runTransactionRtdb(rtdbRoomRef, (currentRoom) => {
+      if (currentRoom) return;
+      return initialRoomData;
+    });
+    if (!roomClaim.committed) throw new Error('This room code is already in use. Please create a new room.');
+
     const liveRef = ref(roomDatabase, `auctions/${roomId}/live`);
-    await set(liveRef, { status: 'waiting' });
+    const hostPresenceRef = ref(roomDatabase, `auctions/${roomId}/presence/${userId}`);
+    const publicRoomRef = ref(roomDatabase, `publicRooms/${roomId}`);
+    const rtdbTeamRef = ref(roomDatabase, `auctions/${roomId}/teams/${roomId}_${userId}`);
+    try {
+      await set(liveRef, { status: 'waiting' });
+      await set(hostPresenceRef, { online: true, lastSeen: serverTimestampRtdb() });
+      if (isPublic) await set(publicRoomRef, { roomId, hostId: userId, hostName: playerDetails.name || 'Auction host', status: 'waiting', auctionType, createdAt: Date.now() });
+      if (playerDetails.team) await set(rtdbTeamRef, {
+        auctionId: roomId, userId, teamId: playerDetails.team, teamName: teamDetails?.name || 'Unknown',
+        budgetRemaining: budget, spent: 0, squad: [], retentionCardsRemaining: 2
+      });
+    } catch (creationError) {
+      await Promise.allSettled([remove(rtdbRoomRef), remove(liveRef), remove(hostPresenceRef), remove(rtdbTeamRef), remove(publicRoomRef)]);
+      throw new Error(`Room creation failed and the partial room was cleaned up: ${creationError?.message || creationError}`);
+    }
+    if (user && user.uid === userId) void trackAnalyticsEvent('room_created', roomId);
 
     // Instantly set host online presence in RTDB
     const hostPresenceRef = ref(roomDatabase, `auctions/${roomId}/presence/${userId}`);
@@ -2459,116 +2489,125 @@ export const AuctionProvider = ({ children }) => {
   }, [getSyncedTime]);
 
   const addBotTeam = useCallback(async (roomId, teamId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
+    const database = getRoomDatabase(roomId);
+    const roomRef = ref(database, `auctions/${roomId}/room`);
     const teamDetails = TEAMS.find(t => t.id === teamId);
     if (!teamDetails) return;
 
     const botUserId = `bot_${teamId}`;
-    const botName = `${teamDetails.name} Bot`;
-
-    const existingPlayers = data.players || [];
-    if (existingPlayers.some(p => p.id === botUserId || p.team === teamId)) return;
-
-    const updatedPlayers = [...existingPlayers, {
+    const botPlayer = {
       id: botUserId,
-      name: botName,
+      name: `${teamDetails.name} Bot`,
       team: teamId,
       teamName: teamDetails.name,
       isHost: false,
       isBot: true
-    }];
+    };
 
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
+    // Atomically merge this bot into the latest roster. A simultaneous friend
+    // join or team selection cannot be erased by this operation.
+    const botRosterTx = await runTransactionRtdb(ref(database, `auctions/${roomId}/room/players`), (currentRoster) => {
+      const roster = Array.isArray(currentRoster)
+        ? currentRoster.filter(Boolean)
+        : Object.values(currentRoster || {}).filter(Boolean);
+      if (roster.some(p => p && (p.id === botUserId || p.team === teamId))) return;
+      return [...roster, botPlayer];
+    });
+    if (!botRosterTx.committed) {
+      throw new Error(`The ${teamId} franchise is already occupied. Refresh the room and try another team.`);
+    }
 
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
+    const roomSnap = await get(roomRef);
+    if (!roomSnap.exists()) return;
+    const latest = roomSnap.val();
+    const latestRoster = Array.isArray(latest.players) ? latest.players : Object.values(latest.players || {});
+    if (!latestRoster.some(p => p && p.id === botUserId && p.isBot)) return;
 
     const teamDataToSet = {
       auctionId: roomId,
       userId: botUserId,
       teamId,
       teamName: teamDetails.name,
-      budgetRemaining: data.settings?.budget || 120.0,
+      budgetRemaining: latest.settings?.budget || 120.0,
       spent: 0,
       squad: []
     };
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), teamDataToSet);
+    await set(ref(database, `auctions/${roomId}/teams/${roomId}_${botUserId}`), teamDataToSet);
+    await set(ref(database, `auctions/${roomId}/room/lastActivityAt`), Date.now());
   }, []);
 
   const removeBotTeam = useCallback(async (roomId, botUserId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const updatedPlayers = (data.players || []).filter(p => p.id !== botUserId);
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
+    const database = getRoomDatabase(roomId);
+    const rosterRef = ref(database, `auctions/${roomId}/room/players`);
+    const removeTx = await runTransactionRtdb(rosterRef, (currentRoster) => {
+      const roster = Array.isArray(currentRoster)
+        ? currentRoster.filter(Boolean)
+        : Object.values(currentRoster || {}).filter(Boolean);
+      if (!roster.some(p => p && p.id === botUserId && p.isBot)) return;
+      return roster.filter(p => !(p && p.id === botUserId && p.isBot));
+    });
+    // Delete the bot's keyed team node even if it was already absent from the roster.
+    await set(ref(database, `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
+    if (!removeTx.committed) return;
+    await set(ref(database, `auctions/${roomId}/room/lastActivityAt`), Date.now());
   }, []);
 
   const fillEmptyTeamsWithBots = useCallback(async (roomId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
+    const database = getRoomDatabase(roomId);
+    const roomRef = ref(database, `auctions/${roomId}/room`);
+    const playersRef = ref(database, `auctions/${roomId}/room/players`);
+    const roomSnap = await get(roomRef);
+    if (!roomSnap.exists()) return;
+    const roomData = roomSnap.val();
 
-    const existingPlayers = data.players || [];
-    const takenTeamIds = new Set(existingPlayers.map(p => p.team).filter(Boolean));
-
-    const updatedPlayers = [...existingPlayers];
-    const teamsToSet = {};
-
-    TEAMS.forEach(t => {
-      if (!takenTeamIds.has(t.id)) {
-        const botUserId = `bot_${t.id}`;
-        const botName = `${t.name} Bot`;
-        updatedPlayers.push({
-          id: botUserId,
-          name: botName,
-          team: t.id,
-          teamName: t.name,
-          isHost: false,
-          isBot: true
-        });
-        teamsToSet[`${roomId}_${botUserId}`] = {
-          auctionId: roomId,
-          userId: botUserId,
-          teamId: t.id,
-          teamName: t.name,
-          budgetRemaining: data.settings?.budget || 120.0,
-          spent: 0,
-          squad: []
-        };
-      }
+    // Build bots from the transaction's latest roster, not a stale read.
+    const fillTx = await runTransactionRtdb(playersRef, (currentRoster) => {
+      const roster = Array.isArray(currentRoster)
+        ? currentRoster.filter(Boolean)
+        : Object.values(currentRoster || {}).filter(Boolean);
+      const takenTeamIds = new Set(roster.map(p => p && p.team).filter(Boolean));
+      const updated = [...roster];
+      TEAMS.forEach(t => {
+        if (!takenTeamIds.has(t.id)) {
+          updated.push({
+            id: `bot_${t.id}`,
+            name: `${t.name} Bot`,
+            team: t.id,
+            teamName: t.name,
+            isHost: false,
+            isBot: true
+          });
+        }
+      });
+      return updated;
     });
+    if (!fillTx.committed) return;
 
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    if (Object.keys(teamsToSet).length > 0) {
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams`), teamsToSet);
+    // Re-read the committed roster and create team nodes only for bots still
+    // present. This reduces stale bot-team records after human replacements.
+    const latestRoomSnap = await get(roomRef);
+    if (!latestRoomSnap.exists()) return;
+    const latestRoom = latestRoomSnap.val();
+    const latestRoster = Array.isArray(latestRoom.players) ? latestRoom.players : Object.values(latestRoom.players || {});
+    const currentBots = latestRoster.filter(p => p && p.isBot && String(p.id || '').startsWith('bot_'));
+    const teamsToSet = {};
+    currentBots.forEach(bot => {
+      const teamDetails = TEAMS.find(t => t.id === bot.team);
+      if (!teamDetails) return;
+      teamsToSet[`${roomId}_${bot.id}`] = {
+        auctionId: roomId,
+        userId: bot.id,
+        teamId: bot.team,
+        teamName: teamDetails.name,
+        budgetRemaining: latestRoom.settings?.budget || roomData.settings?.budget || 120.0,
+        spent: 0,
+        squad: []
+      };
+    });
+    if (Object.keys(teamsToSet).length) {
+      await updateRtdb(ref(database, `auctions/${roomId}/teams`), teamsToSet);
     }
+    await set(ref(database, `auctions/${roomId}/room/lastActivityAt`), Date.now());
   }, []);
 
   // Guard ref: track the last timer cycle (timerEndsAt) that a bot bid was queued for.
