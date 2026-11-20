@@ -1173,12 +1173,8 @@ export const AuctionProvider = ({ children }) => {
     try { await set(ref(rtdb, `completedRoomHistory/${roomId}/users/${userId}`), true); }
     catch (indexError) { console.warn('Could not index room history participant:', indexError?.message || indexError); }
 
-    // Refresh the inactivity heartbeat separately; do not let it block history.
-    try {
-      await set(ref(roomDatabase, `auctions/${roomId}/room/lastActivityAt`), Date.now());
-    } catch (activityError) {
-      console.warn('Could not refresh room activity after joining:', activityError?.message || activityError);
-    }
+    // Joining or staying online is presence, not meaningful auction activity.
+    // Do NOT reset the 10-minute inactivity timer when a player joins.
 
     // Sync updated player count/list to Supabase so Public Lobbies show live player counts
     /*
