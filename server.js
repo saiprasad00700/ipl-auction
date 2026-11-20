@@ -1600,7 +1600,6 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const team=teamSnap.val();
       const {IPL_PLAYERS}=await import('./src/data/players.js');
       const {evaluateBotBid}=await import('./src/lib/botEngine.js');
-      const {getNextBidAmount}=await import('./src/lib/auctionRules.js');
       const player=IPL_PLAYERS.find(p=>p.id===live.playerId);
       if(!player)return sendJson(res,409,{error:'Current player is invalid'});
       const decision=evaluateBotBid({player,currentBid:Number(live.currentBid||0),highBidderId:live.highBidderId,botTeam:team,squadLimit:Number(room.squadLimit||25),overseasLimit:Number(room.overseasLimit||8),initialBudget:Number(room.settings?.budget||120)});
