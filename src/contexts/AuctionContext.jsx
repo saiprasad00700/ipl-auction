@@ -1640,14 +1640,18 @@ export const AuctionProvider = ({ children }) => {
       });
       const rankings = [...eligibleRankings, ...disqualifiedRankings].sort((a, b) => a.rank - b.rank);
       const completedAt = getSyncedTime();
-      await updateRtdb(roomRef, {
-        status: 'completed',
-        completedAt,
-        winnerAnalysisStatus: 'completed',
-        winnerRankings: rankings,
-        winnerAnalysisModel: analysisModel,
-        winnerAnalysisCompletedAt: completedAt
+      if (!user) throw new Error('Sign in again to finalize winner analysis.');
+      const serverId = getRoomServerId(roomId);
+      if (serverId === '3') await ensureServer3Auth();
+      else if (serverId === '2') await ensureServer2Auth();
+      const resultToken = await user.getIdToken();
+      const finalizeResponse = await fetch('/api/winner-analysis-result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resultToken}` },
+        body: JSON.stringify({ roomId, action: 'complete', rankings, model: analysisModel, completedAt })
       });
+      const finalizeResult = await finalizeResponse.json().catch(() => ({}));
+      if (!finalizeResponse.ok) throw new Error(finalizeResult.error || 'Could not save winner analysis securely.');
       // Start the 48-hour history retention clock only after final rankings are saved.
       try {
         await set(ref(rtdb, `completedRoomHistory/${roomId}/completedAt`), completedAt);
@@ -1683,7 +1687,21 @@ export const AuctionProvider = ({ children }) => {
       });
       await flushAuctionToFirestore(roomId);
     } catch (error) {
-      await updateRtdb(roomRef, { status: 'analysis_failed', winnerAnalysisStatus: 'failed', winnerAnalysisError: String(error?.message || 'AI analysis failed') });
+      if (user) {
+        try {
+          const serverId = getRoomServerId(roomId);
+          if (serverId === '3') await ensureServer3Auth();
+          else if (serverId === '2') await ensureServer2Auth();
+          const failureToken = await user.getIdToken();
+          await fetch('/api/winner-analysis-result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${failureToken}` },
+            body: JSON.stringify({ roomId, action: 'fail', error: String(error?.message || 'AI analysis failed') })
+          });
+        } catch (failureSaveError) {
+          console.warn('Could not persist analysis failure through trusted endpoint:', failureSaveError?.message || failureSaveError);
+        }
+      }
       throw error;
     }
   }, [user, getSyncedTime, flushAuctionToFirestore]);
