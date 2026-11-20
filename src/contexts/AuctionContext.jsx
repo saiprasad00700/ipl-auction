@@ -1437,72 +1437,34 @@ export const AuctionProvider = ({ children }) => {
 
   const pauseAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    const now = getSyncedTime();
-
-    // Keep processing_sale intact during RTM. Changing its status to "paused"
-    // is rejected by the RTDB lifecycle validation while an RTM offer is pending.
-    // A separate pause flag freezes the RTM timers without losing the decision.
-    await runTransactionRtdb(liveRef, (live) => {
-      if (!live || live.isPaused || ['sold', 'unsold'].includes(live.status)) return;
-      live.isPaused = true;
-      live.pausedAt = now;
-      live.pausedFromStatus = live.status;
-      if (live.status === 'bidding') {
-        live.pausedTimerRemainingMs = Math.max(0, Number(live.timerEndsAt || now) - now);
-        live.status = 'paused';
-      }
-      return live;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/auction-pause', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, action: 'pause' })
     });
-
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction PAUSED by Admin`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
-    });
-  }, [user, currentAuction, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not pause auction.');
+    return result;
+  }, [user, currentAuction]);
 
   const resumeAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    const now = getSyncedTime();
-
-    await runTransactionRtdb(liveRef, (live) => {
-      if (!live || !live.isPaused) return;
-      const pausedDuration = Math.max(0, now - Number(live.pausedAt || now));
-
-      if (live.status === 'paused') {
-        live.status = live.pausedFromStatus || 'bidding';
-        live.timerEndsAt = now + Math.max(0, Number(live.pausedTimerRemainingMs || 0));
-      } else if (live.status === 'processing_sale' && live.retentionOffer?.status === 'pending') {
-        // Freeze the current RTM phase countdown for the entire pause duration.
-        live.retentionOffer.expiresAt = Number(live.retentionOffer.expiresAt || now) + pausedDuration;
-      }
-
-      delete live.isPaused;
-      delete live.pausedAt;
-      delete live.pausedFromStatus;
-      delete live.pausedTimerRemainingMs;
-      return live;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/auction-pause', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, action: 'resume' })
     });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not resume auction.');
+    return result;
+  }, [user, currentAuction]);
 
-    await remove(ref(getRoomDatabase(roomId), `auctions/${roomId}/pauseRequests`));
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction RESUMED by Admin`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
-    });
-  }, [getSyncedTime, user, currentAuction]);
-
-  // End the bidding phase and open the shared three-minute Playing XI window.
   const endAuction = useCallback(async (roomId) => {
     if (!user || !currentAuction || currentAuction.hostId !== user.uid) return;
     const roomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
