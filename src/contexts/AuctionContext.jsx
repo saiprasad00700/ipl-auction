@@ -1691,66 +1691,19 @@ export const AuctionProvider = ({ children }) => {
     if (!user?.uid || !['accept', 'decline', 'match', 'decline_counter'].includes(decision)) {
       throw new Error('Invalid RTM decision.');
     }
-
-    // Do not wait for the sync-readiness flag after the RTM countdown has begun.
-    // That wait can consume the entire short initial decision window. The RTDB
-    // transaction is the authority; use the cached server-adjusted clock and
-    // record the phase transition atomically.
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    // Capture when the manager actually clicked. A slow network must not turn an on-time
-    // choice into a rejection merely because the transaction reaches Firebase near expiry.
-    const decisionStartedAt = getSyncedTime();
-    const result = await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData || currentData.status !== 'processing_sale') return;
-      const offer = currentData.retentionOffer;
-      if (!offer || offer.status !== 'pending') return;
-      const expiresAt = Number(offer.expiresAt);
-      // Allow a small network/UI scheduling grace for a click made at the countdown
-      // boundary. Store the decision at the deadline so settlement treats it as on-time.
-      if (decisionStartedAt > expiresAt + 1500) return;
-      const now = Math.min(decisionStartedAt, expiresAt);
-      const isInitialDecision = offer.phase === 'initial_decision';
-      const isMatchDecision = offer.phase === 'match_decision';
-      if (isInitialDecision) {
-        if (offer.eligibleUserId !== user.uid || !['accept', 'decline'].includes(decision)) return;
-        if (decision === 'accept') {
-          // Persist the affirmative choice as well as advancing the phase, so
-          // every client can distinguish an exercised RTM from an unanswered offer.
-          offer.rtmUsed = true;
-          offer.phase = 'counter_bid';
-          offer.decision = 'accept';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-          offer.expiresAt = now + 15000;
-        } else {
-          offer.decision = 'decline';
-          offer.decidedBy = user.uid;
-          offer.decidedAt = now;
-        }
-      } else if (isMatchDecision) {
-        if (offer.eligibleUserId !== user.uid || !['match', 'decline_counter'].includes(decision)) return;
-        offer.decision = decision;
-        offer.decidedBy = user.uid;
-        offer.decidedAt = now;
-      } else {
-        return;
-      }
-      return currentData;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/retention-decision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, decision })
     });
-
-    if (!result.committed) {
-      const latest = result.snapshot?.val();
-      const offer = latest?.retentionOffer;
-      reportGuardianError({ operation: 'rtm', severity: 'critical', message: 'RTM decision transaction was not committed', roomId, fingerprint: 'rtm-decision-not-committed' });
-      console.error('[RTM] Decision transaction not committed', {
-        roomId, decision, uid: user.uid, status: latest?.status,
-        phase: offer?.phase, offerStatus: offer?.status,
-        eligibleUserId: offer?.eligibleUserId, expiresAt: offer?.expiresAt,
-        serverTime: getSyncedTime()
-      });
-      throw new Error('Your RTM decision was not saved. Please try again immediately if the offer is still open.');
-    }
-  }, [user, getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Your RTM decision was not saved.');
+    return result;
+  }, [user]);
 
   const submitRetentionCounterBid = useCallback(async (roomId, amount) => {
     if (!user?.uid || !Number.isFinite(Number(amount))) throw new Error('Enter a valid counter-bid amount.');
