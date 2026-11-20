@@ -1643,7 +1643,16 @@ export const AuctionProvider = ({ children }) => {
     };
   }, [user]);
 
-  const sendMessage = useCallback(async (roomId, text, type = 'text') => {
+const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) => {
+    if (!user || !roomId || !messageId || !userId || user.uid !== userId) return;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '2') await ensureServer2Auth();
+    else if (serverId === '3') await ensureServer3Auth();
+    const roomDatabase = getRoomDatabase(roomId);
+    await set(ref(roomDatabase, `auctions/${roomId}/messages/${messageId}/seenBy/${userId}`), seenBy);
+  }, [user]);
+
+    const sendMessage = useCallback(async (roomId, text, type = 'text') => {
     if (!user || !roomId) return;
     // Bot identities are auction placeholders, never real chat participants.
     if (/^(bot[_-]|auctionbot[_-])/i.test(user.uid)) {
@@ -2813,6 +2822,7 @@ export const AuctionProvider = ({ children }) => {
     finalizeWinnerAnalysis,
     retryWinnerAnalysis,
     sendMessage,
+    markMessageSeen,
     messages,
     addBotTeam,
     removeBotTeam,
