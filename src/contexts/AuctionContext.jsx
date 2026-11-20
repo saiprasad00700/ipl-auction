@@ -1035,7 +1035,7 @@ export const AuctionProvider = ({ children }) => {
         status: 'bidding'
       };
     });
-  }, [getSyncedTime]);
+  }, [getSyncedTime, user]);
 
   const joinRoomDb = useCallback(async (roomId, userId, playerDetails) => {
     // Room codes are allocated with their first digit identifying the Firebase server.
