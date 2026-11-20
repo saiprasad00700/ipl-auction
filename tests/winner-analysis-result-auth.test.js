@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateWinnerAnalysisResult } from '../api/winner-analysis-result-auth.js';
+const room={hostId:'host',status:'analyzing'};
+const teams={a:{teamId:'MI'},b:{teamId:'CSK'},c:{teamId:'RCB',disqualified:true}};
+const rankings=[{franchiseId:'MI',rank:1,score:80},{franchiseId:'CSK',rank:2,score:70},{franchiseId:'RCB',rank:3,disqualified:true}];
+test('host can finalize valid analysis results',()=>{const r=validateWinnerAnalysisResult({room,teams,uid:'host',rankings,model:'AI',completedAt:100});assert.equal(r.allowed,true);assert.equal(r.room.status,'completed');assert.deepEqual(r.room.winnerRankings,rankings);});
+test('non-host cannot finalize',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'guest',rankings,model:'AI',completedAt:100}).reason,'host_only'));
+test('finalization only works during analyzing',()=>assert.equal(validateWinnerAnalysisResult({room:{...room,status:'awaiting_xi'},teams,uid:'host',rankings,model:'AI',completedAt:100}).reason,'analysis_not_running'));
+test('rejects duplicate franchise ranks',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'host',rankings:[rankings[0],rankings[0]],model:'AI',completedAt:100}).reason,'invalid_rankings'));
+test('rejects unknown franchise',()=>assert.equal(validateWinnerAnalysisResult({room,teams,uid:'host',rankings:[{franchiseId:'XYZ',rank:1}],model:'AI',completedAt:100}).reason,'unknown_franchise'));
