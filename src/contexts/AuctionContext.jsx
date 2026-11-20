@@ -1291,9 +1291,24 @@ export const AuctionProvider = ({ children }) => {
   const joinAuction = useCallback((auctionId, userId) => {
     if (!userId) return () => {};
     
-    // Connect to the Firebase project assigned to this room.
+    // Connect to the Firebase project assigned to this room. Server 2/3 require
+    // a custom-token sign-in before RTDB listeners can authenticate; delaying
+    // goOnline until that token is ready prevents listeners from racing an
+    // unauthenticated socket on room entry.
+    const roomServerId = getRoomServerId(auctionId);
     const roomDatabase = getRoomDatabase(auctionId);
-    try { goOnline(roomDatabase); } catch (e) {}
+    const roomAuthReady = roomServerId === '3'
+      ? ensureServer3Auth()
+      : roomServerId === '2'
+        ? ensureServer2Auth()
+        : Promise.resolve(roomDatabase);
+    roomAuthReady.then(() => {
+      try { goOnline(roomDatabase); } catch (e) {}
+    }).catch((authError) => {
+      console.error('[Auction] Room server authentication failed:', authError?.message || authError);
+      setLoading(false);
+      handleFirebaseError(authError);
+    });
 
     setLoading(true);
     let auctionLoaded = false;
