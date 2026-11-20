@@ -1125,22 +1125,49 @@ export const AuctionProvider = ({ children }) => {
       throw new Error(`ROOM_COMPLETED:${roomId}`);
     }
 
-    const existingPlayers = data.players || [];
-    const playerExists = existingPlayers.find(p => p.id === userId);
-    
+    const existingPlayers = Array.isArray(data.players)
+      ? data.players
+      : Object.values(data.players || {});
+    const playerExists = existingPlayers.find(p => p && (p.id === userId || p.userId === userId));
+
     const updatedPlayer = {
       id: userId,
       name: playerDetails.name || (playerExists ? playerExists.name : 'Manager'),
       team: playerDetails.team || (playerExists ? playerExists.team : ''),
       teamName: teamDetails?.name || (playerExists ? playerExists.teamName : 'Unknown'),
-      isHost: playerExists ? playerExists.isHost : false
+      isHost: playerExists ? !!playerExists.isHost : false
     };
 
-    const updatedPlayers = existingPlayers.filter(p => p && p.id !== userId && p.userId !== userId);
-    updatedPlayers.push(updatedPlayer);
-
-    // Update the roster first, preserving its array shape.
-    await set(ref(roomDatabase, `auctions/${roomId}/room/players`), updatedPlayers);
+    // CRITICAL SYNC FIX: concurrent joins must never replace the entire roster
+    // using a stale snapshot. Transactionally merge the participant into the
+    // latest server roster, normalize legacy object-shaped data, and dedupe IDs.
+    const playersRef = ref(roomDatabase, `auctions/${roomId}/room/players`);
+    const joinRosterTx = await runTransactionRtdb(playersRef, (currentRoster) => {
+      const roster = Array.isArray(currentRoster)
+        ? currentRoster.filter(Boolean)
+        : Object.values(currentRoster || {}).filter(Boolean);
+      const existingIndex = roster.findIndex(p => p && (p.id === userId || p.userId === userId));
+      if (existingIndex >= 0) {
+        roster[existingIndex] = {
+          ...roster[existingIndex],
+          ...updatedPlayer,
+          // Keep a host flag that was already established by room creation.
+          isHost: !!roster[existingIndex].isHost
+        };
+      } else {
+        roster.push(updatedPlayer);
+      }
+      const seen = new Set();
+      return roster.filter(p => {
+        const id = String(p?.id || p?.userId || '');
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    });
+    if (!joinRosterTx.committed) {
+      throw new Error('Could not safely sync your join to the room. Please retry.');
+    }
 
     // Save history independently of the activity heartbeat. A heartbeat/rules
     // failure must never prevent a successfully joined room from being recorded.
@@ -1847,37 +1874,50 @@ export const AuctionProvider = ({ children }) => {
     
     const data = rtdbRoomSnap.val();
     const teamDetails = TEAMS.find(t => t.id === newTeamId);
-    
-    const existingPlayers = Array.isArray(data.players) ? data.players : [];
-    const playerIndex = existingPlayers.findIndex(p => p && (p.id === userId || p.userId === userId));
-    // Human players may take over a franchise currently occupied by a bot.
-    // Remove the bot roster entry before assigning the franchise to the human.
     const botUserId = `bot_${newTeamId}`;
-    const rosterWithoutTeamBot = existingPlayers.filter(p =>
-      !(p && p.isBot && (p.team === newTeamId || p.id === botUserId))
-    );
-    const updatedPlayers = rosterWithoutTeamBot.map(p =>
-      p && (p.id === userId || p.userId === userId)
-        ? { ...p, id: userId, team: newTeamId, teamName: teamDetails?.name || 'Unknown' }
-        : p
-    );
-    // Repair older/malformed room rosters where the signed-in member is not
-    // present under either identifier instead of silently updating zero rows.
-    if (playerIndex === -1) {
-      updatedPlayers.push({
+    const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
+
+    // CRITICAL SYNC FIX: team selection also uses a transaction so simultaneous
+    // selections cannot overwrite joins or claim the same franchise.
+    const teamRosterTx = await runTransactionRtdb(playersRef, (currentRoster) => {
+      const roster = Array.isArray(currentRoster)
+        ? currentRoster.filter(Boolean)
+        : Object.values(currentRoster || {}).filter(Boolean);
+      const playerIndex = roster.findIndex(p => p && (p.id === userId || p.userId === userId));
+      const existingUser = playerIndex >= 0 ? roster[playerIndex] : null;
+      const teamOwner = roster.find(p => p && p.team === newTeamId
+        && (p.id !== userId && p.userId !== userId)
+        && !(p.isBot && (p.id === botUserId || p.team === newTeamId)));
+      if (teamOwner) return;
+
+      // Human players may replace the bot occupying the selected franchise.
+      const rosterWithoutBot = roster.filter(p =>
+        !(p && p.isBot && (p.team === newTeamId || p.id === botUserId))
+      );
+      const updatedUser = {
+        ...(existingUser || {}),
         id: userId,
-        name: user?.displayName || user?.email || 'Manager',
+        name: existingUser?.name || user?.displayName || user?.email || 'Manager',
         team: newTeamId,
         teamName: teamDetails?.name || 'Unknown',
-        isHost: false
+        isHost: !!existingUser?.isHost
+      };
+      const updatedRoster = rosterWithoutBot.filter(p => !(p && (p.id === userId || p.userId === userId)));
+      updatedRoster.push(updatedUser);
+      const seen = new Set();
+      return updatedRoster.filter(p => {
+        const participantId = String(p?.id || p?.userId || '');
+        if (!participantId || seen.has(participantId)) return false;
+        seen.add(participantId);
+        return true;
       });
+    });
+    if (!teamRosterTx.committed) {
+      throw new Error(`The ${newTeamId} franchise was selected by another participant. Please choose another team.`);
     }
+
     // Write only to the child paths explicitly permitted for room members.
-    // A parent-level update at /room is host-only under database.rules.json.
-    await Promise.all([
-      set(ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`), updatedPlayers),
-      set(ref(getRoomDatabase(roomId), `auctions/${roomId}/room/lastActivityAt`), Date.now())
-    ]);
+    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/room/lastActivityAt`), Date.now());
 
     /*
     try {
