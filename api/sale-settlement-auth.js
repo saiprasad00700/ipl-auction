@@ -3,7 +3,7 @@ export function validateSaleSettlement({ room, live, team, players }) {
   const uid = live.highBidderId;
   const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
   const participant = roster.find((p) => p && (p.id === uid || p.userId === uid));
-  if (!uid || !participant || participant.isBot !== true && !participant.team) return { allowed: false, status: 403, reason: 'winner_not_in_room' };
+  if (!uid || !participant || !participant.team || participant.team !== live.highBidderTeamId) return { allowed: false, status: 403, reason: 'winner_not_in_room' };
   if (!live.playerId || !players.some((p) => p.id === live.playerId)) return { allowed: false, status: 409, reason: 'unknown_player' };
   if (!Number.isFinite(Number(live.currentBid)) || Number(live.currentBid) < 0) return { allowed: false, status: 409, reason: 'invalid_sale_price' };
   if (team && team.userId && team.userId !== uid) return { allowed: false, status: 409, reason: 'team_identity_mismatch' };
