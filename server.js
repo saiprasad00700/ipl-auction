@@ -1061,6 +1061,48 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/start-auction') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot start auctions' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Auction start request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const rootRef = database.ref(`auctions/${roomId}`);
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const { buildAuctionStart } = await import('./api/auction-start-auth.js');
+      let reason = null;
+      const transaction = await rootRef.transaction((current) => {
+        const room = current?.room;
+        if (!room || room.hostId !== uid) { reason = 'host_only'; return; }
+        const result = buildAuctionStart({ room, players: IPL_PLAYERS, now: Date.now(), bidTimerSeconds: room.settings?.bidTimer || 15 });
+        if (!result.allowed) { reason = result.reason; return; }
+        return { ...current, room: result.room, playerOrder: result.order, live: result.live };
+      });
+      if (!transaction.committed) {
+        const status = reason === 'host_only' ? 403 : 409;
+        return sendJson(res, status, { error: reason === 'minimum_members' ? 'Invite at least one friend or add a bot to start.' : reason === 'room_not_waiting' ? 'Auction already started or room is not waiting.' : 'Auction could not be started.', reason });
+      }
+      const finalRoom = transaction.snapshot.val()?.room;
+      if (finalRoom?.isPublic) {
+        try { await database.ref(`publicRooms/${roomId}`).update({ status: 'active' }); } catch {}
+      }
+      return sendJson(res, 200, { ok: true, roomId, room: finalRoom, live: transaction.snapshot.val()?.live, playerOrder: transaction.snapshot.val()?.playerOrder });
+    } catch (error) {
+      console.warn('[Auction start] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not start auction securely' });
+    }
+  }
   if (pathname === '/api/advance-auction') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
