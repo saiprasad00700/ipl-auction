@@ -2193,6 +2193,17 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Analysis result request limit reached' });
       const roomRef = services.database.ref('auctions/' + roomId + '/room');
       const action = String(body.action || 'complete');
+      if (action === 'retry') {
+        let reason = null;
+        const tx = await roomRef.transaction(current => {
+          if (!current) { reason = 'room_not_found'; return; }
+          if (current.hostId !== uid) { reason = 'host_only'; return; }
+          if (current.status !== 'analysis_failed') { reason = 'analysis_not_failed'; return; }
+          return { ...current, status: 'awaiting_xi', winnerAnalysisStatus: 'collecting', winnerAnalysisError: null };
+        });
+        if (!tx.committed) return sendJson(res, reason === 'host_only' ? 403 : 409, { error: 'Analysis retry is not allowed for this room', reason });
+        return sendJson(res, 200, { ok: true, status: 'awaiting_xi' });
+      }
       if (action === 'fail') {
         let reason = null;
         const tx = await roomRef.transaction(current => {
