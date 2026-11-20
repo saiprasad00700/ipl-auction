@@ -1,8 +1,8 @@
 export function resolveAuctionEnd({ room, teams, uid, now, xiDeadlineMs }) {
   if (!room || !uid) return { allowed:false,status:401,reason:'identity_required' };
   if (room.hostId!==uid) return { allowed:false,status:403,reason:'host_only' };
-  if (room.status!=='active') return { allowed:false,status:409,reason:'auction_not_active' };
   if (['awaiting_xi','analyzing','completed','analysis_failed'].includes(room.status)) return { allowed:false,status:409,reason:'already_ended' };
+  if (room.status!=='active') return { allowed:false,status:409,reason:'auction_not_active' };
   const isMega=(room.auctionType||'mega')==='mega';
   const disqualified=[];const updates={};
   for(const [key,team] of Object.entries(teams||{})){
