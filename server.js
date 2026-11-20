@@ -1074,10 +1074,6 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const isHost = roomData.hostId === decoded.uid;
       if (!isHost && !rosterEntry) return sendJson(res, 403, { error: 'You must join this auction before using voice chat' });
 
-      // Successful voice-chat access is genuine room activity. Online presence
-      // and heartbeats alone do not reset the room inactivity timer.
-      await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
-
       const appId = String(process.env.AGORA_APP_ID || '').trim();
       const certificate = String(process.env.AGORA_APP_CERTIFICATE || '').trim();
       const publicAppId = String(process.env.VITE_AGORA_APP_ID || '').trim();
@@ -1118,6 +1114,9 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
         tokenExpirationSeconds, privilegeExpirationSeconds
       );
+      // Only a successful voice-chat token issuance counts as activity.
+      // Mere online presence or failed token requests do not keep rooms alive.
+      await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
       return sendJson(res, 200, {
         appId, channelName, token, uid: rtcAccount,
         expiresIn: tokenExpirationSeconds,
