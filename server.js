@@ -1145,6 +1145,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roomRef = database.ref(`auctions/${roomId}/room`);
       let selectedTeamId = '';
       let removedBotId = '';
+      let createdBotTeamIds = [];
       const transaction = await roomRef.transaction((room) => {
         if (!room || room.hostId !== uid || room.status !== 'waiting') return;
         const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
@@ -1157,12 +1158,14 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
           return { ...room, players: [...roster, { id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true }], lastActivityAt: Date.now() };
         }
         if (action === 'fill') {
+          createdBotTeamIds = [];
           const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
           const newPlayers = [...roster];
           for (const teamId of Object.keys(teamNames)) {
             if (taken.has(teamId)) continue;
             const botId = `bot_${teamId}`;
             newPlayers.push({ id: botId, name: `${teamNames[teamId]} Bot`, team: teamId, teamName: teamNames[teamId], isHost: false, isBot: true });
+            createdBotTeamIds.push(teamId);
             taken.add(teamId);
           }
           return { ...room, players: newPlayers, lastActivityAt: Date.now() };
@@ -1186,26 +1189,15 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roster = Array.isArray(finalRoom.players) ? finalRoom.players : Object.values(finalRoom.players || {});
       const teamsRef = database.ref(`auctions/${roomId}/teams`);
       const teamUpdates = {};
-      if (action === 'add' && selectedTeamId) {
-        const botId = `bot_${selectedTeamId}`;
-        teamUpdates[`${roomId}_${botId}`] = {
-          auctionId: roomId, userId: botId, teamId: selectedTeamId, teamName: teamNames[selectedTeamId],
+      const teamsToInitialize = action === 'add' && selectedTeamId ? [selectedTeamId] : action === 'fill' ? createdBotTeamIds : [];
+      for (const teamId of teamsToInitialize) {
+        const botId = `bot_${teamId}`;
+        const botTeamRef = teamsRef.child(`${roomId}_${botId}`);
+        await botTeamRef.transaction((existingTeam) => existingTeam || ({
+          auctionId: roomId, userId: botId, teamId, teamName: teamNames[teamId],
           budgetRemaining: Number(finalRoom.settings?.budget || 120), spent: 0, squad: [], retentionCardsRemaining: 2
-        };
-      } else if (action === 'fill') {
-        const taken = new Set(roster.map((p) => p?.team).filter(Boolean));
-        for (const teamId of Object.keys(teamNames)) {
-          if (!taken.has(teamId)) continue;
-          const botId = `bot_${teamId}`;
-          if (roster.some((p) => p?.id === botId)) {
-            teamUpdates[`${roomId}_${botId}`] = {
-              auctionId: roomId, userId: botId, teamId, teamName: teamNames[teamId],
-              budgetRemaining: Number(finalRoom.settings?.budget || 120), spent: 0, squad: [], retentionCardsRemaining: 2
-            };
-          }
-        }
+        }));
       }
-      if (Object.keys(teamUpdates).length) await teamsRef.update(teamUpdates);
       if (action === 'remove' && removedBotId) await teamsRef.child(`${roomId}_${removedBotId}`).remove();
       return sendJson(res, 200, { ok: true, action, roomId });
     } catch (error) {
