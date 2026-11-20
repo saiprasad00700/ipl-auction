@@ -4,7 +4,8 @@ export function resolveAuctionAdvance({ live, room, order, players, now, bidTime
   if (Number(live.transitionDeadline || 0) > Number(now)) return { allowed: false, status: 409, reason: 'transition_waiting' };
   const playerOrder = Array.isArray(order) && order.length ? order : players.map((_, index) => index);
   const currentIndex = playerOrder.findIndex((idx) => players[idx]?.id === live.playerId);
-  const nextIndex = currentIndex >= 0 ? playerOrder[currentIndex + 1] : playerOrder[0];
+  if (currentIndex < 0) return { allowed: false, status: 409, reason: 'current_player_not_in_order' };
+  const nextIndex = playerOrder[currentIndex + 1];
   if (nextIndex === undefined || !players[nextIndex]) {
     return { allowed: true, status: 200, action: 'finish', live: { ...live, status: 'awaiting_xi', transitionDeadline: null }, nextIndex: null };
   }
