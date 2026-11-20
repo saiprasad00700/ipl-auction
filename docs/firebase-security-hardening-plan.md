@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative retention decisions
+- Initial RTM accept/decline and original-franchise match/decline-counter decisions now use `POST /api/retention-decision`.
+- The server verifies the room's assigned Firebase project token, room membership, ban status, RTM phase, eligible manager identity, and offer expiry, then commits the phase/decision through a live-state transaction.
+- Buyer counter-bids now use `POST /api/retention-counter-bid`; the server verifies the buyer, pending counter-bid phase, deadline, higher amount, and purse affordability before transactionally advancing to the match-decision phase.
+- Pure validation tests cover RTM decisions and counter-bids.
+- Client-side RTM transaction writes have been removed from these two actions. Final sale settlement and durable purse/squad/card updates are still client-coordinated and remain the next critical migration.
+
 ## Server-authoritative bidding
 - Client bid placement now calls `POST /api/place-bid`; the server verifies the Firebase ID token against the room's assigned Firebase project (Server 1/2/3).
 - Server validation checks membership, ban state, active room/live bidding state, current high bidder, timer expiry, team-record identity/franchise match, player catalog entry, squad size, overseas quota, and purse affordability.
