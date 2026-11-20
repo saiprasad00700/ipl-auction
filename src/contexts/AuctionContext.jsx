@@ -1788,35 +1788,26 @@ export const AuctionProvider = ({ children }) => {
 
   // ─── Bot Management & Bidding Engine ───
 
-  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName, timerSeconds = DEFAULT_BID_TIMER_SECONDS, maxValuation = Infinity, botBudget = Infinity) => {
-    if (!roomId) return;
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-
-    await runTransactionRtdb(liveRef, (currentData) => {
-      if (!currentData) return currentData;
-      if (currentData.status !== 'bidding') return; // abort
-      if (currentData.highBidderId === botUserId) return; // abort
-
-      const now = getSyncedTime();
-      // Reject if timer has already expired server-side
-      if (currentData.timerEndsAt && now >= currentData.timerEndsAt) return;
-      
-      const cBid = currentData.currentBid || 0;
-      const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
-
-      // Guard: Abort retried transaction if updated bid exceeds bot's max valuation or remaining budget
-      if (nAmount > maxValuation || nAmount > botBudget) return;
-
-      currentData.currentBid = nAmount;
-      currentData.highBidderId = botUserId;
-      currentData.highBidderName = botName;
-      currentData.highBidderTeamId = botTeamId;
-      // Use the room's configured timer, NOT a hardcoded 10 seconds
-      currentData.timerEndsAt = now + (timerSeconds * 1000);
-      
-      return currentData;
+  const placeBotBid = useCallback(async (roomId, botUserId, botTeamId, botName) => {
+    if (!roomId || !user) return;
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/place-bot-bid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId, botUserId, botTeamId, botName })
     });
-  }, [getSyncedTime]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (result.reason !== 'live_state_changed' && result.reason !== 'bid_timer_expired' && result.reason !== 'already_high_bidder') {
+        throw new Error(result.error || 'Bot bid failed.');
+      }
+      return result;
+    }
+    return result;
+  }, [user]);
 
   const botTeamMutation = useCallback(async (roomId, action, teamIdOrBotId) => {
     if (!user) throw new Error('Sign in required');
