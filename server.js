@@ -1060,6 +1060,60 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/advance-auction') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid room/server' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot advance auction lots' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Auction advance request limit reached. Please wait before retrying.' });
+      const database = services.database;
+      const roomRef = database.ref(`auctions/${roomId}/room`);
+      const liveRef = database.ref(`auctions/${roomId}/live`);
+      const roomSnap = await roomRef.get();
+      if (!roomSnap.exists()) return sendJson(res, 404, { error: 'Room not found' });
+      const room = roomSnap.val();
+      const roster = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      if (!roster.some((p) => p && (p.id === uid || p.userId === uid) && !p.isBot)) return sendJson(res, 403, { error: 'Room participant required' });
+      const banned = Array.isArray(room.bannedPlayers) ? room.bannedPlayers : Object.keys(room.bannedPlayers || {}).filter((key) => room.bannedPlayers[key] === true);
+      if (banned.includes(uid)) return sendJson(res, 403, { error: 'You are banned from this room' });
+      const { IPL_PLAYERS } = await import('./src/data/players.js');
+      const orderSnap = await database.ref(`auctions/${roomId}/playerOrder`).get();
+      const order = orderSnap.exists() ? orderSnap.val() : room.playerOrder;
+      const { resolveAuctionAdvance } = await import('./api/auction-advance-auth.js');
+      let reason = null;
+      const tx = await liveRef.transaction((current) => {
+        const result = resolveAuctionAdvance({ live: current, room, order, players: IPL_PLAYERS, now: Date.now(), bidTimerSeconds: room.settings?.bidTimer || 15 });
+        if (!result.allowed) { reason = result.reason; return; }
+        return result.live;
+      });
+      if (!tx.committed) return sendJson(res, 409, { error: reason === 'transition_waiting' ? 'Player transition timer is still active.' : 'Auction progression was not committed.', reason: reason || 'transaction_not_committed' });
+      const finalLive = tx.snapshot.val();
+      if (finalLive.status === 'awaiting_xi') {
+        const now = Date.now();
+        const usesSquadBalanceAnalysis = room.auctionType !== 'mega';
+        await roomRef.update({
+          status: 'awaiting_xi',
+          xiSubmissionStartedAt: now,
+          xiSubmissionDeadline: usesSquadBalanceAnalysis ? now : now + PLAYING_XI_DEADLINE_MS,
+          winnerAnalysisStatus: 'collecting'
+        });
+      }
+      return sendJson(res, 200, { ok: true, live: finalLive, finished: finalLive.status === 'awaiting_xi' });
+    } catch (error) {
+      console.warn('[Auction advance] Request failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not advance auction securely' });
+    }
+  }
   if (pathname === '/api/settle-sale') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
