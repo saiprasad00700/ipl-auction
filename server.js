@@ -1061,6 +1061,41 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not submit feedback right now' });
     }
   }
+  if (pathname === '/api/auction-pause') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req);
+      const roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),action=String(body.action||'');
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId)||!['pause','resume'].includes(action))return sendJson(res,400,{error:'Invalid room/server/action'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7));
+      const uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot pause/resume auctions'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Pause/resume request limit reached. Please wait before retrying.'});
+      const database=services.database,roomRef=database.ref(`auctions/${roomId}/room`),liveRef=database.ref(`auctions/${roomId}/live`);
+      const roomSnap=await roomRef.get();
+      if(!roomSnap.exists())return sendJson(res,404,{error:'Room not found'});
+      if(roomSnap.val().hostId!==uid)return sendJson(res,403,{error:'Only the host can pause or resume the auction'});
+      const {applyAuctionPauseResume}=await import('./api/auction-pause-auth.js');
+      let reason=null;
+      const tx=await liveRef.transaction(current=>{
+        const result=applyAuctionPauseResume({live:current,action,now:Date.now()});
+        if(!result.allowed){reason=result.reason;return;}
+        return result.live;
+      });
+      if(!tx.committed)return sendJson(res,409,{error:reason==='already_paused'?'Auction is already paused.':reason==='not_paused'?'Auction is not paused.':'Auction cannot be paused/resumed in its current state.',reason});
+      if(action==='resume')await database.ref(`auctions/${roomId}/pauseRequests`).remove();
+      await database.ref(`auctions/${roomId}/messages`).push({userId:'system',userName:'System',text:action==='pause'?'Auction PAUSED by Admin':'Auction RESUMED by Admin',type:'log',timestamp:Date.now()});
+      return sendJson(res,200,{ok:true,live:tx.snapshot.val()});
+    }catch(error){
+      console.warn('[Auction pause/resume] Request failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not pause/resume auction securely'});
+    }
+  }
   if (pathname === '/api/start-auction') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
