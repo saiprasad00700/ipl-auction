@@ -798,54 +798,31 @@ export const AuctionProvider = ({ children }) => {
 
       if (isSold) {
         teamDocId = `${roomId}_${auctionState.highBidderId}`;
-        const teamRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${teamDocId}`);
-        const defaultBudget = roomData.settings?.budget || 120.0;
-
-        // A transaction makes the squad append and budget deduction atomic. If
-        // multiple browsers settle the same lot, only the first can apply it.
-        const teamTx = await runTransactionRtdb(teamRef, (current) => {
-          const tData = current || {};
-          const squad = Array.isArray(tData.squad) ? tData.squad : [];
-          if (squad.some((p) => p?.id === auctionState.playerId)) return;
-          return {
-            ...tData,
-            auctionId: roomId,
-            userId: auctionState.highBidderId,
-            teamId: auctionState.highBidderTeamId || tData.teamId || '',
-            teamName: teamDetails?.name || auctionState.highBidderName || tData.teamName || 'Unknown',
-            budgetRemaining: Math.max(0, Number(tData.budgetRemaining ?? defaultBudget) - Number(auctionState.currentBid)),
-            spent: Number(tData.spent || 0) + Number(auctionState.currentBid),
-            retentionCardsRemaining: successfullyRetainedPlayer
-              ? Math.max(0, Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE) - 1)
-              : Number(tData.retentionCardsRemaining ?? RETENTION_CARDS_PER_FRANCHISE),
-            squad: [...squad, { id: auctionState.playerId, bid: auctionState.currentBid, rtmUsed: successfullyRetainedPlayer }]
-          };
+        if (!user) throw new Error('Sign in required to settle sale.');
+        const serverId = getRoomServerId(roomId);
+        if (serverId === '3') await ensureServer3Auth();
+        else if (serverId === '2') await ensureServer2Auth();
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/settle-sale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ roomId, serverId, teamName: teamDetails?.name || auctionState.highBidderName || 'Unknown' })
         });
-
-        const finalTeamData = teamTx.snapshot?.exists() ? teamTx.snapshot.val() : null;
-        teamSaleApplied = Boolean(teamTx.committed);
+        const settlement = await response.json().catch(() => ({}));
+        if (!response.ok || !settlement.team) throw new Error(settlement.error || 'Sale settlement failed.');
+        const finalTeamData = settlement.team;
+        teamSaleApplied = settlement.applied === true;
         newTeamData = finalTeamData;
 
-        // Reconcile room-level counters from the committed team record, not by
-        // incrementing a stale room snapshot. This also repairs the counters if a
-        // previous client committed the squad transaction but disconnected before
-        // updating room.players.
-        if (finalTeamData) {
-          const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
-          const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
-            if (!Array.isArray(currentPlayers)) return;
-            return currentPlayers.map((p) => p.id === auctionState.highBidderId
-              ? {
-                  ...p,
-                  spent: Number(finalTeamData.spent || 0),
-                  squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0
-                }
-              : p);
-          });
-          if (!playersTx.committed) {
-            throw new Error('Could not synchronize team totals to the room roster.');
-          }
-        }
+        // Reconcile room-level counters from the trusted team settlement.
+        const playersRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room/players`);
+        const playersTx = await runTransactionRtdb(playersRef, (currentPlayers) => {
+          if (!Array.isArray(currentPlayers)) return;
+          return currentPlayers.map((p) => p.id === auctionState.highBidderId
+            ? { ...p, spent: Number(finalTeamData.spent || 0), squadCount: Array.isArray(finalTeamData.squad) ? finalTeamData.squad.length : 0 }
+            : p);
+        });
+        if (!playersTx.committed) throw new Error('Could not synchronize team totals to the room roster.');
       }
 
       // Do not advance the lot until required state writes have completed. A failed
