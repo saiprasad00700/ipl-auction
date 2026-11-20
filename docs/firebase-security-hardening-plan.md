@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative bidding expiry and RTM offer creation
+- `POST /api/finalize-bidding` now verifies room-server Firebase identity, membership, ban status, active room, and server-side bid timer expiry.
+- It computes sold/unsold state and eligibility for an RTM offer using the original-franchise dataset, eligible franchise manager, card count, purse, and overseas-player limit, then commits the live state in an RTDB transaction.
+- Client timer/recovery flow calls this endpoint for expired bidding and the RTM finalization endpoint for expired processing stages.
+- Pure helper tests cover timer rejection, eligible offer creation, and RTM skip conditions.
+- Cross-path consistency caveat remains: eligibility reads room/team snapshots before the live transaction; trusted settlement still validates purse/card/squad limits. Restrictive Firebase rules are not yet safe to deploy.
+
 ## Server-authoritative auction progression
 - `POST /api/advance-auction` authenticates the room participant against the assigned Firebase project and validates the sold/unsold transition deadline.
 - It advances to the next ordered player with server-calculated timer reset, or transactionally marks the live auction as `awaiting_xi` and updates the room XI phase metadata at auction completion.
