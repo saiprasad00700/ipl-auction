@@ -17,6 +17,7 @@ test('prevents a second user from claiming an occupied franchise', () => {
   const room = { status: 'waiting', players: [{ id: 'host', team: 'CSK' }] };
   assert.equal(validateRoomJoin({ room, uid: 'guest', teamId: 'CSK' }).reason, 'franchise_taken');
   assert.equal(validateRoomJoin({ room, uid: 'host', teamId: 'CSK' }).allowed, true);
+  assert.equal(validateRoomJoin({ room, uid: 'host', teamId: 'MI' }).reason, 'team_change_requires_explicit_transfer');
 });
 
 test('allows a same-user reconnect and builds a deduplicated roster entry', () => {
