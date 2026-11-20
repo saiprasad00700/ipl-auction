@@ -44,3 +44,10 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Review the rules diff and test results.
 - Merge only after tests pass and a deployment/rollback plan is ready.
 - Deploy rules in a coordinated window; verify room creation, joining, bots, bidding, retention, and cleanup immediately.
+
+## Branch-only protections added during this audit
+- Winner analysis endpoint now requires a verified Firebase ID token and room-host authorization, with room-phase checks and server routing by room-code prefix.
+- Agora voice token requests now bind the requested RTC identity to the authenticated Firebase UID to prevent participant identity impersonation.
+- Room activity endpoint now has a per-user in-memory rate limit of 30 requests per minute; bot identities are rejected.
+- CI workflow explicitly runs on pushes to `security-rules-hardening`. The production health-check job remains restricted to `main`.
+- These changes are isolated in the security branch and have not been merged or deployed.
