@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import analyzeWinner from './api/analyze-winner.js';
 import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
 import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
+import { authorizeWinnerAnalysis } from './api/winner-analysis-auth.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -1165,9 +1166,12 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roomSnapshot = await database.ref('auctions/' + roomId + '/room').get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
       const roomData = roomSnapshot.val() || {};
-      if (roomData.hostId !== decoded.uid) return sendJson(res, 403, { error: 'Only the room host can run winner analysis' });
-      if (!['awaiting_xi', 'analyzing'].includes(String(roomData.status || ''))) {
-        return sendJson(res, 409, { error: 'Winner analysis is not currently allowed for this room' });
+      const authorizationResult = authorizeWinnerAnalysis({ uid: decoded.uid, room: roomData, roomStatus: roomData.status });
+      if (!authorizationResult.allowed) {
+        const message = authorizationResult.reason === 'host_only'
+          ? 'Only the room host can run winner analysis'
+          : 'Winner analysis is not currently allowed for this room';
+        return sendJson(res, authorizationResult.status, { error: message });
       }
       const responseShim = {
         statusCode: 200,
