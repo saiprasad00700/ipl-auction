@@ -7,6 +7,7 @@ import analyzeWinner from './api/analyze-winner.js';
 import { buildPhaseTwoMetrics } from './api/analytics-phase2.js';
 import { recordGuardianError, sanitizeGuardianInput } from './api/guardian.js';
 import { authorizeWinnerAnalysis } from './api/winner-analysis-auth.js';
+import { validateRtcAccount } from './api/voice-token-auth.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(ROOT, 'dist');
@@ -1080,6 +1081,8 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const serverId = String(body.serverId || '1');
       if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)) return sendJson(res, 400, { error: 'Invalid room' });
       if (!/^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount)) return sendJson(res, 400, { error: 'Invalid voice participant ID' });
+      const rtcIdentityCheck = validateRtcAccount({ uid: decoded.uid, rtcAccount });
+      if (!rtcIdentityCheck.allowed) return sendJson(res, 403, { error: 'Voice identity must match your authenticated account' });
       if (!['1', '2', '3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
 
