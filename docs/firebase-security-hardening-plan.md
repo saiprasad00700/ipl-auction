@@ -41,6 +41,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
+## Server-authoritative bidding
+- Client bid placement now calls `POST /api/place-bid`; the server verifies the Firebase ID token against the room's assigned Firebase project (Server 1/2/3).
+- Server validation checks membership, ban state, active room/live bidding state, current high bidder, timer expiry, team-record identity/franchise match, player catalog entry, squad size, overseas quota, and purse affordability.
+- The live bid is committed in an RTDB transaction with server-computed bid increment and timer reset. The client no longer writes the live bid directly.
+- Unit tests cover authorization, phase/timer, high-bidder rejection, identity mismatch, squad/overseas limits, and insufficient budget.
+- This migration is incomplete: auction start/advance, RTM decision and sale settlement still involve client-side writes. Firebase rules remain permissive until the rest of the trusted mutation path is migrated and emulator-tested.
+
 ## Server-authoritative bot team management
 - Bot add/remove/fill requests now call `POST /api/room-bots` with a Firebase ID token.
 - The server verifies the authenticated host, room-code server routing, and waiting-room status; clients cannot manage bots after the auction starts.
