@@ -73,4 +73,4 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Team records are initialized through an idempotent transaction that preserves existing team state on reconnect.
 - The RTDB client join flow now calls the endpoint; legacy non-RTDB rooms retain a compatibility path.
 - Remaining caveat: roster transaction and team-record transaction are separate RTDB paths, so a failure between them can leave a roster member without a team record. The endpoint is designed to be safely retried, but full atomic coordination across room and team paths remains a follow-up.
-- Bot add/remove/fill operations are not yet server-authoritative and remain pending.
+- Bot add/remove/fill operations are now server-authoritative through `POST /api/room-bots`, with host authorization, waiting-room enforcement, room transactions, and idempotent team initialization (see implementation caveats above).
