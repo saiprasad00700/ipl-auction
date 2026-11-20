@@ -2256,10 +2256,20 @@ export const AuctionProvider = ({ children }) => {
       let eligibleRankings = [];
       let analysisModel = 'Eligibility Rules';
       if (payload.length >= 2 || (usesSquadBalanceAnalysis && payload.length === 1)) {
+        if (!user?.getIdToken) throw new Error('Sign in again to complete winner analysis.');
+        const analysisToken = await user.getIdToken();
         const response = await fetch('/api/analyze-winner', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomId, auctionType: roomData.auctionType || 'mega', franchises: payload })
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + analysisToken
+          },
+          body: JSON.stringify({
+            roomId,
+            serverId: getRoomServerId(roomId),
+            auctionType: roomData.auctionType || 'mega',
+            franchises: payload
+          })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'AI analysis failed');
