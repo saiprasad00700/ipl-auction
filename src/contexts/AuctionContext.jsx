@@ -688,72 +688,30 @@ export const AuctionProvider = ({ children }) => {
           });
         });
 
-        // A decision is accepted only if it was made by the eligible manager before expiry.
-        const settleTx = await runTransactionRtdb(liveRef, (currentData) => {
-          if (!currentData || currentData.status !== 'processing_sale' || currentData.isPaused) return;
-          const offer = currentData.retentionOffer;
-          if (!offer || offer.status !== 'pending') return;
-          const now = getSyncedTime();
-          const initialDeclined = offer.phase === 'initial_decision'
-            && offer.decision === 'decline'
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          const matchDecisionMade = offer.phase === 'match_decision'
-            && ['match', 'decline_counter'].includes(offer.decision)
-            && Number(offer.decidedAt) <= Number(offer.expiresAt);
-          if (!initialDeclined && !matchDecisionMade && now < Number(offer.expiresAt) + 1500) return;
-          if (offer.phase === 'counter_bid' && offer.rtmUsed) {
-            currentData.highBidderId = offer.eligibleUserId;
-            currentData.highBidderName = offer.eligibleTeamName;
-            currentData.highBidderTeamId = offer.originalFranchiseId;
-            currentData.currentBid = Number(offer.bid || currentData.currentBid || 0);
-            offer.status = 'accepted';
-          } else if (offer.phase === 'match_decision' && offer.counterBid != null) {
-            if (offer.decision === 'match' && Number(offer.decidedAt) <= Number(offer.expiresAt)) {
-              currentData.highBidderId = offer.eligibleUserId;
-              currentData.highBidderName = offer.eligibleTeamName;
-              currentData.highBidderTeamId = offer.originalFranchiseId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'accepted';
-            } else {
-              currentData.highBidderId = offer.buyerId;
-              currentData.highBidderName = offer.buyerName;
-              currentData.highBidderTeamId = offer.buyerTeamId;
-              currentData.currentBid = Number(offer.counterBid);
-              offer.status = 'declined';
-            }
-          } else {
-            offer.status = offer.decision === 'decline' ? 'declined' : 'expired';
-          }
-          currentData.status = currentData.highBidderId ? 'sold' : 'unsold';
-          currentData.transitionDeadline = now + (currentData.status === 'sold' ? 5000 : 2000) + 2500;
-          return currentData;
+        // Final RTM outcome is resolved by the trusted server transaction.
+        if (!user) throw new Error('Sign in required to finalize RTM.');
+        const serverId = getRoomServerId(roomId);
+        if (serverId === '3') await ensureServer3Auth();
+        else if (serverId === '2') await ensureServer2Auth();
+        const idToken = await user.getIdToken();
+        const finalizeResponse = await fetch('/api/retention-finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ roomId, serverId })
         });
-        if (!settleTx.committed) {
-          const failedState = settleTx.snapshot?.val() || null;
+        const finalizeResult = await finalizeResponse.json().catch(() => ({}));
+        if (!finalizeResponse.ok || !finalizeResult.live) {
+          const latestSnap = await get(liveRef);
+          const failedState = latestSnap.val() || null;
           const failedOffer = failedState?.retentionOffer || null;
-          console.error('[Auction] RTM settlement transaction was not committed.', {
-            roomId,
-            liveStatus: failedState?.status ?? null,
-            offerPhase: failedOffer?.phase ?? null,
-            offerStatus: failedOffer?.status ?? null,
-            offerDecision: failedOffer?.decision ?? null,
-            offerExpiresAt: failedOffer?.expiresAt ?? null,
-            offerDecidedAt: failedOffer?.decidedAt ?? null,
-            hasCounterBid: failedOffer?.counterBid != null,
-            serverTimeSynced: isServerTimeSynced(currentAuction?.id ? getRoomDatabase(currentAuction.id) : rtdb),
-            serverTime: getSyncedTime(),
-            liveState: failedState
-          });
-          endingPlayerRef.current = false;
-          // Keep recovering if the lot is still awaiting RTM settlement. Another
-          // connected client may have raced this transaction or its clock may
-          // have reached the expiry boundary slightly later.
-          if (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending' && !failedState?.isPaused) {
+          if (finalizeResult.reason === 'window_open' || (failedState?.status === 'processing_sale' && failedOffer?.status === 'pending')) {
+            endingPlayerRef.current = false;
             setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+            return;
           }
-          return;
+          throw new Error(finalizeResult.error || 'RTM finalization failed.');
         }
-        auctionState = settleTx.snapshot.val();
+        auctionState = finalizeResult.live;
         if (auctionState.retentionOffer?.status === 'accepted') {
           await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
             userId: 'system', userName: 'System',
