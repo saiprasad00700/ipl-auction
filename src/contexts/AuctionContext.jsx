@@ -2421,118 +2421,33 @@ export const AuctionProvider = ({ children }) => {
     });
   }, [getSyncedTime]);
 
+  const botTeamMutation = useCallback(async (roomId, action, teamIdOrBotId) => {
+    if (!user) throw new Error('Sign in required');
+    const roomServerId = getRoomServerId(roomId);
+    if (roomServerId === '3') await ensureServer3Auth();
+    else if (roomServerId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/room-bots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId: roomServerId, action, value: teamIdOrBotId })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Bot team update failed');
+    return result;
+  }, [user]);
+
   const addBotTeam = useCallback(async (roomId, teamId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-    const teamDetails = TEAMS.find(t => t.id === teamId);
-    if (!teamDetails) return;
-
-    const botUserId = `bot_${teamId}`;
-    const botName = `${teamDetails.name} Bot`;
-
-    const existingPlayers = data.players || [];
-    if (existingPlayers.some(p => p.id === botUserId || p.team === teamId)) return;
-
-    const updatedPlayers = [...existingPlayers, {
-      id: botUserId,
-      name: botName,
-      team: teamId,
-      teamName: teamDetails.name,
-      isHost: false,
-      isBot: true
-    }];
-
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    const teamDataToSet = {
-      auctionId: roomId,
-      userId: botUserId,
-      teamId,
-      teamName: teamDetails.name,
-      budgetRemaining: data.settings?.budget || 120.0,
-      spent: 0,
-      squad: []
-    };
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), teamDataToSet);
-  }, []);
+    return botTeamMutation(roomId, 'add', teamId);
+  }, [botTeamMutation]);
 
   const removeBotTeam = useCallback(async (roomId, botUserId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const updatedPlayers = (data.players || []).filter(p => p.id !== botUserId);
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    await set(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams/${roomId}_${botUserId}`), null);
-  }, []);
+    return botTeamMutation(roomId, 'remove', botUserId);
+  }, [botTeamMutation]);
 
   const fillEmptyTeamsWithBots = useCallback(async (roomId) => {
-    const rtdbRoomSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
-    if (!rtdbRoomSnap.exists()) return;
-    const data = rtdbRoomSnap.val();
-
-    const existingPlayers = data.players || [];
-    const takenTeamIds = new Set(existingPlayers.map(p => p.team).filter(Boolean));
-
-    const updatedPlayers = [...existingPlayers];
-    const teamsToSet = {};
-
-    TEAMS.forEach(t => {
-      if (!takenTeamIds.has(t.id)) {
-        const botUserId = `bot_${t.id}`;
-        const botName = `${t.name} Bot`;
-        updatedPlayers.push({
-          id: botUserId,
-          name: botName,
-          team: t.id,
-          teamName: t.name,
-          isHost: false,
-          isBot: true
-        });
-        teamsToSet[`${roomId}_${botUserId}`] = {
-          auctionId: roomId,
-          userId: botUserId,
-          teamId: t.id,
-          teamName: t.name,
-          budgetRemaining: data.settings?.budget || 120.0,
-          spent: 0,
-          squad: []
-        };
-      }
-    });
-
-    await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), { players: updatedPlayers, lastActivityAt: Date.now() });
-
-    /*
-    try {
-      if (supabase) {
-        await supabase.from('auctions').update({ players: updatedPlayers }).eq('id', roomId);
-      }
-    } catch (sErr) {}
-    */
-
-    if (Object.keys(teamsToSet).length > 0) {
-      await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/teams`), teamsToSet);
-    }
-  }, []);
+    return botTeamMutation(roomId, 'fill', null);
+  }, [botTeamMutation]);
 
   // Guard ref: track the last timer cycle (timerEndsAt) that a bot bid was queued for.
   // Prevents multiple bot bids from being scheduled when currentAuction re-renders
