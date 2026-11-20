@@ -8,6 +8,7 @@ const teams={CSK:{teamId:'CSK',teamName:'Chennai',squad:Array(17).fill({id:'p'})
 test('rejects non-host and already-ended auction',()=>{
  assert.equal(resolveAuctionEnd({room,teams,uid:'guest',now:1000,xiDeadlineMs:300000}).reason,'host_only');
  assert.equal(resolveAuctionEnd({room:{...room,status:'awaiting_xi'},teams,uid:'host',now:1000,xiDeadlineMs:300000}).reason,'already_ended');
+ assert.equal(resolveAuctionEnd({room:{...room,status:'waiting'},teams,uid:'host',now:1000,xiDeadlineMs:300000}).reason,'auction_not_active');
 });
 
 test('ends mega auction and disqualifies teams below 18',()=>{
