@@ -48,6 +48,13 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Pure helper tests cover timer rejection, eligible offer creation, and RTM skip conditions.
 - Cross-path consistency caveat remains: eligibility reads room/team snapshots before the live transaction; trusted settlement still validates purse/card/squad limits. Restrictive Firebase rules are not yet safe to deploy.
 
+## Server-authoritative auction start
+- `POST /api/start-auction` authenticates the room's assigned Firebase project, requires the recorded host, a waiting room, and at least two distinct participants.
+- Server-generated marquee/role-balanced player order and the initial live lot are committed in a transaction at the room's auction root.
+- The client no longer writes auction status, player order, or initial live bidding state directly.
+- Unit tests cover host-room prerequisites, minimum participants, start initialization, and sprint player selection.
+- The atomic transaction operates on the room's auction subtree, so production emulator/load validation is still required before rollout.
+
 ## Server-authoritative auction progression
 - `POST /api/advance-auction` authenticates the room participant against the assigned Firebase project and validates the sold/unsold transition deadline.
 - It advances to the next ordered player with server-calculated timer reset, or transactionally marks the live auction as `awaiting_xi` and updates the room XI phase metadata at auction completion.
