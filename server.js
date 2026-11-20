@@ -1189,7 +1189,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const roster = Array.isArray(finalRoom.players) ? finalRoom.players : Object.values(finalRoom.players || {});
       const teamsRef = database.ref(`auctions/${roomId}/teams`);
       const teamUpdates = {};
-      const teamsToInitialize = action === 'add' && selectedTeamId ? [selectedTeamId] : action === 'fill' ? createdBotTeamIds : [];
+      const teamsToInitialize = action === 'add' && selectedTeamId ? [selectedTeamId] : action === 'fill' ? roster.filter((player) => player?.isBot === true && /^bot_[A-Z]{2,4}$/.test(String(player.id || ''))).map((player) => String(player.team || '').toUpperCase()).filter((teamId) => teamNames[teamId]) : [];
       for (const teamId of teamsToInitialize) {
         const botId = `bot_${teamId}`;
         const botTeamRef = teamsRef.child(`${roomId}_${botId}`);
