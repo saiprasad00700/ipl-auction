@@ -1941,6 +1941,49 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res, 500, { error: 'Could not join room securely' });
     }
   }
+  if (pathname === '/api/room-kick') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    try {
+      const authorization = String(req.headers.authorization || '');
+      if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
+      const body = await readBody(req);
+      const roomId = String(body.roomId || '').trim();
+      const serverId = String(body.serverId || '1');
+      const targetUid = String(body.targetUid || '').trim();
+      if (!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId) || !['1','2','3'].includes(serverId) || !targetUid) return sendJson(res, 400, { error: 'Invalid room/server/target' });
+      const expectedServer = roomId.startsWith('3') ? '3' : roomId.startsWith('2') ? '2' : '1';
+      if (serverId !== expectedServer) return sendJson(res, 400, { error: 'Room server does not match room code' });
+      const services = serverId === '3' ? await getFirebaseServer3AdminServices() : serverId === '2' ? await getFirebaseServer2AdminServices() : await getFirebaseAdminServices();
+      const decoded = await services.auth.verifyIdToken(authorization.slice(7));
+      const uid = decoded.uid;
+      if (!uid || /^(bot[_-]|auctionbot[_-])/i.test(uid)) return sendJson(res, 403, { error: 'Automated accounts cannot kick participants' });
+      if (!allowRoomActivityRequest(uid)) return sendJson(res, 429, { error: 'Room management request limit reached. Please wait before retrying.' });
+      const roomRef = services.database.ref('auctions/' + roomId + '/room');
+      const { applyRoomKick } = await import('./api/room-kick-auth.js');
+      let reason = null, target = null;
+      const transaction = await roomRef.transaction((currentRoom) => {
+        const decision = applyRoomKick({ room: currentRoom, uid, targetUid, now: Date.now() });
+        if (!decision.allowed) { reason = decision.reason; return; }
+        target = decision.target;
+        return decision.room;
+      });
+      if (!transaction.committed) {
+        const current = transaction.snapshot.val();
+        const status = reason === 'host_only' ? 403 : reason === 'room_not_found' || reason === 'target_not_found' ? 404 : 400;
+        return sendJson(res, status, { error: reason === 'host_only' ? 'Only the host can remove participants.' : reason === 'target_not_found' ? 'Participant is not in this room.' : 'Could not remove participant.', reason });
+      }
+      const targetTeamKey = roomId + '_' + targetUid;
+      await services.database.ref('auctions/' + roomId + '/teams/' + targetTeamKey).remove().catch((e) => console.warn('[Room kick] Team cleanup failed:', e?.message || e));
+      await services.database.ref('auctions/' + roomId + '/messages').push({
+        userId: 'system', userName: 'System', text: String(target?.name || 'Participant') + ' has been removed from the session.',
+        type: 'log', timestamp: Date.now()
+      }).catch((e) => console.warn('[Room kick] Message write failed:', e?.message || e));
+      return sendJson(res, 200, { ok: true, roomId, targetUid });
+    } catch (error) {
+      console.warn('[Room kick] Mutation failed:', error?.message || error);
+      return sendJson(res, 500, { error: 'Could not remove participant securely' });
+    }
+  }
   if (pathname === '/api/room-bots') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
