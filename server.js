@@ -1685,6 +1685,38 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       return sendJson(res,500,{error:'Could not create room securely'});
     }
   }
+  if(pathname==='/api/claim-franchise'){
+    if(req.method!=='POST')return sendJson(res,405,{error:'Method not allowed'});
+    try{
+      const authorization=String(req.headers.authorization||'');
+      if(!authorization.startsWith('Bearer '))return sendJson(res,401,{error:'Sign in required'});
+      const body=await readBody(req),roomId=String(body.roomId||'').trim(),serverId=String(body.serverId||'1'),teamId=String(body.teamId||'').trim().toUpperCase();
+      if(!/^[a-zA-Z0-9_-]{1,80}$/.test(roomId)||!['1','2','3'].includes(serverId))return sendJson(res,400,{error:'Invalid room/server'});
+      const expectedServer=roomId.startsWith('3')?'3':roomId.startsWith('2')?'2':'1';
+      if(serverId!==expectedServer)return sendJson(res,400,{error:'Room server does not match room code'});
+      const services=serverId==='3'?await getFirebaseServer3AdminServices():serverId==='2'?await getFirebaseServer2AdminServices():await getFirebaseAdminServices();
+      const decoded=await services.auth.verifyIdToken(authorization.slice(7)),uid=decoded.uid;
+      if(!uid||/^(bot[_-]|auctionbot[_-])/i.test(uid))return sendJson(res,403,{error:'Automated accounts cannot claim franchises'});
+      if(!allowRoomActivityRequest(uid))return sendJson(res,429,{error:'Franchise claim limit reached. Please wait before retrying.'});
+      const teamNames={MI:'Mumbai Indians',CSK:'Chennai Super Kings',RCB:'Royal Challengers Bengaluru',KKR:'Kolkata Knight Riders',DC:'Delhi Capitals',PBKS:'Punjab Kings',RR:'Rajasthan Royals',SRH:'Sunrisers Hyderabad',LSG:'Lucknow Super Giants',GT:'Gujarat Titans'};
+      if(!teamNames[teamId])return sendJson(res,400,{error:'Invalid franchise'});
+      const rootRef=services.database.ref(`auctions/${roomId}`),{applyFranchiseClaim}=await import('./api/franchise-claim-auth.js');
+      let reason=null,claimed=null;
+      const tx=await rootRef.transaction(current=>{
+        if(!current){reason='room_not_found';return;}
+        const room=current.room||{},budget=Number(room.settings?.budget||120);
+        const result=applyFranchiseClaim({root:{...current,roomId},roomId,uid,teamId,teamNames,budget,now:Date.now()});
+        if(!result.allowed){reason=result.reason;return;}
+        claimed=result.player;
+        return result.root;
+      });
+      if(!tx.committed)return sendJson(res,reason==='room_member_required'||reason==='banned'?403:reason==='room_not_found'?404:409,{error:reason==='franchise_taken'?'Franchise is already claimed.':reason==='join_closed'?'Franchises can only be changed before auction start.':'Could not claim franchise.',reason});
+      return sendJson(res,200,{ok:true,player:claimed,teamId,roomId});
+    }catch(error){
+      console.warn('[Franchise claim] Failed:',error?.message||error);
+      return sendJson(res,500,{error:'Could not claim franchise securely'});
+    }
+  }
   if (pathname === '/api/room-join') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
