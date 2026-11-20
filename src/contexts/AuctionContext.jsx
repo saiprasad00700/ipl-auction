@@ -807,53 +807,32 @@ export const AuctionProvider = ({ children }) => {
       const waitTime = isSold ? 5000 : 2000;
 
       // Player order from the single room snapshot already fetched above
-      let playerOrder = roomData.playerOrder;
-      if (!playerOrder) {
-        const orderSnap = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`));
-        if (orderSnap.exists()) playerOrder = orderSnap.val();
-      }
-
-      // ── Bug Fix 2: Always release endingPlayerRef via finally inside the timeout callback ──
-      // Previously, component unmount before timeout fired left the ref stuck at true forever.
-      const advanceToNextPlayer = async () => {
+        const advanceToNextPlayer = async () => {
         try {
-          if (roomData.status !== 'active') return;
-
-          const settings = roomData.settings;
-          const currentPlayerId = auctionState.playerId;
-          const order = playerOrder || Array.from({ length: IPL_PLAYERS.length }, (_, i) => i);
-          const currentPlayerIndexInOrder = order.findIndex(idx => IPL_PLAYERS[idx] && IPL_PLAYERS[idx].id === currentPlayerId);
-          const nextIndexInOrder = currentPlayerIndexInOrder !== -1 ? order[currentPlayerIndexInOrder + 1] : order[0];
-
-          if (nextIndexInOrder !== undefined && IPL_PLAYERS[nextIndexInOrder]) {
-            const nextPlayer = IPL_PLAYERS[nextIndexInOrder];
-            // Guard the local timeout with the same settled-lot identity as the
-            // recovery path. If another client already advanced it, do not reset
-            // the next player's timer or overwrite newer live state.
-            await runTransactionRtdb(liveRef, (current) => {
-              if (!current || current.playerId !== currentPlayerId
-                || !['sold', 'unsold'].includes(current.status)) return;
-              return {
-                playerId: nextPlayer.id,
-                currentBid: 0,
-                highBidderId: '',
-                highBidderName: 'No Bids',
-                timerEndsAt: getSyncedTime() + (settings?.bidTimer || DEFAULT_BID_TIMER_SECONDS) * 1000,
-                status: 'bidding'
-              };
-            });
-          } else {
-            // Natural end of bidding must enter the same shared XI phase as host-triggered end.
-            const endedAt = getSyncedTime();
+          if (roomData.status !== 'active' || !user) return;
+          const serverId = getRoomServerId(roomId);
+          if (serverId === '3') await ensureServer3Auth();
+          else if (serverId === '2') await ensureServer2Auth();
+          const idToken = await user.getIdToken();
+          const response = await fetch('/api/advance-auction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ roomId, serverId })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.live) {
+            if (result.reason === 'transition_waiting') {
+              endingPlayerRef.current = false;
+              setTimeout(() => { void endPlayerAuction(roomId); }, 500);
+              return;
+            }
+            throw new Error(result.error || 'Auction progression failed.');
+          }
+          if (result.finished) {
+            const now = getSyncedTime();
             const roomSnapshot = await get(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`));
             const auctionType = roomSnapshot.val()?.auctionType || 'mega';
             const usesSquadBalanceAnalysis = auctionType !== 'mega';
-            await updateRtdb(ref(getRoomDatabase(roomId), `auctions/${roomId}/room`), {
-              status: 'awaiting_xi',
-              xiSubmissionStartedAt: endedAt,
-              xiSubmissionDeadline: usesSquadBalanceAnalysis ? endedAt : endedAt + PLAYING_XI_DEADLINE_MS,
-              winnerAnalysisStatus: 'collecting'
-            });
             await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
               userId: 'system', userName: 'System',
               text: usesSquadBalanceAnalysis
@@ -863,12 +842,11 @@ export const AuctionProvider = ({ children }) => {
             });
           }
         } finally {
-          // Always release the lock — even if any async step above throws or component unmounts
           endingPlayerRef.current = false;
         }
       };
-
       setTimeout(advanceToNextPlayer, waitTime);
+
     } catch (err) {
       // Log the real failure instead of silently swallowing the auction settlement error.
       console.error('[Auction] endPlayerAuction failed:', err);
