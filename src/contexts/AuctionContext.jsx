@@ -1298,14 +1298,17 @@ export const AuctionProvider = ({ children }) => {
     const roomServerId = getRoomServerId(auctionId);
     const roomDatabase = getRoomDatabase(auctionId);
     setLoading(true);
+    let joinCancelled = false;
     const roomAuthReady = roomServerId === '3'
       ? ensureServer3Auth()
       : roomServerId === '2'
         ? ensureServer2Auth()
         : Promise.resolve(roomDatabase);
     roomAuthReady.then(() => {
+      if (joinCancelled) return;
       try { goOnline(roomDatabase); } catch (e) {}
     }).catch((authError) => {
+      if (joinCancelled) return;
       console.error('[Auction] Room server authentication failed:', authError?.message || authError);
       setLoading(false);
       handleFirebaseError(authError);
@@ -1640,6 +1643,7 @@ export const AuctionProvider = ({ children }) => {
     });
 
     return () => {
+      joinCancelled = true;
       clearInterval(watchdog);
       unsubConnected();
       unsubPresence();
