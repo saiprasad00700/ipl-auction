@@ -1113,6 +1113,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         if (player.country !== 'IND' && overseasCount >= overseasLimit) return;
         const remaining = Number(team.budgetRemaining ?? defaultBudget);
         if (remaining < validation.bid) return;
+        if (validation.retained && Number(team.retentionCardsRemaining ?? retentionCardsDefault) < 1) return;
         return {
           ...team,
           auctionId: roomId,
