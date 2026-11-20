@@ -41,73 +41,20 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Server 2/3 room operations use the room's assigned Firebase database.
 - Cleanup never removes active rooms; inactive-room expiry matches the configured policy.
 
-## Server-authoritative bidding expiry and RTM offer creation
-- `POST /api/finalize-bidding` now verifies room-server Firebase identity, membership, ban status, active room, and server-side bid timer expiry.
-- It computes sold/unsold state and eligibility for an RTM offer using the original-franchise dataset, eligible franchise manager, card count, purse, and overseas-player limit, then commits the live state in an RTDB transaction.
-- Client timer/recovery flow calls this endpoint for expired bidding and the RTM finalization endpoint for expired processing stages.
-- Pure helper tests cover timer rejection, eligible offer creation, and RTM skip conditions.
-- Cross-path consistency caveat remains: eligibility reads room/team snapshots before the live transaction; trusted settlement still validates purse/card/squad limits. Restrictive Firebase rules are not yet safe to deploy.
-
-## Server-authoritative room settings
-- Room settings updates now authenticate the room's assigned Firebase project and verify the recorded host.
-- Only supported timer values (3/5/10/15 seconds) and the auction-mode purse budget are accepted.
-- Settings updates use a room transaction and the client no longer writes settings directly.
-- Helper tests cover host authorization, supported settings, timer validation, and mode budget limits.
-
-## Server-authoritative Playing XI submission
-- `POST /api/submit-playing-xi` verifies the assigned Firebase project token, room membership, ban status, XI phase/deadline, and disqualification state.
-- The server validates the ordered 11 starters and both Impact Player choices against the franchise squad and player catalogue, then commits the XI in a team transaction.
-- The client no longer writes the submitted XI directly.
-- Emulator tests for ownership/deadline/quota edge cases are still required before restrictive rules are introduced.
-
-## Server-authoritative pause/resume and host end
-- Host pause/resume is now authenticated by the assigned Firebase project and host identity; timer and RTM expiry freezing are applied inside the server transaction.
-- Host end-auction/disqualification is now performed in an atomic auction-root transaction. Mega auction minimum-squad disqualification and XI-phase metadata are calculated server-side.
-- Clients call the trusted APIs and only add the system log messages afterward.
-- Pure helper tests cover pause/resume timer freezing and host end/disqualification rules.
-- Emulator testing is still required for multi-path transaction contention and pause/end races.
-
-## Server-authoritative auction start
-- `POST /api/start-auction` authenticates the room's assigned Firebase project, requires the recorded host, a waiting room, and at least two distinct participants.
-- Server-generated marquee/role-balanced player order and the initial live lot are committed in a transaction at the room's auction root.
-- The client no longer writes auction status, player order, or initial live bidding state directly.
-- Unit tests cover host-room prerequisites, minimum participants, start initialization, and sprint player selection.
-- The atomic transaction operates on the room's auction subtree, so production emulator/load validation is still required before rollout.
-
-## Server-authoritative auction progression
-- `POST /api/advance-auction` authenticates the room participant against the assigned Firebase project and validates the sold/unsold transition deadline.
-- It advances to the next ordered player with server-calculated timer reset, or transactionally marks the live auction as `awaiting_xi` and updates the room XI phase metadata at auction completion.
-- Both normal client progression and overdue-transition recovery now call the trusted endpoint rather than writing the next live player directly.
-- Unit tests cover transition wait, next-player advancement, and final-lot completion.
-- Remaining gap: the client still initiates the first expired-bidding transition and retention-offer creation. That is the next server-state-machine migration before restrictive RTDB rules.
-
-## Server-authoritative RTM finalization
-- The `POST /api/retention-finalize` endpoint authenticates the caller against the room's assigned Firebase project and checks room membership and ban state.
-- Final RTM outcomes (original manager retain after counter-bid timeout, match decision, decline, or expiry) are resolved by a server transaction using server time.
-- The client now requests finalization from this endpoint instead of directly mutating the RTM outcome.
-- Pure helper tests cover RTM phase/window resolution.
-- RTM offer creation still originates from the client timer path and remains a security gap. Full bidding-expiry/offer creation and auction progression should be migrated before restrictive rules.
-
-## Trusted sale-side effects
-- Durable sold-player team updates (squad append, purse deduction, spent total, and RTM card decrement) now call `POST /api/settle-sale`.
-- The endpoint verifies a room participant caller against the assigned Firebase project, validates that the live state is sold, verifies the winner/franchise roster entry and player catalog record, and commits the team record idempotently.
-- Team settlement checks squad size, overseas quota, purse affordability, and RTM-card availability. A repeated request returns the existing team record without double-charging.
-- Client sale settlement and recovery now use this endpoint, then reconcile room roster counters from the trusted team result.
-- Remaining trust gap: the client still controls transitions into `sold`/RTM-finalized live state. The settlement endpoint is not yet a complete trusted auction state machine; the bid-expiry/RTM offer opening/finalization and next-player progression still need server migration before restrictive Firebase live/team rules can safely be deployed.
-
-## Server-authoritative retention decisions
-- Initial RTM accept/decline and original-franchise match/decline-counter decisions now use `POST /api/retention-decision`.
-- The server verifies the room's assigned Firebase project token, room membership, ban status, RTM phase, eligible manager identity, and offer expiry, then commits the phase/decision through a live-state transaction.
-- Buyer counter-bids now use `POST /api/retention-counter-bid`; the server verifies the buyer, pending counter-bid phase, deadline, higher amount, and purse affordability before transactionally advancing to the match-decision phase.
-- Pure validation tests cover RTM decisions and counter-bids.
-- Client-side RTM transaction writes have been removed from these two actions. Final sale settlement and durable purse/squad/card updates are still client-coordinated and remain the next critical migration.
-
-## Server-authoritative bidding
-- Client bid placement now calls `POST /api/place-bid`; the server verifies the Firebase ID token against the room's assigned Firebase project (Server 1/2/3).
-- Server validation checks membership, ban state, active room/live bidding state, current high bidder, timer expiry, team-record identity/franchise match, player catalog entry, squad size, overseas quota, and purse affordability.
-- The live bid is committed in an RTDB transaction with server-computed bid increment and timer reset. The client no longer writes the live bid directly.
-- Unit tests cover authorization, phase/timer, high-bidder rejection, identity mismatch, squad/overseas limits, and insufficient budget.
-- This migration is incomplete: auction start/advance, RTM decision and sale settlement still involve client-side writes. Firebase rules remain permissive until the rest of the trusted mutation path is migrated and emulator-tested.
+## Server-authoritative auction lifecycle
+- `POST /api/start-auction`: host-authenticated RTDB transaction creates randomized player order, initial live state, and active room phase; enforces minimum two participants.
+- `POST /api/place-bid`: authenticated non-bot participant; server verifies assigned Firebase project, room membership/ban, live phase/timer, bidder team identity, current player, squad/overseas limits, budget, and computes increment before committing live bid transaction.
+- `POST /api/finalize-bidding`: authenticated room participant; server verifies timer expiry and derives sold/unsold state and RTM eligibility from current room/team/catalog data in a live transaction.
+- `POST /api/retention-decision` and `POST /api/retention-counter-bid`: authenticated, eligible manager/buyer decisions are validated by phase and expiry; counter-bid amount and purse are checked.
+- `POST /api/retention-finalize`: server resolves timeout/decision outcome and commits sold/unsold result and transition deadline transactionally.
+- `POST /api/advance-auction`: participant-authorized progression checks room active, not paused, settled lot, transition deadline, and the current player exists in the configured order before moving to the next player or awaiting-XI.
+- `POST /api/auction-pause`: host-only pause/resume; server preserves remaining bid timer or RTM expiry while paused.
+- `POST /api/end-auction`: host-only transition from an active auction to awaiting-XI, records deadline, and marks mega-auction teams below 18 players disqualified.
+- `POST /api/settle-sale`: trusted idempotent squad/purse/card settlement checks sold state, winning participant/franchise, catalog player, squad limit, overseas quota, purse, and RTM card availability; client recovery uses this endpoint.
+- Client auction lifecycle handlers have been wired to these endpoints; direct client bid, expiry, RTM decision/finalization, lot progression, pause/resume, end-auction, and sold-player purse/squad/card mutations are removed from the corresponding flow.
+- Added pure-helper unit tests for start, bid, expired bidding/RTM eligibility, retention decision/counter/finalization, advance, pause, end-auction, and settlement authorization. Two additional regression checks were added: ending only from active phase, and rejecting progression when current player is absent from player order.
+- **Important remaining trust boundary:** RTDB rules still permit authenticated client writes to `live` and broad `teams` writes. These endpoints alone cannot prevent direct client bypass until bot bidding/RTM bot decisions, post-auction Playing XI/team updates, room roster/metadata, and any remaining direct mutations are migrated or explicitly rule-scoped. Do not deploy restrictive rules until those paths and Emulator tests are complete.
+- The endpoint migration is branch-only; no production deployment.
 
 ## Server-authoritative bot team management
 - Bot add/remove/fill requests now call `POST /api/room-bots` with a Firebase ID token.
