@@ -336,124 +336,31 @@ export const AuctionProvider = ({ children }) => {
   }, []);
 
   const startAuction = useCallback(async (roomId) => {
-    // Record the host's start request immediately, even before auction setup runs.
-    const rtdbRoomRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/room`);
-    await updateRtdb(rtdbRoomRef, { lastActivityAt: Date.now() });
-    // Fetch room data to determine auction type
-    const roomSnap = await get(rtdbRoomRef);
-    const roomData = roomSnap.exists() ? roomSnap.val() : {};
-    const roster = Array.isArray(roomData.players)
-      ? roomData.players
-      : Object.values(roomData.players || {});
-    const uniqueParticipants = new Map();
-    roster.forEach((player) => {
-      const participantId = String(player?.id || player?.userId || '').trim();
-      if (participantId) uniqueParticipants.set(participantId, player);
+    if (!user) throw new Error('Sign in to start the auction.');
+    const serverId = getRoomServerId(roomId);
+    if (serverId === '3') await ensureServer3Auth();
+    else if (serverId === '2') await ensureServer2Auth();
+    const idToken = await user.getIdToken();
+    const response = await fetch('/api/start-auction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ roomId, serverId })
     });
-    if (uniqueParticipants.size < 2) {
-      const error = new Error('Invite at least 1 friend or add a bot to start the auction.');
-      error.code = 'MINIMUM_MEMBERS_REQUIRED';
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result.error || 'Could not start auction.');
+      if (result.reason === 'minimum_members') error.code = 'MINIMUM_MEMBERS_REQUIRED';
       throw error;
     }
-    const auctionType = roomData.auctionType || 'mega';
-
-    // Calculate target players
-    let targetPlayers = IPL_PLAYERS.length;
-    if (auctionType === 'sprint11') targetPlayers = 150;
-    else if (auctionType === 'sprint5') targetPlayers = 75;
-
-    // 1. Identify Marquee vs Non-Marquee players
-    const marqueeIndices = [];
-    const nonMarqueeIndicesByRole = {};
-    
-    IPL_PLAYERS.forEach((p, i) => {
-      if (p.set.includes('Marquee')) {
-        marqueeIndices.push(i);
-      } else {
-        if (!nonMarqueeIndicesByRole[p.role]) nonMarqueeIndicesByRole[p.role] = [];
-        nonMarqueeIndicesByRole[p.role].push(i);
-      }
-    });
-
-    // Always keep all Marquee players
-    const selectedPlayersByRole = new Set(marqueeIndices);
-
-    // Calculate fraction based on target players for NON-MARQUEE only
-    const nonMarqueeTarget = Math.max(0, targetPlayers - marqueeIndices.length);
-    const nonMarqueeTotal = IPL_PLAYERS.length - marqueeIndices.length;
-    const fraction = nonMarqueeTotal > 0 ? (nonMarqueeTarget / nonMarqueeTotal) : 1;
-
-    // 2. Select NON-MARQUEE players proportionally by ROLE
-    Object.keys(nonMarqueeIndicesByRole).forEach(roleName => {
-      const roleIndices = nonMarqueeIndicesByRole[roleName];
-      const shuffledRole = shuffleArray(roleIndices);
-      
-      const limit = auctionType === 'mega' 
-        ? shuffledRole.length 
-        : Math.max(1, Math.ceil(shuffledRole.length * fraction));
-        
-      shuffledRole.slice(0, limit).forEach(idx => selectedPlayersByRole.add(idx));
-    });
-
-    // 2. Build the final auction order maintaining the realistic SET order (Marquee -> Set 1 -> etc.)
-    const sets = [...new Set(IPL_PLAYERS.map(p => p.set))];
-    let randomizedIndices = [];
-    sets.forEach(setName => {
-      // Only include players from this set who were selected in the role balancing phase
-      const setIndices = IPL_PLAYERS
-        .map((p, i) => (p.set === setName && selectedPlayersByRole.has(i)) ? i : -1)
-        .filter(i => i !== -1);
-        
-      randomizedIndices = [...randomizedIndices, ...shuffleArray(setIndices)];
-    });
-
-    const playerOrderRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/playerOrder`);
-    
-    // Store playerOrder in room node (matching RTDB rules) and attempt subnode update
-    await updateRtdb(rtdbRoomRef, {
-      status: 'active',
-      playerOrder: randomizedIndices,
-      lastActivityAt: Date.now()
-    });
-    try {
-      const publicRoomSnap = await get(ref(getRoomDatabase(roomId), `publicRooms/${roomId}`));
-      if (publicRoomSnap.exists()) await updateRtdb(ref(getRoomDatabase(roomId), `publicRooms/${roomId}`), { status: 'active' });
-    } catch (directoryError) { console.warn('Public room status sync failed:', directoryError); }
-
     if (supabase) {
-      try {
-        await supabase.from('auctions').update({ status: 'active' }).eq('id', roomId);
-      } catch (sErr) {}
+      try { await supabase.from('auctions').update({ status: 'active' }).eq('id', roomId); } catch {}
     }
-
-    try {
-      await set(playerOrderRef, randomizedIndices);
-    } catch (e) {
-      // Graceful fallback if RTDB sub-path rule is pending deploy
-    }
-
-    const liveRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/live`);
-    await set(liveRef, {
-      playerId: IPL_PLAYERS[randomizedIndices[0]].id,
-      currentBid: 0,
-      highBidderId: '',
-      highBidderName: 'No Bids',
-      timerEndsAt: getSyncedTime() + DEFAULT_BID_TIMER_SECONDS * 1000,
-      status: 'bidding'
-    });
-    
-    // Add to messages collection for chronological sorting
-    const msgRef = ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`);
-    await push(msgRef, {
-      userId: 'system',
-      userName: 'System',
-      text: `Auction has started!`,
-      type: 'log',
-      timestamp: serverTimestampRtdb()
+    await push(ref(getRoomDatabase(roomId), `auctions/${roomId}/messages`), {
+      userId: 'system', userName: 'System', text: 'Auction has started!', type: 'log', timestamp: serverTimestampRtdb()
     });
     void trackAnalyticsEvent('auction_start', roomId);
-
-  }, [getSyncedTime]);
+    return result;
+  }, [user]);
 
   const endPlayerAuction = useCallback(async (roomId) => {
     // A single missed sync check must not permanently stall the lot at 0 seconds.
