@@ -25,6 +25,11 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Live player state advances to the next lot and room phase through client-side transactions/updates. This is a correctness/recovery mechanism, not a security boundary.
 - Server-authoritative auction settlement, purse/squad/retention integrity, membership-scoped room reads, and comprehensive Firebase Emulator tests remain unfinished.
 
+## Trusted franchise-claim migration
+- The client now routes franchise changes through `POST /api/claim-franchise`.
+- The trusted root transaction validates host/member identity, waiting-room phase, bans, and franchise occupancy; it updates the room roster and team state and removes a replaced bot's team record in the same root transaction.
+- This closes the previous client-side direct write path for franchise changes in RTDB rooms. Emulator and race testing are still required.
+
 ## Trusted room-kick mutation
 - `POST /api/room-kick` verifies the Firebase ID token against the room's assigned Firebase project and enforces host-only removal.
 - The room transaction removes the target from the roster, adds their UID to the ban list, and refreshes activity. Team cleanup and system chat logging are follow-up operations; failures are logged and can leave cleanup work, so emulator/concurrency validation is still required.
@@ -38,6 +43,7 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - Two users claim same franchise concurrently: exactly one succeeds.
 - Host adds/removes bots: allowed and consistent; non-host bot manipulation denied.
 - Host kicks a member: roster removal and ban persist; non-host, self-kick, and missing-target requests are denied.
+- Franchise claim/change: two concurrent claims for the same franchise produce exactly one winner; bot takeover preserves the human's team purse/squad and removes the bot record.
 - Human takeover of bot franchise: succeeds through intended flow without duplicate team.
 - Participant changes own purse/squad directly: denied.
 - Participant changes another team's purse/squad: denied.
