@@ -21,6 +21,8 @@ Make Firebase enforce room membership and narrowly scoped access, and move integ
 - The `live` auction state remains client-writable under complex rules. These rules are not a complete trusted settlement system and may permit tampering with auction state.
 - The transactional `POST /api/room-join` endpoint now replaces the RTDB roster read-modify-write client flow for RTDB rooms, checking room phase, bans, franchise occupancy, and reconnect identity.
 - Bot add/remove/fill now use `POST /api/room-bots`; the server verifies the Firebase identity and host role and commits roster changes in a room transaction. Team-record initialization is separate and idempotent; this leaves a recoverable cross-path failure window.
+- Auction settlement is currently coordinated by clients: the client claims expired lots with RTDB transactions, reads pre-settlement room/team snapshots for RTM eligibility, and then applies sale side effects in separate team and roster transactions. Recovery is idempotent for duplicate squad entries, but the process is not trusted-server authoritative and the pre-read snapshots can be stale.
+- Live player state advances to the next lot and room phase through client-side transactions/updates. This is a correctness/recovery mechanism, not a security boundary.
 - Server-authoritative auction settlement, purse/squad/retention integrity, membership-scoped room reads, and comprehensive Firebase Emulator tests remain unfinished.
 
 ## Test matrix required before deployment
