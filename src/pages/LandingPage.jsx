@@ -58,23 +58,34 @@ const LandingPage = () => {
         const database = serverId === "3" ? await ensureServer3Auth() : serverId === "2" ? await ensureServer2Auth() : rtdb;
         goOnline(database);
         const snapshot = await get(ref(database, "publicRooms"));
-        return { serverId, directory: snapshot.exists() ? snapshot.val() : {} };
+        return { serverId, database, directory: snapshot.exists() ? snapshot.val() : {} };
       }));
-      const rooms = directories.flatMap(({ serverId, directory }) =>
-        Object.values(directory).map((room) => ({ ...room, serverId })).filter((room) =>
-          room && typeof room.roomId === "string" &&
-          typeof room.hostName === "string" &&
-          (room.status === "waiting" || room.status === "active") &&
-          ["mega", "sprint11", "sprint5"].includes(room.auctionType)
-        ).map((room) => ({
-          roomId: room.roomId,
-          hostName: room.hostName,
-          status: room.status,
-          auctionType: room.auctionType,
-          serverId: room.serverId,
-          players: 0
-        }))
-      );
+      // Validate each public directory entry against the actual auction node.
+      // This prevents completed/stale entries from being displayed or joined.
+      const rooms = (await Promise.all(directories.flatMap(({ serverId, database, directory }) =>
+        Object.values(directory).map(async (room) => {
+          if (!room || typeof room.roomId !== "string" || typeof room.hostName !== "string" ||
+              !["waiting", "active"].includes(room.status) ||
+              !["mega", "sprint11", "sprint5"].includes(room.auctionType)) return null;
+          try {
+            const auctionSnapshot = await get(ref(database, `auctions/${room.roomId}/room`));
+            if (!auctionSnapshot.exists()) return null;
+            const auction = auctionSnapshot.val() || {};
+            const auctionStatus = String(auction.status || "").toLowerCase();
+            const liveStatus = String(auction.liveStatus || "").toLowerCase();
+            if (auctionStatus === "completed" || liveStatus === "completed" ||
+                auction.winnerAnalysisStatus === "completed" || auction.completedAt) return null;
+            return {
+              roomId: room.roomId, hostName: room.hostName,
+              status: room.status, auctionType: room.auctionType,
+              serverId, players: 0
+            };
+          } catch (validationError) {
+            console.warn("Could not validate public room:", room.roomId, validationError);
+            return null;
+          }
+        })
+      ))).filter(Boolean);
       setPublicRooms(rooms);
     } catch (err) {
       console.error("Could not load public auction rooms:", err);
