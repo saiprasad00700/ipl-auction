@@ -1087,7 +1087,7 @@ useEffect(() => {
       });
 
       try {
-         await placeBid(nextBidAmount);
+         await placeBid(bidAmount);
       } catch (err) {
          setOptimisticState(null);
          setError(err.message);
@@ -1795,7 +1795,8 @@ useEffect(() => {
 
                                     <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2 mb-2">
                                        {[1, 1.5, 2].map((increment) => {
-                                          const quickBidAmount = Math.max(nextBidAmount, (displayAuctionState?.currentBid || 0) + increment);
+                                          const bidBaseline = (displayAuctionState?.currentBid || 0) > 0 ? displayAuctionState.currentBid : nextBidAmount;
+                                           const quickBidAmount = Math.round((bidBaseline + increment) * 100) / 100;
                                           const quickBidDisabled = spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid || isBiddingInFlight || (team?.budgetRemaining || 0) < quickBidAmount;
                                           return (
                                              <button
