@@ -311,9 +311,15 @@ async function cleanupAbandonedRooms() {
       const COMPLETED_ROOM_RETENTION_MS = 48 * 60 * 60 * 1000;
 
       if (isCompleted) {
-        // Never delete a completed room without a reliable completion time.
+        // Completed rooms must disappear from the active public directory immediately,
+        // while their auction/history data remains available for the 48-hour retention.
+        await database.ref('publicRooms/' + roomId).remove().catch((error) => {
+          console.warn('[Room cleanup] Could not remove completed room from public directory:', roomId, error?.message || error);
+        });
+        await database.ref(ALLOCATOR_PATH + '/' + roomId).remove().catch(() => {});
+        // Never delete retained completed auction data without a reliable completion time.
         if (!Number.isFinite(completionStamp) || completionStamp <= 0) {
-          console.warn('[Room cleanup] Completed room has no valid completedAt; preserving it:', roomId);
+          console.warn('[Room cleanup] Completed room has no valid completedAt; preserving auction data:', roomId);
           continue;
         }
         if (now - completionStamp < COMPLETED_ROOM_RETENTION_MS) continue;
@@ -393,9 +399,8 @@ async function cleanupAbandonedRooms() {
           if (!publicRoom || typeof publicRoom !== 'object') continue;
           const auctionNode = rooms[roomId];
           if (auctionNode) continue; // Never remove a directory entry while its auction node exists.
-          const createdAt = Number(publicRoom.createdAt || publicRoom.lastActivityAt || 0);
-          if (!Number.isFinite(createdAt) || createdAt <= 0 || now - createdAt < ROOM_IDLE_TIMEOUT_MS) continue;
-
+          // If the auction node is missing, the public entry is stale and should
+          // be removed immediately—no 10-minute grace period for broken listings.
           // Firebase is the source of truth for orphan directory entries.
           // Remove the stale public room and capacity reservation first so
           // optional Supabase failures cannot leave the room visible forever.
