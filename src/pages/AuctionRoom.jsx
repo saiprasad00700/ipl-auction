@@ -1039,7 +1039,7 @@ useEffect(() => {
       if (displayAuctionState?.highBidderId === user?.uid) return;
 
       // Budget Guard
-      if ((team?.budgetRemaining || 0) < nextBidAmount) {
+      if ((team?.budgetRemaining || 0) < bidAmount) {
          setError('Insufficient Budget');
          playBeep(220, 0.3);
          setTimeout(() => setError(''), 3000);
@@ -1793,6 +1793,23 @@ useEffect(() => {
                                        );
                                     })()}
 
+                                    <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2 mb-2">
+                                       {[1, 1.5, 2].map((increment) => {
+                                          const quickBidAmount = Math.max(nextBidAmount, (displayAuctionState?.currentBid || 0) + increment);
+                                          const quickBidDisabled = spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid || isBiddingInFlight || (team?.budgetRemaining || 0) < quickBidAmount;
+                                          return (
+                                             <button
+                                                key={increment}
+                                                onClick={() => handleBid(quickBidAmount)}
+                                                disabled={quickBidDisabled}
+                                                title={`Increase by ₹${increment} Cr — bid ₹${quickBidAmount.toFixed(2)} Cr`}
+                                                className="px-3 py-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/[0.06] text-emerald-300 hover:bg-emerald-400/15 hover:border-emerald-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[10px] sm:text-xs font-black whitespace-nowrap"
+                                             >
+                                                +{increment} Cr <span className="text-emerald-100/60 ml-1">({quickBidAmount.toFixed(2)})</span>
+                                             </button>
+                                          );
+                                       })}
+                                    </div>
                                     <div className="flex gap-3 md:gap-4">
                                        <button
                                           onClick={handleBid}
