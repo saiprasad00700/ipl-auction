@@ -1061,7 +1061,9 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       if (!['1', '2', '3'].includes(serverId)) return sendJson(res, 400, { error: 'Invalid server selection' });
       if (/^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) return sendJson(res, 403, { error: 'Automated accounts cannot use voice chat' });
 
-      const { database } = await getDatabaseForServer(serverId);
+      // getDatabaseForServer returns the Firebase Database instance directly.
+      // Do not destructure it: the old code produced undefined and failed at .ref().
+      const database = await getDatabaseForServer(serverId);
       const roomSnapshot = await database.ref(`auctions/${roomId}/room`).get();
       if (!roomSnapshot.exists()) return sendJson(res, 404, { error: 'Auction room not found' });
       const roomData = roomSnapshot.val() || {};
@@ -1120,7 +1122,11 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         limitMinutes: applicationLimitMinutes
       });
     } catch (error) {
-      console.error('[Agora Voice] Token request failed:', error?.message || error);
+      console.error('[Agora Voice] Token request failed:', {
+        message: error?.message || String(error),
+        code: error?.code || null,
+        stack: error?.stack || null
+      });
       return sendJson(res, 500, { error: 'Could not start voice chat. Check Agora server configuration.' });
     }
   }
