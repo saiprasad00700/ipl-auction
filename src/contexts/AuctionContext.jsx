@@ -1737,7 +1737,8 @@ const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) =>
 
         const cBid = currentData.currentBid || 0;
         const minAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
-        const nAmount = requestedAmount;\n        if (nAmount < minAmount) return; // another bid changed the baseline; require a fresh click
+        const nAmount = requestedAmount;
+        if (nAmount < minAmount) return; // another bid changed the baseline; require a fresh click
 
         // Guard: Abort retried transaction if updated bid exceeds user's budget
         if (nAmount > myBudget) return;
