@@ -1034,11 +1034,11 @@ useEffect(() => {
       return () => clearInterval(interval);
    }, [displayAuctionState?.timerEndsAt, displayAuctionState?.status, currentAuction?.status, isAdmin, id, endPlayerAuction, getSyncedTime]);
 
-   const handleBid = async () => {
-      if (isBiddingInFlight) return;
-      if (displayAuctionState?.highBidderId === user?.uid) return;
-
-      // Budget Guard
+   const handleBid = async (requestedBidAmount = nextBidAmount) => {
+       if (isBiddingInFlight) return;
+       if (displayAuctionState?.highBidderId === user?.uid) return;
+       const bidAmount = Math.max(nextBidAmount, requestedBidAmount);
+       // Budget Guard
       if ((team?.budgetRemaining || 0) < bidAmount) {
          setError('Insufficient Budget');
          playBeep(220, 0.3);
