@@ -1084,28 +1084,10 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         return sendJson(res, 503, { error: 'Agora voice chat is not configured correctly on this server' });
       }
 
-      // Reserve five participant-minutes per short-lived token. The 8,000-minute
-      // application cap leaves a 20% safety buffer below Agora's published 10,000
-      // free-minute allowance. The transaction is shared through primary Firebase
-      // so both Render servers consume one common budget.
-      const monthKey = new Date().toISOString().slice(0, 7);
-      const usageRef = (await getFirebaseAdminServices()).database.ref('agoraVoiceUsage/' + monthKey);
-      const blockMinutes = 5;
-      const applicationLimitMinutes = 8000;
-      const reservation = await usageRef.transaction((current) => {
-        const usage = current || { reservedMinutes: 0, updatedAt: Date.now() };
-        const reservedMinutes = Math.max(0, Number(usage.reservedMinutes) || 0);
-        if (reservedMinutes + blockMinutes > applicationLimitMinutes) return;
-        return { ...usage, reservedMinutes: reservedMinutes + blockMinutes, updatedAt: Date.now() };
-      });
-      if (!reservation.committed) {
-        return sendJson(res, 429, {
-          error: 'SS AUCTION monthly free voice allowance has been reached. Voice chat will be available again next month.',
-          code: 'AGORA_FREE_LIMIT_REACHED',
-          limitMinutes: applicationLimitMinutes
-        });
-      }
-
+      // Do not enforce an application-side monthly token reservation quota.
+      // The previous 5-minute reservation per token request permanently consumed
+      // budget on reconnects/renewals and could block voice despite low actual usage.
+      // Agora remains responsible for enforcing its provider-side usage limits.
       const channelName = 'ssauction-' + roomId;
       const tokenExpirationSeconds = 300;
       const privilegeExpirationSeconds = 300;
@@ -1122,9 +1104,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
       return sendJson(res, 200, {
         appId, channelName, token, uid: rtcAccount,
-        expiresIn: tokenExpirationSeconds,
-        reservedMinutes: Number(reservation.snapshot.val()?.reservedMinutes || 0),
-        limitMinutes: applicationLimitMinutes
+        expiresIn: tokenExpirationSeconds
       });
     } catch (error) {
       console.error('[Agora Voice] Token request failed:', {
