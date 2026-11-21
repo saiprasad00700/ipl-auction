@@ -154,21 +154,37 @@ const VoiceChat = ({ roomId }) => {
       }
     };
 
-    start();
-    return () => {
-      cancelled = true;
+    const leaveVoiceImmediately = () => {
+      // Synchronously stop local transmission and renewal; leave Agora as soon as possible.
       if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current);
       refreshTimerRef.current = null;
-      rosterUnsubscribeRef.current?.();
-      rosterUnsubscribeRef.current = null;
-      if (didConnect) void trackAnalyticsEvent('voice_leave', roomId);
-      try { localTrackRef.current?.close(); } catch {}
+      try {
+        const track = localTrackRef.current;
+        if (track) {
+          void track.setEnabled(false).catch(() => {});
+          track.close();
+        }
+      } catch {}
       localTrackRef.current = null;
-      roomDatabaseRef.current = null;
-      if (client) void client.leave().catch(() => {});
+      const activeClient = clientRef.current || client;
       clientRef.current = null;
       setConnected(false);
       setMicOn(false);
+      if (activeClient) void activeClient.leave().catch(() => {});
+    };
+
+    start();
+    // Browser tab/window exit: stop voice without waiting for React unmount.
+    const handlePageExit = () => leaveVoiceImmediately();
+    window.addEventListener('pagehide', handlePageExit);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('pagehide', handlePageExit);
+      leaveVoiceImmediately();
+      rosterUnsubscribeRef.current?.();
+      rosterUnsubscribeRef.current = null;
+      if (didConnect) void trackAnalyticsEvent('voice_leave', roomId);
+      roomDatabaseRef.current = null;
     };
   }, [roomId, user]);
 
