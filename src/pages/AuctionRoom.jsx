@@ -1034,9 +1034,9 @@ useEffect(() => {
       return () => clearInterval(interval);
    }, [displayAuctionState?.timerEndsAt, displayAuctionState?.status, currentAuction?.status, isAdmin, id, endPlayerAuction, getSyncedTime]);
 
-   const handleBid = async (requestedBidAmount = nextBidAmount) => {
+   const handleBid = async (requestedBidAmount = nextBidAmount, allowOwnRaise = false) => {
        if (isBiddingInFlight) return;
-       if (displayAuctionState?.highBidderId === user?.uid) return;
+       if (displayAuctionState?.highBidderId === user?.uid && !allowOwnRaise) return;
        const bidAmount = Math.max(nextBidAmount, requestedBidAmount);
        // Budget Guard
       if ((team?.budgetRemaining || 0) < bidAmount) {
@@ -1797,11 +1797,11 @@ useEffect(() => {
                                        {[1, 1.5, 2].map((increment) => {
                                           const bidBaseline = (displayAuctionState?.currentBid || 0) > 0 ? displayAuctionState.currentBid : nextBidAmount;
                                            const quickBidAmount = Math.round((bidBaseline + increment) * 100) / 100;
-                                          const quickBidDisabled = spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || displayAuctionState?.highBidderId === user?.uid || isBiddingInFlight || (team?.budgetRemaining || 0) < quickBidAmount;
+                                          const quickBidDisabled = spectateMode || !team || timeLeft === 0 || displayAuctionState?.status !== 'bidding' || isBiddingInFlight || (team?.budgetRemaining || 0) < quickBidAmount;
                                           return (
                                              <button
                                                 key={increment}
-                                                onClick={() => handleBid(quickBidAmount)}
+                                                onClick={() => handleBid(quickBidAmount, true)}
                                                 disabled={quickBidDisabled}
                                                 title={`Increase by ₹${increment} Cr — bid ₹${quickBidAmount.toFixed(2)} Cr`}
                                                 className="px-3 py-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/[0.06] text-emerald-300 hover:bg-emerald-400/15 hover:border-emerald-300/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[10px] sm:text-xs font-black whitespace-nowrap"
