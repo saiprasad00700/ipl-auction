@@ -1687,7 +1687,7 @@ const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) =>
       throw new Error("You have been removed from this auction and cannot bid.");
     }
     if (currentAuction.currentAuction?.status !== 'bidding') throw new Error("Auction is not accepting bids right now.");
-    if (currentAuction.currentAuction?.highBidderId === user.uid) throw new Error("You are already the highest bidder!");
+    // Raising your own current bid is allowed for quick-bid buttons.
 
     // Squad limit check
     const squadLimit = currentAuction.squadLimit || 25;
@@ -1709,14 +1709,15 @@ const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) =>
       }
     }
 
-    // ── Bug Fix 1: Budget pre-flight check OUTSIDE the transaction ──
-    // The transaction update function is retried by Firebase on conflicts — using team.budgetRemaining
-    // inside it reads a stale React closure each retry, not the live DB value. We do the check here
-    // (from the most recent RTDB-synced team state) and rely on the server to enforce it atomically.
+    // Validate the requested final bid amount (quick bids may exceed the normal increment).
     const cBidSnapshot = currentAuction.currentAuction?.currentBid || 0;
-    const nextBidSnapshot = getNextBidAmount(cBidSnapshot, player?.basePrice || 0, player?.set);
-    const myBudget = team.budgetRemaining || 0;
-    if (myBudget < nextBidSnapshot) {
+    const normalNextBid = getNextBidAmount(cBidSnapshot, player?.basePrice || 0, player?.set);
+    const requestedAmount = Number(amount ?? normalNextBid);
+    if (!Number.isFinite(requestedAmount) || requestedAmount < normalNextBid) {
+      throw new Error('Bid amount is below the minimum next bid.');
+    }
+    const myBudget = Number(team.budgetRemaining || 0);
+    if (myBudget < requestedAmount) {
       throw new Error('Insufficient budget to place this bid.');
     }
 
@@ -1726,7 +1727,7 @@ const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) =>
       txResult = await runTransactionRtdb(liveRef, (currentData) => {
         if (!currentData) return currentData;
         if (currentData.status !== 'bidding') return; // normal abort
-        if (currentData.highBidderId === user.uid) return; // normal abort
+        // Allow the current high bidder to raise their own bid via quick-bid.
 
         const now = getSyncedTime();
         // Server-side guard: Reject late bids if timer has already expired
@@ -1735,7 +1736,7 @@ const markMessageSeen = useCallback(async (roomId, messageId, userId, seenBy) =>
         }
 
         const cBid = currentData.currentBid || 0;
-        const nAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);
+        const minAmount = getNextBidAmount(cBid, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.basePrice || 0, IPL_PLAYERS.find(p => p.id === currentData.playerId)?.set);\n        const nAmount = requestedAmount;\n        if (nAmount < minAmount) return; // another bid changed the baseline; require a fresh click
 
         // Guard: Abort retried transaction if updated bid exceeds user's budget
         if (nAmount > myBudget) return;
