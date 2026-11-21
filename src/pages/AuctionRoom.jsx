@@ -1079,7 +1079,7 @@ useEffect(() => {
 
       setOptimisticState({
          ...displayAuctionState,
-         currentBid: nextBidAmount,
+         currentBid: bidAmount,
          highBidderId: user?.uid,
          highBidderName: user?.displayName || 'Manager',
          highBidderTeamId: team?.teamId,
