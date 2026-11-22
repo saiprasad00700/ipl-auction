@@ -140,6 +140,13 @@ export default {
       });
     }
 
+    // Temporary fallback: route the custom domain to the currently working Server 3.
+    // Preserve the requested path and query string, including room URLs.
+    const server3 = new URL("https://ss-auction-server-3.onrender.com");
+    server3.pathname = url.pathname;
+    server3.search = url.search;
+    return Response.redirect(server3.toString(), 307);
+
     if (url.pathname === "/__edge-health") {
       const [server1Healthy, server2Healthy] = await Promise.all([
         probeOrigin("server1"),
