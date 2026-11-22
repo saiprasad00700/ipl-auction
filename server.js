@@ -244,6 +244,25 @@ async function getFirebaseServer2AdminServices() {
   return firebaseServer2AdminPromise;
 }
 
+// Verify bridge tokens using the Firebase project that issued the ID token.
+async function verifyAuctionBridgeToken(token) {
+  const providers = [
+    () => getFirebaseAdminServices(),
+    () => getFirebaseServer2AdminServices(),
+    () => getFirebaseServer3AdminServices()
+  ];
+  let lastError;
+  for (const getServices of providers) {
+    try {
+      const { auth } = await getServices();
+      return await auth.verifyIdToken(token);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Firebase ID token could not be verified');
+}
+
 let firebaseServer3AdminPromise;
 async function getFirebaseServer3AdminServices() {
   if (!firebaseServer3AdminPromise) firebaseServer3AdminPromise = (async () => {
@@ -915,8 +934,7 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const { auth: primaryAuth } = await getFirebaseAdminServices();
-      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
+      const decoded = await verifyAuctionBridgeToken(authorization.slice(7));
       if (!decoded?.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
         return sendJson(res, 403, { error: 'This account cannot access auction rooms' });
       }
