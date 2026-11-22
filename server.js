@@ -1141,6 +1141,21 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'Method not allowed' });
+  // Serve AdSense ads.txt directly from the source public directory as a robust fallback.
+  // This avoids ads.txt returning 404 if a deployment's dist copy is missing.
+  if (pathname === '/ads.txt') {
+    try {
+      const adsTxt = await readFile(path.join(ROOT, 'public', 'ads.txt'));
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600'
+      });
+      res.end(req.method === 'HEAD' ? undefined : adsTxt);
+      return;
+    } catch {
+      // Fall through to the normal static handler if source file is unavailable.
+    }
+  }
   return serveStatic(req, res, pathname);
 });
 
