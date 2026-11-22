@@ -118,7 +118,7 @@ const registerServerTimeSync = (database, label) => {
   };
   timeSyncByDatabase.set(database, state);
   try {
-    goOffline(database);
+    // Keep RTDB online; this listener is only for server-time synchronization.
     const connectedRef = ref(database, '.info/connected');
     const offsetRef = ref(database, '.info/serverTimeOffset');
     onValue(offsetRef, (snap) => {
