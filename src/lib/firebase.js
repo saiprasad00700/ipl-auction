@@ -5,13 +5,12 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getDatabase, ref, onValue, get, goOffline } from "firebase/database";
 import { getStorage } from "firebase/storage";
 
-// The default app is the Primary Firebase project used for Google/guest auth
-// and server token bridges. Server 2 and Server 3 remain separate named apps.
-// Do not replace this with Server 3 config: backend Admin token verification
-// expects tokens issued by the Primary project.
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  // Single-project setup: Auth, Firestore and the Realtime Database all live in
+  // the same Firebase project, so RTDB requests carry the signed-in user's token
+  // and the database rules can rely on `auth != null` / `auth.uid`.
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -119,7 +118,7 @@ const registerServerTimeSync = (database, label) => {
   };
   timeSyncByDatabase.set(database, state);
   try {
-    // Keep the database online; server-time sync listeners must not disconnect RTDB.
+    goOffline(database);
     const connectedRef = ref(database, '.info/connected');
     const offsetRef = ref(database, '.info/serverTimeOffset');
     onValue(offsetRef, (snap) => {

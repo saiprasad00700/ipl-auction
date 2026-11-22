@@ -128,25 +128,6 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // Serve AdSense ads.txt directly at the edge, independent of Render origin selection.
-    if (url.pathname === "/ads.txt") {
-      const body = "google.com, pub-2349011540703210, DIRECT, f08c47fec0942fa0\n";
-      return new Response(request.method === "HEAD" ? null : body, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
-    }
-
-    // Temporary fallback: route the custom domain to the currently working Server 3.
-    // Preserve the requested path and query string, including room URLs.
-    const server3 = new URL("https://ss-auction-server-3.onrender.com");
-    server3.pathname = url.pathname;
-    server3.search = url.search;
-    return Response.redirect(server3.toString(), 307);
-
     if (url.pathname === "/__edge-health") {
       const [server1Healthy, server2Healthy] = await Promise.all([
         probeOrigin("server1"),

@@ -244,28 +244,6 @@ async function getFirebaseServer2AdminServices() {
   return firebaseServer2AdminPromise;
 }
 
-
-// Verify bridge tokens against the Firebase project that issued them. Clients may
-// currently present an ID token from the selected auction server rather than the
-// primary project; only a fully verified token is accepted.
-async function verifyAuctionBridgeToken(token) {
-  const providers = [
-    () => getFirebaseAdminServices(),
-    () => getFirebaseServer2AdminServices(),
-    () => getFirebaseServer3AdminServices()
-  ];
-  let lastError;
-  for (const getServices of providers) {
-    try {
-      const { auth } = await getServices();
-      return await auth.verifyIdToken(token);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('Firebase ID token could not be verified');
-}
-
 let firebaseServer3AdminPromise;
 async function getFirebaseServer3AdminServices() {
   if (!firebaseServer3AdminPromise) firebaseServer3AdminPromise = (async () => {
@@ -937,7 +915,8 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     try {
       const authorization = String(req.headers.authorization || '');
       if (!authorization.startsWith('Bearer ')) return sendJson(res, 401, { error: 'Sign in required' });
-      const decoded = await verifyAuctionBridgeToken(authorization.slice(7));
+      const { auth: primaryAuth } = await getFirebaseAdminServices();
+      const decoded = await primaryAuth.verifyIdToken(authorization.slice(7));
       if (!decoded?.uid || /^(bot[_-]|auctionbot[_-])/i.test(decoded.uid)) {
         return sendJson(res, 403, { error: 'This account cannot access auction rooms' });
       }
@@ -1162,108 +1141,11 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'Method not allowed' });
-  // Serve AdSense ads.txt directly from the source public directory as a robust fallback.
-  // This avoids ads.txt returning 404 if a deployment's dist copy is missing.
-  if (pathname === '/ads.txt') {
-    try {
-      const adsTxt = await readFile(path.join(ROOT, 'public', 'ads.txt'));
-      res.writeHead(200, {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600'
-      });
-      res.end(req.method === 'HEAD' ? undefined : adsTxt);
-      return;
-    } catch {
-      // Fall through to the normal static handler if source file is unavailable.
-    }
-  }
   return serveStatic(req, res, pathname);
 });
 
-async function diagnoseFirebaseConfig(label, config) {
-  const missing = Object.entries(config).filter(([, value]) => !String(value || '').trim()).map(([key]) => key);
-  const databaseHost = (() => { try { return new URL(config.databaseURL).host; } catch { return 'invalid-or-empty'; } })();
-  const expectedDatabaseHost = config.projectId ? config.projectId + '-default-rtdb' : '';
-  const databaseProjectMatch = !!config.projectId && databaseHost.startsWith(expectedDatabaseHost);
-  const authDomainMatch = !!config.projectId && config.authDomain === config.projectId + '.firebaseapp.com';
-  const appIdParts = String(config.appId || '').split(':');
-  const appIdProjectNumber = appIdParts.length >= 3 ? appIdParts[1] : '';
-  const appIdProjectNumberMatch = !!config.messagingSenderId && appIdProjectNumber === String(config.messagingSenderId);
-  console.info(`[Firebase config diagnostic:${label}]`, {
-    missing,
-    projectId: config.projectId || '(missing)',
-    authDomain: config.authDomain || '(missing)',
-    databaseHost: databaseHost,
-    databaseProjectMatch,
-    authDomainMatch,
-    messagingSenderId: config.messagingSenderId || '(missing)',
-    appIdProjectNumber: appIdProjectNumber || '(invalid-format)',
-    appIdProjectNumberMatch,
-    apiKeyLength: String(config.apiKey || '').length,
-    apiKeyMasked: config.apiKey ? String(config.apiKey).slice(0, 5) + '…' + String(config.apiKey).slice(-4) : '(missing)'
-  });
-  if (!config.apiKey) return;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.apiKey), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: 'diagnostic-invalid-token' }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    const payload = await response.json().catch(() => ({}));
-    const errorMessage = String(payload?.error?.message || '');
-    console.info(`[Firebase API-key diagnostic:${label}]`, {
-      status: response.status,
-      result: response.ok ? 'unexpected-success' : errorMessage === 'API_KEY_INVALID' ? 'API_KEY_INVALID' : errorMessage === 'INVALID_ID_TOKEN' ? 'API_KEY_ACCEPTED_INVALID_TOKEN_EXPECTED' : 'other-rejection',
-      errorMessage: errorMessage.slice(0, 120)
-    });
-  } catch (error) {
-    console.warn(`[Firebase API-key diagnostic:${label}] Request failed:`, error?.name || 'Error', error?.message || '');
-  }
-}
-
-async function diagnoseFirebaseConfigs() {
-  const primaryConfig = {
-    apiKey: process.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    databaseURL: process.env.VITE_FIREBASE_DATABASE_URL || '',
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || '',
-    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: process.env.VITE_FIREBASE_APP_ID || ''
-  };
-  const server3Config = {
-    apiKey: process.env.VITE_SERVER3_FIREBASE_API_KEY || '',
-    authDomain: 'ss-auction-server-3.firebaseapp.com',
-    databaseURL: process.env.SERVER3_FIREBASE_DATABASE_URL || 'https://ss-auction-server-3-default-rtdb.asia-southeast1.firebasedatabase.app',
-    projectId: 'ss-auction-server-3',
-    messagingSenderId: '927894920165',
-    appId: '1:927894920165:web:9527bf71b06f0374c0ed0c'
-  };
-  await Promise.all([
-    diagnoseFirebaseConfig('primary-server1', primaryConfig),
-    diagnoseFirebaseConfig('server3', server3Config)
-  ]);
-  try {
-    const raw = process.env.SERVER3_FIREBASE_SERVICE_ACCOUNT_JSON;
-    const serviceAccount = raw ? JSON.parse(raw) : null;
-    console.info('[Firebase Server 3 Admin diagnostic]', {
-      serviceAccountPresent: !!raw,
-      serviceAccountProjectId: serviceAccount?.project_id || '(missing)',
-      projectMatch: serviceAccount?.project_id === server3Config.projectId,
-      databaseURL: process.env.SERVER3_FIREBASE_DATABASE_URL || '(missing)',
-      databaseHostMatch: (() => { try { return new URL(process.env.SERVER3_FIREBASE_DATABASE_URL || '').host === new URL(server3Config.databaseURL).host; } catch { return false; } })()
-    });
-  } catch (error) {
-    console.warn('[Firebase Server 3 Admin diagnostic] Service account JSON is invalid:', error?.message || error);
-  }
-}
-
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Crick Auction server listening on port ${PORT}`);
-  void diagnoseFirebaseConfigs();
   startRoomCleanup();
   startAnalyticsPresenceSnapshots();
 });

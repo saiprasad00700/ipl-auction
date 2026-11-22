@@ -45,11 +45,6 @@ const LandingPage = () => {
   const [selectedServer, setSelectedServer] = useState("auto");
   const [serverCapacityPrompt, setServerCapacityPrompt] = useState("");
 
-  // Auth context must be initialized before any hook dependency reads `user`.
-  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
-  const { createRoom, joinRoomDb } = useAuction();
-  const navigate = useNavigate();
-
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
   const [lobbiesLoading, setLobbiesLoading] = useState(false);
@@ -58,15 +53,7 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      // Server 2/3 require primary Firebase authentication before custom-token auth.
-      // Anonymous visitors should only query Server 1's public directory.
-      const serverIds = selectedServer === "auto"
-        ? (user?.uid ? ["1", "2", "3"] : ["1"])
-        : (selectedServer === "1" || user?.uid ? [selectedServer] : []);
-      if (!serverIds.length) {
-        setPublicRooms([]);
-        return;
-      }
+      const serverIds = selectedServer === "auto" ? ["1", "2", "3"] : [selectedServer];
       const directories = await Promise.all(serverIds.map(async (serverId) => {
         const database = serverId === "3" ? await ensureServer3Auth() : serverId === "2" ? await ensureServer2Auth() : rtdb;
         goOnline(database);
@@ -111,7 +98,7 @@ const LandingPage = () => {
     fetchPublicLobbies();
     const refreshId = setInterval(fetchPublicLobbies, 15000);
     return () => clearInterval(refreshId);
-  }, [selectedServer, user?.uid]);
+  }, [selectedServer]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
@@ -126,6 +113,9 @@ const LandingPage = () => {
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [guestName, setGuestName] = useState("");
 
+  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
+  const { createRoom, joinRoomDb } = useAuction();
+  const navigate = useNavigate();
 
   // Check for URL errors (e.g., from being kicked)
   useEffect(() => {
