@@ -1159,8 +1159,59 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
   return serveStatic(req, res, pathname);
 });
 
+async function diagnosePrimaryFirebaseConfig() {
+  const config = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    databaseURL: process.env.VITE_FIREBASE_DATABASE_URL || '',
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || '',
+    appId: process.env.VITE_FIREBASE_APP_ID || ''
+  };
+  const missing = Object.entries(config).filter(([, value]) => !String(value).trim()).map(([key]) => key);
+  const dbHost = (() => { try { return new URL(config.databaseURL).host; } catch { return 'invalid-or-empty'; } })();
+  const expectedHost = config.projectId ? config.projectId + '-default-rtdb' : '';
+  const hostProjectMatch = !!config.projectId && dbHost.startsWith(expectedHost);
+  const authDomainMatch = !!config.projectId && config.authDomain === config.projectId + '.firebaseapp.com';
+  const appIdProjectMatch = !!config.projectId && config.appId.startsWith('1:') && config.appId.split(':')[1] === config.projectId;
+  console.info('[Firebase config diagnostic]', {
+    missing,
+    projectId: config.projectId || '(missing)',
+    authDomain: config.authDomain || '(missing)',
+    databaseHost: dbHost,
+    hostProjectMatch,
+    authDomainMatch,
+    appIdProjectMatch,
+    apiKeyLength: config.apiKey.length,
+    apiKeyMasked: config.apiKey ? config.apiKey.slice(0, 5) + '…' + config.apiKey.slice(-4) : '(missing)'
+  });
+  if (!config.apiKey) return;
+  try {
+    // A deliberately invalid ID token is used only to test API-key acceptance.
+    // No user data is accessed or created. A valid API key should return INVALID_ID_TOKEN.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.apiKey), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: 'diagnostic-invalid-token' }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    const payload = await response.json().catch(() => ({}));
+    const errorMessage = String(payload?.error?.message || '');
+    console.info('[Firebase API-key diagnostic]', {
+      status: response.status,
+      result: response.ok ? 'unexpected-success' : errorMessage === 'API_KEY_INVALID' ? 'API_KEY_INVALID' : errorMessage === 'INVALID_ID_TOKEN' ? 'API_KEY_ACCEPTED_INVALID_TOKEN_EXPECTED' : 'other-rejection',
+      errorMessage: errorMessage.slice(0, 120)
+    });
+  } catch (error) {
+    console.warn('[Firebase API-key diagnostic] Request failed:', error?.name || 'Error', error?.message || '');
+  }
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Crick Auction server listening on port ${PORT}`);
+  void diagnosePrimaryFirebaseConfig();
   startRoomCleanup();
   startAnalyticsPresenceSnapshots();
 });
