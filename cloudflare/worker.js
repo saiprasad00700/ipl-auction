@@ -130,7 +130,7 @@ export default {
 
     // Serve AdSense ads.txt directly at the edge, independent of Render origin selection.
     if (url.pathname === "/ads.txt") {
-      const body = "google.com, pub-2349011540703210, DIRECT, f08c47fec0942fa0\\n";
+      const body = "google.com, pub-2349011540703210, DIRECT, f08c47fec0942fa0\n";
       return new Response(request.method === "HEAD" ? null : body, {
         status: 200,
         headers: {
