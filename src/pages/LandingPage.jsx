@@ -53,7 +53,15 @@ const LandingPage = () => {
   const fetchPublicLobbies = async () => {
     setLobbiesLoading(true);
     try {
-      const serverIds = selectedServer === "auto" ? ["1", "2", "3"] : [selectedServer];
+      // Server 2/3 require primary Firebase authentication before custom-token auth.
+      // Anonymous visitors should only query Server 1's public directory.
+      const serverIds = selectedServer === "auto"
+        ? (user?.uid ? ["1", "2", "3"] : ["1"])
+        : (selectedServer === "1" || user?.uid ? [selectedServer] : []);
+      if (!serverIds.length) {
+        setPublicRooms([]);
+        return;
+      }
       const directories = await Promise.all(serverIds.map(async (serverId) => {
         const database = serverId === "3" ? await ensureServer3Auth() : serverId === "2" ? await ensureServer2Auth() : rtdb;
         goOnline(database);
@@ -98,7 +106,7 @@ const LandingPage = () => {
     fetchPublicLobbies();
     const refreshId = setInterval(fetchPublicLobbies, 15000);
     return () => clearInterval(refreshId);
-  }, [selectedServer]);
+  }, [selectedServer, user?.uid]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState("all");
