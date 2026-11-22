@@ -5,18 +5,18 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getDatabase, ref, onValue, get, goOffline } from "firebase/database";
 import { getStorage } from "firebase/storage";
 
+// Server 3 is the active Firebase project for this deployment. Keep the
+// default Firebase app aligned with the Server 3 app config; the prior Render
+// environment mixed a Server 3 project ID with a different app's sender ID/App ID,
+// which caused the default RTDB app to reject credentials and fail WebSockets.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  // Single-project setup: Auth, Firestore and the Realtime Database all live in
-  // the same Firebase project, so RTDB requests carry the signed-in user's token
-  // and the database rules can rely on `auth != null` / `auth.uid`.
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_SERVER3_FIREBASE_API_KEY,
+  authDomain: "ss-auction-server-3.firebaseapp.com",
+  databaseURL: "https://ss-auction-server-3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ss-auction-server-3",
+  storageBucket: "ss-auction-server-3.firebasestorage.app",
+  messagingSenderId: "927894920165",
+  appId: "1:927894920165:web:9527bf71b06f0374c0ed0c"
 };
 
 const app = initializeApp(firebaseConfig);
