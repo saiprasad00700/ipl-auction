@@ -93,7 +93,10 @@ export const AuthProvider = ({ children }) => {
   const loginAsGuest = async (displayName) => {
     const result = await signInAnonymously(auth);
     await updateProfile(result.user, { displayName });
-    setUser({ ...result.user, displayName });
+    // Keep the original Firebase User instance. Spreading it into a plain object
+    // strips prototype methods such as getIdToken(), which breaks server-token
+    // authentication when a guest starts or joins a room.
+    setUser(result.user);
     return result.user;
   };
 
