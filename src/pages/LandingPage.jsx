@@ -46,6 +46,9 @@ const LandingPage = () => {
   const [serverCapacityPrompt, setServerCapacityPrompt] = useState("");
 
   // Auth context must be initialized before any hook dependency reads `user`.
+  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
+  const { createRoom, joinRoomDb } = useAuction();
+  const navigate = useNavigate();
 
   // Public Lobbies state
   const [publicRooms, setPublicRooms] = useState([]);
@@ -123,9 +126,6 @@ const LandingPage = () => {
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [guestName, setGuestName] = useState("");
 
-  const { user, loginWithGoogle, loginAsGuest, logout } = useAuth();
-  const { createRoom, joinRoomDb } = useAuction();
-  const navigate = useNavigate();
 
   // Check for URL errors (e.g., from being kicked)
   useEffect(() => {
