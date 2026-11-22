@@ -1159,35 +1159,30 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
   return serveStatic(req, res, pathname);
 });
 
-async function diagnosePrimaryFirebaseConfig() {
-  const config = {
-    apiKey: process.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    databaseURL: process.env.VITE_FIREBASE_DATABASE_URL || '',
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || '',
-    appId: process.env.VITE_FIREBASE_APP_ID || ''
-  };
-  const missing = Object.entries(config).filter(([, value]) => !String(value).trim()).map(([key]) => key);
-  const dbHost = (() => { try { return new URL(config.databaseURL).host; } catch { return 'invalid-or-empty'; } })();
-  const expectedHost = config.projectId ? config.projectId + '-default-rtdb' : '';
-  const hostProjectMatch = !!config.projectId && dbHost.startsWith(expectedHost);
+async function diagnoseFirebaseConfig(label, config) {
+  const missing = Object.entries(config).filter(([, value]) => !String(value || '').trim()).map(([key]) => key);
+  const databaseHost = (() => { try { return new URL(config.databaseURL).host; } catch { return 'invalid-or-empty'; } })();
+  const expectedDatabaseHost = config.projectId ? config.projectId + '-default-rtdb' : '';
+  const databaseProjectMatch = !!config.projectId && databaseHost.startsWith(expectedDatabaseHost);
   const authDomainMatch = !!config.projectId && config.authDomain === config.projectId + '.firebaseapp.com';
-  const appIdProjectMatch = !!config.projectId && config.appId.startsWith('1:') && config.appId.split(':')[1] === config.projectId;
-  console.info('[Firebase config diagnostic]', {
+  const appIdParts = String(config.appId || '').split(':');
+  const appIdProjectNumber = appIdParts.length >= 3 ? appIdParts[1] : '';
+  const appIdProjectNumberMatch = !!config.messagingSenderId && appIdProjectNumber === String(config.messagingSenderId);
+  console.info(`[Firebase config diagnostic:${label}]`, {
     missing,
     projectId: config.projectId || '(missing)',
     authDomain: config.authDomain || '(missing)',
-    databaseHost: dbHost,
-    hostProjectMatch,
+    databaseHost: databaseHost,
+    databaseProjectMatch,
     authDomainMatch,
-    appIdProjectMatch,
-    apiKeyLength: config.apiKey.length,
-    apiKeyMasked: config.apiKey ? config.apiKey.slice(0, 5) + '…' + config.apiKey.slice(-4) : '(missing)'
+    messagingSenderId: config.messagingSenderId || '(missing)',
+    appIdProjectNumber: appIdProjectNumber || '(invalid-format)',
+    appIdProjectNumberMatch,
+    apiKeyLength: String(config.apiKey || '').length,
+    apiKeyMasked: config.apiKey ? String(config.apiKey).slice(0, 5) + '…' + String(config.apiKey).slice(-4) : '(missing)'
   });
   if (!config.apiKey) return;
   try {
-    // A deliberately invalid ID token is used only to test API-key acceptance.
-    // No user data is accessed or created. A valid API key should return INVALID_ID_TOKEN.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(config.apiKey), {
@@ -1199,19 +1194,55 @@ async function diagnosePrimaryFirebaseConfig() {
     clearTimeout(timeout);
     const payload = await response.json().catch(() => ({}));
     const errorMessage = String(payload?.error?.message || '');
-    console.info('[Firebase API-key diagnostic]', {
+    console.info(`[Firebase API-key diagnostic:${label}]`, {
       status: response.status,
       result: response.ok ? 'unexpected-success' : errorMessage === 'API_KEY_INVALID' ? 'API_KEY_INVALID' : errorMessage === 'INVALID_ID_TOKEN' ? 'API_KEY_ACCEPTED_INVALID_TOKEN_EXPECTED' : 'other-rejection',
       errorMessage: errorMessage.slice(0, 120)
     });
   } catch (error) {
-    console.warn('[Firebase API-key diagnostic] Request failed:', error?.name || 'Error', error?.message || '');
+    console.warn(`[Firebase API-key diagnostic:${label}] Request failed:`, error?.name || 'Error', error?.message || '');
+  }
+}
+
+async function diagnoseFirebaseConfigs() {
+  const primaryConfig = {
+    apiKey: process.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    databaseURL: process.env.VITE_FIREBASE_DATABASE_URL || '',
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || '',
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.VITE_FIREBASE_APP_ID || ''
+  };
+  const server3Config = {
+    apiKey: process.env.VITE_SERVER3_FIREBASE_API_KEY || '',
+    authDomain: 'ss-auction-server-3.firebaseapp.com',
+    databaseURL: process.env.SERVER3_FIREBASE_DATABASE_URL || 'https://ss-auction-server-3-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'ss-auction-server-3',
+    messagingSenderId: '927894920165',
+    appId: '1:927894920165:web:9527bf71b06f0374c0ed0c'
+  };
+  await Promise.all([
+    diagnoseFirebaseConfig('primary-server1', primaryConfig),
+    diagnoseFirebaseConfig('server3', server3Config)
+  ]);
+  try {
+    const raw = process.env.SERVER3_FIREBASE_SERVICE_ACCOUNT_JSON;
+    const serviceAccount = raw ? JSON.parse(raw) : null;
+    console.info('[Firebase Server 3 Admin diagnostic]', {
+      serviceAccountPresent: !!raw,
+      serviceAccountProjectId: serviceAccount?.project_id || '(missing)',
+      projectMatch: serviceAccount?.project_id === server3Config.projectId,
+      databaseURL: process.env.SERVER3_FIREBASE_DATABASE_URL || '(missing)',
+      databaseHostMatch: (() => { try { return new URL(process.env.SERVER3_FIREBASE_DATABASE_URL || '').host === new URL(server3Config.databaseURL).host; } catch { return false; } })()
+    });
+  } catch (error) {
+    console.warn('[Firebase Server 3 Admin diagnostic] Service account JSON is invalid:', error?.message || error);
   }
 }
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Crick Auction server listening on port ${PORT}`);
-  void diagnosePrimaryFirebaseConfig();
+  void diagnoseFirebaseConfigs();
   startRoomCleanup();
   startAnalyticsPresenceSnapshots();
 });
