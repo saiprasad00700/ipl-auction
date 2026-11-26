@@ -123,7 +123,27 @@ const VoiceChat = ({ roomId }) => {
           }
         });
 
-        await client.join(initial.appId, initial.channelName, initial.token, rtcAccount);
+        // Gateway/network failures are often transient. Retry a fresh token and join
+        // rather than leaving Voice Chat permanently broken after one attempt.
+        let joinError = null;
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            const joinCredentials = attempt === 1 ? initial : await requestVoiceToken();
+            await client.join(joinCredentials.appId, joinCredentials.channelName, joinCredentials.token, rtcAccount);
+            joinError = null;
+            break;
+          } catch (err) {
+            joinError = err;
+            const message = String(err?.message || err);
+            const code = String(err?.code || '');
+            const transientGatewayError = /CAN_NOT_GET_GATEWAY_SERVER|gateway|network|timeout|connection/i.test(message) ||
+              /4096|NETWORK|TIMEOUT/i.test(code);
+            if (!transientGatewayError || attempt === 3) break;
+            console.warn('[Agora Voice] Gateway join failed; retrying', { attempt, message });
+            await new Promise((resolve) => window.setTimeout(resolve, 1000 * attempt));
+          }
+        }
+        if (joinError) throw joinError;
         if (cancelled) { await client.leave(); return; }
 
         // Join receive-only. Do not request a microphone until the user
