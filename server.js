@@ -1098,6 +1098,15 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
       const appId = String(process.env.AGORA_APP_ID || '').trim();
       const certificate = String(process.env.AGORA_APP_CERTIFICATE || '').trim();
       const publicAppId = String(process.env.VITE_AGORA_APP_ID || '').trim();
+      console.info('[Agora Voice][diagnostic] Server credential configuration', {
+        serverId,
+        appIdPresent: Boolean(appId),
+        appIdLength: appId.length,
+        certificatePresent: Boolean(certificate),
+        certificateLength: certificate.length,
+        publicAppIdPresent: Boolean(publicAppId),
+        publicAppIdMatches: publicAppId ? publicAppId === appId : null
+      });
       if (!appId || !certificate || (publicAppId && publicAppId !== appId)) {
         return sendJson(res, 503, { error: 'Agora voice chat is not configured correctly on this server' });
       }
@@ -1117,6 +1126,12 @@ readRows('analytics_presence_snapshots', 'sampled_at,online_players,active_playe
         appId, certificate, channelName, rtcAccount, RtcRole.PUBLISHER,
         tokenExpirationSeconds, privilegeExpirationSeconds
       );
+      console.info('[Agora Voice][diagnostic] Token generated successfully', {
+        serverId, channelNameLength: channelName.length, tokenPresent: Boolean(token),
+        tokenLength: typeof token === 'string' ? token.length : 0,
+        uidFormatValid: /^[A-Za-z0-9_-]{1,255}$/.test(rtcAccount),
+        expirationSeconds: tokenExpirationSeconds
+      });
       // Only a successful voice-chat token issuance counts as activity.
       // Mere online presence or failed token requests do not keep rooms alive.
       await database.ref(`auctions/${roomId}/room`).update({ lastActivityAt: Date.now() });
