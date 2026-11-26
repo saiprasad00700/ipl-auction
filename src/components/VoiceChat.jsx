@@ -152,8 +152,9 @@ const VoiceChat = ({ roomId }) => {
         // rather than leaving Voice Chat permanently broken after one attempt.
         let joinError = null;
         for (let attempt = 1; attempt <= 3; attempt += 1) {
+          let joinCredentials;
           try {
-            const joinCredentials = attempt === 1 ? initial : await requestVoiceToken();
+            joinCredentials = attempt === 1 ? initial : await requestVoiceToken();
             await client.join(joinCredentials.appId, joinCredentials.channelName, joinCredentials.token, rtcAccount);
             joinError = null;
             break;
