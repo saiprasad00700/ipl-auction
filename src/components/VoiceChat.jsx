@@ -77,6 +77,20 @@ const VoiceChat = ({ roomId }) => {
         roomDatabase = serverId === '3' ? await ensureServer3Auth() : serverId === '2' ? await ensureServer2Auth() : rtdb;
         roomDatabaseRef.current = roomDatabase;
         const initial = await requestVoiceToken();
+        console.info('[Agora Voice][diagnostic] Token endpoint succeeded', {
+          serverId,
+          appIdPresent: Boolean(initial?.appId),
+          channelNamePresent: Boolean(initial?.channelName),
+          tokenPresent: Boolean(initial?.token),
+          tokenLength: typeof initial?.token === 'string' ? initial.token.length : 0,
+          appIdLength: typeof initial?.appId === 'string' ? initial.appId.length : 0,
+          channelNameLength: typeof initial?.channelName === 'string' ? initial.channelName.length : 0,
+          sdkVersion: AgoraRTC.getVersion?.() || 'unknown',
+          browserOnline: navigator.onLine
+        });
+        if (!initial?.appId || !initial?.channelName || !initial?.token) {
+          throw new Error('Voice credentials response is incomplete (App ID, channel, or token missing).');
+        }
         if (cancelled) return;
 
         const rosterRef = ref(roomDatabase, `auctions/${roomId}/room`);
@@ -116,11 +130,22 @@ const VoiceChat = ({ roomId }) => {
             console.warn('[Agora Voice] Could not update room activity:', activityError?.message || activityError);
           });
         });
-        client.on('connection-state-change', (currentState) => {
+        client.on('connection-state-change', (currentState, previousState, reason) => {
+          console.info('[Agora Voice][diagnostic] Connection state changed', {
+            currentState, previousState, reason,
+            sdkVersion: AgoraRTC.getVersion?.() || 'unknown',
+            browserOnline: navigator.onLine
+          });
           if (currentState === 'DISCONNECTED') {
             setConnected(false);
             setMicOn(false);
           }
+        });
+        client.on('exception', (event) => {
+          console.warn('[Agora Voice][diagnostic] SDK exception', {
+            code: event?.code, message: event?.msg || event?.message,
+            uid: event?.uid, type: event?.type
+          });
         });
 
         // Gateway/network failures are often transient. Retry a fresh token and join
@@ -136,11 +161,22 @@ const VoiceChat = ({ roomId }) => {
             joinError = err;
             const message = String(err?.message || err);
             const code = String(err?.code || '');
+            console.error('[Agora Voice][diagnostic] Join attempt failed', {
+              attempt, errorName: err?.name, code, message,
+              errorData: err?.data || null,
+              sdkVersion: AgoraRTC.getVersion?.() || 'unknown',
+              appIdPresent: Boolean(joinCredentials?.appId),
+              channelName: joinCredentials?.channelName || null,
+              tokenPresent: Boolean(joinCredentials?.token),
+              tokenLength: typeof joinCredentials?.token === 'string' ? joinCredentials.token.length : 0,
+              browserOnline: navigator.onLine,
+              userAgent: navigator.userAgent
+            });
             const transientGatewayError = /CAN_NOT_GET_GATEWAY_SERVER|gateway|network|timeout|connection/i.test(message) ||
               /4096|NETWORK|TIMEOUT/i.test(code);
             if (!transientGatewayError || attempt === 3) break;
-            console.warn('[Agora Voice] Gateway join failed; retrying', { attempt, message });
-            await new Promise((resolve) => window.setTimeout(resolve, 1000 * attempt));
+            console.warn('[Agora Voice][diagnostic] Retrying gateway join', { attempt, delayMs: 1500 * attempt });
+            await new Promise((resolve) => window.setTimeout(resolve, 1500 * attempt));
           }
         }
         if (joinError) throw joinError;
@@ -170,6 +206,11 @@ const VoiceChat = ({ roomId }) => {
           }
         }, TOKEN_REFRESH_MS);
       } catch (err) {
+        console.error('[Agora Voice][diagnostic] Voice initialization failed', {
+          errorName: err?.name, code: err?.code, message: err?.message || String(err),
+          sdkVersion: AgoraRTC.getVersion?.() || 'unknown',
+          browserOnline: navigator.onLine
+        });
         if (!cancelled) setError(err?.message || 'Voice chat could not connect');
       }
     };
